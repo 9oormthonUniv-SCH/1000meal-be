@@ -19,7 +19,28 @@ repositories {
 }
 
 dependencies {
+    // Spring Web - REST API 개발용
     implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // Spring Data JPA - ORM 기반 DB 연동
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+
+    // MySQL Driver - MySQL 데이터베이스 연동
+    runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // Spring Security - 인증 및 인가 보안 처리
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    // Lombok - 코드 간결화를 위한 애너테이션 (Getter, Builder 등)
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok'
+    testAnnotationProcessor 'org.projectlombok:lombok'
+
+    // Spring Validation - @Valid 등의 유효성 검사
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Test 의존성 (JUnit, Mockito 등)
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
