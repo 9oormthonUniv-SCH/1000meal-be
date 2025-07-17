@@ -33,7 +33,7 @@ public class User {
 
     private LocalDateTime createAt;
 
-    public void update(String name, String phoneNumber) {
+    public void updateInfo(String name, String phoneNumber) {
         this.name = name;
         this.phoneNumber = phoneNumber;
     }

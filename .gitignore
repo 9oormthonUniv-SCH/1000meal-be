@@ -43,5 +43,6 @@ bin/
 
 
 *.env
+*.yml
 application-*.yml
 application.properties
