@@ -46,3 +46,4 @@ bin/
 *.yml
 application-*.yml
 application.properties
+src/main/resources/

@@ -26,9 +26,10 @@ public class OAuthAttributes {
 
     public static OAuthAttributes of(String registrationId, String userNameAttributeName,
                                      Map<String, Object> attributes) {
-        // 현재는 Google만 지원 (이후 Kakao 등 확장 가능)
         if ("google".equals(registrationId)) {
             return ofGoogle(userNameAttributeName, attributes);
+        } else if ("naver".equals(registrationId)) {
+            return ofNaver(userNameAttributeName, attributes);
         }
 
         throw new IllegalArgumentException("Unsupported OAuth provider: " + registrationId);
@@ -41,6 +42,20 @@ public class OAuthAttributes {
                 .email((String) attributes.get("email"))
                 .attributes(attributes)
                 .nameAttributeKey(userNameAttributeName)
+                .build();
+    }
+
+    private static OAuthAttributes ofNaver(String userNameAttributeName,
+                                           Map<String, Object> attributes) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> response = (Map<String, Object>) attributes.get("response");
+
+        return OAuthAttributes.builder()
+                .name((String) response.get("name")) // null 가능성 있음
+                .email((String) response.get("email"))
+                .attributes(response) // 내부 response만 저장
+                .nameAttributeKey(userNameAttributeName)
+                .nameAttributeKey("id")
                 .build();
     }
 
