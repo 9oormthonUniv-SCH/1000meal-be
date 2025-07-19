@@ -30,6 +30,8 @@ public class OAuthAttributes {
             return ofGoogle(userNameAttributeName, attributes);
         } else if ("naver".equals(registrationId)) {
             return ofNaver(userNameAttributeName, attributes);
+        } else if ("kakao".equals(registrationId)) {
+            return ofKakao(userNameAttributeName, attributes);
         }
 
         throw new IllegalArgumentException("Unsupported OAuth provider: " + registrationId);
@@ -58,6 +60,20 @@ public class OAuthAttributes {
                 .nameAttributeKey("id")
                 .build();
     }
+
+    private static OAuthAttributes ofKakao(String userNameAttributeName,
+                                           Map<String, Object> attributes) {
+        Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+        Map<String, Object> profile = (Map<String, Object>) kakaoAccount.get("profile");
+
+        return OAuthAttributes.builder()
+                .name((String) profile.get("nickname"))
+                .email((String) kakaoAccount.get("email"))
+                .attributes(attributes)
+                .nameAttributeKey(userNameAttributeName)
+                .build();
+    }
+
 
     // 이 정보를 기반으로 User 엔티티를 생성 (DB 저장용)
     public User toEntity() {
