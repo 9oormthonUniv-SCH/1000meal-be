@@ -15,6 +15,7 @@ public class StoreRequest {
     private String description;
     private LocalTime openTime;
     private LocalTime closeTime;
+    private boolean isOpen;
     private int remain;
     private String hours;
     private double lat;
