@@ -6,7 +6,7 @@ import com._1000meal.store.dto.StoreResponse;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import com._1000meal.store.domain.Menu;
+import com._1000meal.menu.domain.Menu;
 
 
 import java.time.LocalTime;
@@ -24,34 +24,15 @@ public class StoreService {
                 .map(this::toDto)
                 .toList();
     }
+
     public StoreResponse createStore(StoreRequest request) {
-        Store store = Store.builder()
-                .name(request.getName())
-                .address(request.getAddress())
-                .phone(request.getPhone())
-                .description(request.getDescription())
-                .openTime(request.getOpenTime())
-                .closeTime(request.getCloseTime())
-                .remain(request.getRemain())
-                .hours(request.getHours())
-                .lat(request.getLat())
-                .lng(request.getLng())
-                .isOpen(false)
-                .menus(null) // ✅ 메뉴는 아직 없음
+        Store store = Store.builder().name(request.getName()).address(request.getAddress()).phone(request.getPhone()).description(request.getDescription()).openTime(request.getOpenTime()).closeTime(request.getCloseTime()).remain(request.getRemain()).hours(request.getHours()).lat(request.getLat()).lng(request.getLng())
+                .isOpen(false).menus(null)
                 .build();
 
         Store saved = storeRepository.save(store);
 
-        return StoreResponse.builder()
-                .id(saved.getId())
-                .name(saved.getName())
-                .address(saved.getAddress())
-                .phone(saved.getPhone())
-                .description(saved.getDescription())
-                .hours(saved.getHours())
-                .remain(saved.getRemain())
-                .lat(saved.getLat())
-                .lng(saved.getLng())
+        return StoreResponse.builder().id(saved.getId()).name(saved.getName()).address(saved.getAddress()).phone(saved.getPhone()).description(saved.getDescription()).hours(saved.getHours()).remain(saved.getRemain()).lat(saved.getLat()).lng(saved.getLng())
                 .isOpen(false)
                 .menu(
                         saved.getMenus() == null

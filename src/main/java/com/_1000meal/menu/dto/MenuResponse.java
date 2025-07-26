@@ -1,4 +1,5 @@
-package com._1000meal.store.dto;
+package com._1000meal.menu.dto;
+
 
 import lombok.*;
 import java.time.LocalDate;
@@ -8,7 +9,8 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MenuRequest {
+public class MenuResponse {
+    private Long id;
     private Long storeId;
     private LocalDate date;
     private String imageUrl;

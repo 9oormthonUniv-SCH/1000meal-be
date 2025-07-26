@@ -1,5 +1,6 @@
 package com._1000meal.store.domain;
 
+import com._1000meal.menu.domain.Menu;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalTime;
