@@ -25,6 +25,7 @@ public class Store {
 
     private LocalTime openTime;   // 영업시작시간
     private LocalTime closeTime;  // 영업종료시간
+    private boolean isOpen;
 
     private int remain;           // 남은 수량
     private String hours;         // 운영 시간 문자열 ("08:00 ~ 소진 시")

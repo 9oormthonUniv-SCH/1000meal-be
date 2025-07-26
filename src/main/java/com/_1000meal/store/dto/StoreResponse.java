@@ -15,6 +15,7 @@ public class StoreResponse {
     private String phone;
     private String description;
     private String hours;
+    private boolean isOpen;
     private int remain;
     private double lat;
     private double lng;
