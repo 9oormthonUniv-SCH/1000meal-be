@@ -2,15 +2,15 @@ package com._1000meal.admin.login.controller;
 
 import com._1000meal.admin.login.dto.AdminLoginRequest;
 import com._1000meal.admin.login.dto.AdminLoginResponse;
+import com._1000meal.admin.login.dto.AdminResponse;
+import com._1000meal.admin.login.dto.AdminSignupRequest;
 import com._1000meal.admin.login.entity.AdminEntity;
 import com._1000meal.admin.login.security.JwtProvider;
 import com._1000meal.admin.login.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin")
@@ -25,5 +25,23 @@ public class AdminAuthController {
         AdminEntity admin = adminService.authenticate(request.getUsername(), request.getPassword());
         String token = jwtProvider.createToken(admin.getId(), admin.getUsername());
         return ResponseEntity.ok(new AdminLoginResponse(token));
+    }
+
+    @PostMapping("/signup")
+    public ResponseEntity<String> signup(@RequestBody AdminSignupRequest request) {
+        adminService.signup(request);
+        return ResponseEntity.ok("관리자 회원가입 완료");
+    }
+
+
+    @GetMapping("/me")
+    public ResponseEntity<AdminResponse> getMyInfo(Authentication authentication) {
+        // JWT 필터에서 authentication.getName() == username 이 됨
+        String username = authentication.getName();
+        AdminEntity admin = adminService.getAdminByUsername(username);
+
+        // 응답 DTO 생성 (id, username 등 민감하지 않은 정보만)
+        AdminResponse response = new AdminResponse(admin.getId(), admin.getUsername(), admin.getName(), admin.getPhoneNumber());
+        return ResponseEntity.ok(response);
     }
 }
