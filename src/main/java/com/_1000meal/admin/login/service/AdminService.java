@@ -1,8 +1,10 @@
 package com._1000meal.admin.login.service;
 
 import com._1000meal.admin.login.dto.AdminSignupRequest;
+import com._1000meal.admin.login.dto.PasswordChangeRequest;
 import com._1000meal.admin.login.entity.AdminEntity;
 import com._1000meal.admin.login.repository.AdminRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -45,4 +47,22 @@ public class AdminService {
         return adminRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("관리자 계정이 존재하지 않습니다."));
     }
+
+
+    //비밀번호 수정
+    @Transactional
+    public void changePassword(String username, PasswordChangeRequest request) {
+        AdminEntity admin = adminRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("관리자 계정이 존재하지 않습니다."));
+        // 기존 비밀번호 확인
+        if (!passwordEncoder.matches(request.getOldPassword(), admin.getPassword())) {
+            throw new RuntimeException("기존 비밀번호가 일치하지 않습니다.");
+        }
+        // 새 비밀번호 암호화 & 저장
+        admin.changePassword(passwordEncoder.encode(request.getNewPassword()));
+        adminRepository.save(admin);
+    }
+
+
+
 }

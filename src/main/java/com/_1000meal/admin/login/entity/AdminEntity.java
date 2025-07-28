@@ -28,4 +28,9 @@ public class AdminEntity {
     private String phoneNumber;
 
     // 추가 예정
+
+    // 비밀번호만 변경하는 커스텀 메서드
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }

@@ -1,9 +1,6 @@
 package com._1000meal.admin.login.controller;
 
-import com._1000meal.admin.login.dto.AdminLoginRequest;
-import com._1000meal.admin.login.dto.AdminLoginResponse;
-import com._1000meal.admin.login.dto.AdminResponse;
-import com._1000meal.admin.login.dto.AdminSignupRequest;
+import com._1000meal.admin.login.dto.*;
 import com._1000meal.admin.login.entity.AdminEntity;
 import com._1000meal.admin.login.security.JwtProvider;
 import com._1000meal.admin.login.service.AdminService;
@@ -43,5 +40,16 @@ public class AdminAuthController {
         // 응답 DTO 생성 (id, username 등 민감하지 않은 정보만)
         AdminResponse response = new AdminResponse(admin.getId(), admin.getUsername(), admin.getName(), admin.getPhoneNumber());
         return ResponseEntity.ok(response);
+    }
+
+
+    @PatchMapping("/password")
+    public ResponseEntity<String> changePassword(
+            @RequestBody PasswordChangeRequest request,
+            Authentication authentication
+    ) {
+        String username = authentication.getName();
+        adminService.changePassword(username, request);
+        return ResponseEntity.ok("비밀번호가 성공적으로 변경되었습니다.");
     }
 }
