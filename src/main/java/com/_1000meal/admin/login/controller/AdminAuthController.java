@@ -2,7 +2,7 @@ package com._1000meal.admin.login.controller;
 
 import com._1000meal.admin.login.dto.*;
 import com._1000meal.admin.login.entity.AdminEntity;
-import com._1000meal.admin.login.security.JwtProvider;
+import com._1000meal.global.security.JwtProvider;
 import com._1000meal.admin.login.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

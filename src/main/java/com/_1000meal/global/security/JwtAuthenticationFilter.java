@@ -1,4 +1,4 @@
-package com._1000meal.admin.login.security;
+package com._1000meal.global.security;
 
 import com._1000meal.admin.login.entity.AdminEntity;
 import com._1000meal.admin.login.repository.AdminRepository;

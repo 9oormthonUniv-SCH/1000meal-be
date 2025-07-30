@@ -39,7 +39,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         User user = saveOrUpdate(attributes);
 
-        // 👉 세션에 저장
+        // 세션에 저장
         httpSession.setAttribute("user", user);
 
         return new DefaultOAuth2User(
