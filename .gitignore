@@ -40,3 +40,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+
+*.env
+*.yml
+application-*.yml
+application.properties
+src/main/resources/
