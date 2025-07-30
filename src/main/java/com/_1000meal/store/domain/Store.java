@@ -1,6 +1,6 @@
 package com._1000meal.store.domain;
 
-import com._1000meal.menu.domain.Menu;
+import com._1000meal.menu.domain.WeeklyMenu;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalTime;
@@ -34,6 +34,6 @@ public class Store {
     private double lat;           // 위도
     private double lng;           // 경도
 
-    @OneToMany(mappedBy = "store", cascade = CascadeType.ALL)
-    private List<Menu> menus = new ArrayList<>(); // 해당 식당의 메뉴들
+    @OneToOne(mappedBy = "store", cascade = CascadeType.ALL)
+    private WeeklyMenu weeklyMenu;
 }
