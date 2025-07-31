@@ -1,4 +1,4 @@
-package com._1000meal.user.domain;
+package com._1000meal.global.constant;
 
 public enum Role {
     STUDENT, ADMIN

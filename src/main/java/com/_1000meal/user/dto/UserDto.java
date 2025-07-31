@@ -1,7 +1,7 @@
 package com._1000meal.user.dto;
 
 import com._1000meal.user.domain.User;
-import com._1000meal.user.domain.Role;
+import com._1000meal.global.constant.Role;
 import lombok.Getter;
 
 @Getter

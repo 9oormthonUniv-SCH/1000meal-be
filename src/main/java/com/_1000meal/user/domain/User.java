@@ -1,5 +1,6 @@
 package com._1000meal.user.domain;
 
+import com._1000meal.global.constant.Role;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
