@@ -10,6 +10,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import jakarta.servlet.http.HttpServletResponse; // 또는 javax.servlet.http.HttpServletResponse
+import java.time.LocalDateTime;
+
+
+
 
 @Configuration
 @RequiredArgsConstructor
@@ -51,8 +58,46 @@ public class SecurityConfig {
                         .defaultSuccessUrl("/login/success", true)
                 )
                 // ======== JWT 인증 필터 (관리자) ========
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
+                // ... 기타 설정
+                .exceptionHandling()
+                .authenticationEntryPoint(restAuthenticationEntryPoint()) // 인증실패
+                .accessDeniedHandler(restAccessDeniedHandler());
+
+        // 권한실패
         return http.build();
+    }
+
+    @Bean
+    public AuthenticationEntryPoint restAuthenticationEntryPoint() {
+        return (request, response, authException) -> {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json; charset=UTF-8");  // ← 여기!
+            response.getWriter().write("""
+                {
+                    "statusCode": 401,
+                    "message": "로그인이 필요합니다.",
+                    "timestamp": "%s",
+                    "data": null
+                }
+                """.formatted(LocalDateTime.now()));
+        };
+    }
+
+    @Bean
+    public AccessDeniedHandler restAccessDeniedHandler() {
+        return (request, response, accessDeniedException) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            response.getWriter().write("""
+                {
+                    "statusCode": 403,
+                    "message": "권한이 없습니다.",
+                    "timestamp": "%s",
+                    "data": null
+                }
+                """.formatted(LocalDateTime.now()));
+        };
     }
 }
