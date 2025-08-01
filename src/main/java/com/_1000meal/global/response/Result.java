@@ -4,24 +4,19 @@ import com._1000meal.global.error.exception.ErrorCodeIfs;
 
 import java.time.LocalDateTime;
 
-public record Result(
+
+
+public record Result<T>(
         Integer statusCode,
         String message,
-        LocalDateTime timestamp
+        LocalDateTime timestamp,
+        T data
 ) {
-    public static Result ok() {
-        return new Result(
-                200,
-                "OK",
-                LocalDateTime.now()
-        );
+    public static <T> Result<T> ok(T data) {
+        return new Result<>(200, "OK", LocalDateTime.now(), data);
     }
 
-    public static Result error(ErrorCodeIfs errorCodeIfs) {
-        return new Result(
-                errorCodeIfs.getHttpStatusCode(),
-                errorCodeIfs.getMessage(),
-                LocalDateTime.now()
-        );
+    public static Result<?> error(ErrorCodeIfs code) {
+        return new Result<>(code.getHttpStatusCode(), code.getMessage(), LocalDateTime.now(), null);
     }
 }
