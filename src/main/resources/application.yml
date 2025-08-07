@@ -69,5 +69,16 @@ spring:
   jackson:
     time-zone: Asia/Seoul
 
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: tejava7177@gmail.com
+    password: txyninczpxfhcrsy
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+    default-encoding: UTF-8
+
 server:
   port: 8080

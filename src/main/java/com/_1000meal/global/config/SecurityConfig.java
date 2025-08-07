@@ -40,6 +40,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").authenticated()
                         // ======== 사용자 관련 API ========
                         .requestMatchers("/", "/login/**", "/oauth2/**").permitAll()
+                        // =======이메일 인증=====
+                        .requestMatchers("/signup/email/send").permitAll()
+                        .requestMatchers("/signup/email/verify").permitAll()
                         // Swagger 문서 허용 (springdoc-openapi 기준)
                         .requestMatchers(
                                 "/swagger-ui/**",
