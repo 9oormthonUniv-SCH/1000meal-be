@@ -1,22 +1,37 @@
 package com._1000meal.global.response;
 
 import com._1000meal.global.error.exception.ErrorCodeIfs;
-
 import java.time.LocalDateTime;
+import com._1000meal.global.error.code.SuccessCode;
 
 
-
-public record Result<T>(
-        Integer statusCode,
+public record Result(
+        String code,
         String message,
-        LocalDateTime timestamp,
-        T data
+        LocalDateTime timestamp
 ) {
-    public static <T> Result<T> ok(T data) {
-        return new Result<>(200, "OK", LocalDateTime.now(), data);
+    public static Result ok() {
+        return new Result(
+                SuccessCode.OK.getCode(),
+                SuccessCode.OK.getMessage(),
+                LocalDateTime.now()
+        );
     }
 
-    public static Result<?> error(ErrorCodeIfs code) {
-        return new Result<>(code.getHttpStatusCode(), code.getMessage(), LocalDateTime.now(), null);
+    public static Result success(SuccessCode successCode) {
+        return new Result(
+                successCode.getCode(),
+                successCode.getMessage(),
+                LocalDateTime.now()
+        );
     }
+
+    public static Result error(ErrorCodeIfs errorCodeIfs) {
+        return new Result(
+                errorCodeIfs.getCode(),
+                errorCodeIfs.getMessage(),
+                LocalDateTime.now()
+        );
+    }
+
 }

@@ -2,7 +2,7 @@ package com._1000meal.global.error.exception;
 
 import lombok.Getter;
 
-// 서비스 내 모든 커스텀 예외는 이 클래스를 상속받아 사용
+
 @Getter
 public class CustomException extends RuntimeException {
 
