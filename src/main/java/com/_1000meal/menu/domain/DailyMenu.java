@@ -7,11 +7,16 @@ import lombok.*;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder(builderMethodName = "hiddenBuilder")
 @Entity
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class DailyMenu {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -24,7 +29,22 @@ public class DailyMenu {
 
     private boolean isOpen;
 
-    // 메뉴를 쉼표로 구분된 문자열로 저장
     private String menuTexts;
+
+    public static DailyMenuBuilder builder() {
+        return hiddenBuilder().isOpen(false); // 기본값 false로
+    }
+
+    @PostLoad @PostPersist @PostUpdate
+    private void updateIsOpen() {
+        this.isOpen = (menuTexts != null && !menuTexts.trim().isEmpty());
+    }
+
+    @PrePersist
+    @PreUpdate
+    private void prePersistOrUpdate() {
+        this.isOpen = (menuTexts != null && !menuTexts.trim().isEmpty());
+    }
 }
+
 
