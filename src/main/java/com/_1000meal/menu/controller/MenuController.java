@@ -15,15 +15,15 @@ public class MenuController {
 
     private final MenuService menuService;
 
-    @PostMapping("/weekly")
-    public ResponseEntity<WeeklyMenuResponse> createWeeklyMenu(@RequestBody WeeklyMenuRequest request) {
-        menuService.createWeeklyMenu(request);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
+//    @PostMapping("/weekly")
+//    public ResponseEntity<WeeklyMenuResponse> createWeeklyMenu(@RequestBody WeeklyMenuRequest request) {
+//        menuService.createWeeklyMenu(request);
+//        return ResponseEntity.status(HttpStatus.CREATED).build();
+//    }
 
-    @GetMapping("/weekly/{storeId}")
-    public ResponseEntity<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
-        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
-        return ResponseEntity.ok(response);
-    }
+//    @GetMapping("/weekly/{storeId}")
+//    public ResponseEntity<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
+//        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
+//        return ResponseEntity.ok(response);
+//    }
 }
