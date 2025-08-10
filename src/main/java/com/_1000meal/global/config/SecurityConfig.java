@@ -5,7 +5,9 @@ import com._1000meal.user.oauth.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.ExceptionHandlingConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -44,6 +46,8 @@ public class SecurityConfig {
                         .requestMatchers("/signup/email/send").permitAll()
                         .requestMatchers("/signup/email/verify").permitAll()
                         // Swagger 문서 허용 (springdoc-openapi 기준)
+                        // ======== 메뉴 관련 API ========
+                        .requestMatchers("/menus/**").permitAll()
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -64,12 +68,17 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 // ... 기타 설정
-                .exceptionHandling()
-                .authenticationEntryPoint(restAuthenticationEntryPoint()) // 인증실패
-                .accessDeniedHandler(restAccessDeniedHandler());
+
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(restAuthenticationEntryPoint())
+                        .accessDeniedHandler(restAccessDeniedHandler()));
 
         // 권한실패
         return http.build();
+    }
+
+    private <H extends HttpSecurityBuilder<H>> ExceptionHandlingConfigurer<H> exceptionHandling() {
+        return null;
     }
 
     @Bean
