@@ -46,8 +46,9 @@ public class SecurityConfig {
                         .requestMatchers("/signup/email/send").permitAll()
                         .requestMatchers("/signup/email/verify").permitAll()
                         // Swagger 문서 허용 (springdoc-openapi 기준)
-                        // ======== 메뉴 관련 API ========
-                        .requestMatchers("/menus/**").permitAll()
+                        // ======== 메뉴, 가게 관련 API ========
+                        .requestMatchers("/api/v1/stores/**").permitAll()
+                        .requestMatchers("/api/v1/menus/**").permitAll()
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",

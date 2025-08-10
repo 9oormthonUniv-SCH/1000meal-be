@@ -9,6 +9,7 @@ import java.time.LocalTime;
 @AllArgsConstructor
 @Builder
 public class StoreRequest {
+
     private String name;
     private String address;
     private String phone;

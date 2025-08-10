@@ -1,5 +1,7 @@
 package com._1000meal.store.controller;
 
+import com._1000meal.global.error.code.SuccessCode;
+import com._1000meal.global.response.ApiResponse;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreRequest;
 import com._1000meal.store.dto.StoreResponse;
@@ -11,25 +13,32 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/stores")
+@RequestMapping("/api/v1/stores")
 @RequiredArgsConstructor
 public class StoreController {
 
     private final StoreService storeService;
 
-    @GetMapping
-    public ResponseEntity<List<StoreDetailedResponse>> getAllStores() {
-        return ResponseEntity.ok(storeService.getAllStores());
-    }
-
-    @PostMapping
-    public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) {
-        StoreResponse response = storeService.createStore(request);
-        return ResponseEntity.status(201).body(response);
-    }
-
     @GetMapping("/{storeId}")
-    public ResponseEntity<StoreDetailedResponse> getStoreDetail(@PathVariable Long storeId) {
-        return ResponseEntity.ok(storeService.getStoreDetail(storeId));
+    public ApiResponse<StoreDetailedResponse> getStoreDetail(@PathVariable Long storeId) {
+
+        StoreDetailedResponse response = storeService.getStoreDetail(storeId);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
+
+    @GetMapping
+    public ApiResponse<List<StoreResponse>> getAllStores() {
+
+        List<StoreResponse> response = storeService.getAllStores();
+
+        return ApiResponse.success(response, SuccessCode.OK);
+    }
+
+//    @PostMapping
+//    public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) {
+//        StoreResponse response = storeService.createStore(request);
+//        return ResponseEntity.status(201).body(response);
+//    }
+
+
 }

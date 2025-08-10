@@ -1,5 +1,7 @@
 package com._1000meal.menu.controller;
 
+import com._1000meal.global.error.code.SuccessCode;
+import com._1000meal.global.response.ApiResponse;
 import com._1000meal.menu.dto.WeeklyMenuRequest;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.service.MenuService;
@@ -10,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/menus")
+@RequestMapping("/api/v1/menus")
 public class MenuController {
 
     private final MenuService menuService;
@@ -22,8 +24,8 @@ public class MenuController {
 //    }
 
     @GetMapping("/weekly/{storeId}")
-    public ResponseEntity<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
+    public ApiResponse<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
         WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
-        return ResponseEntity.ok(response);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
 }
