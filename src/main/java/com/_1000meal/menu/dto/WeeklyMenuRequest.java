@@ -16,7 +16,7 @@ public class WeeklyMenuRequest {
         private LocalDate date;
         private DayOfWeek dayOfWeek;
         private boolean isOpen;
-        private List<String> menuNames; // 클라이언트는 List<String>으로 보냄
+        private List<String> menuNames;
     }
 }
 

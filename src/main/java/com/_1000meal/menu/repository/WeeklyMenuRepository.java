@@ -9,20 +9,12 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Optional;
 
-// WeeklyMenuRepository
 public interface WeeklyMenuRepository extends JpaRepository<WeeklyMenu, Long> {
 
-    @Query("""
-        select distinct wm
-        from WeeklyMenu wm
-        join wm.store s
-        left join fetch wm.dailyMenus dm
-        left join fetch dm.menus m
-        where s.id = :storeId
-          and wm.startDate <= :endDate
-          and wm.endDate   >= :startDate
-    """)
-    Optional<WeeklyMenu> findByStoreIdAndRangeWithMenus(@Param("storeId") Long storeId,
-                                                        @Param("startDate") LocalDate startDate,
-                                                        @Param("endDate") LocalDate endDate);
+    @Query("SELECT wm FROM WeeklyMenu wm " +
+            "LEFT JOIN FETCH wm.dailyMenus dm " +
+            "LEFT JOIN FETCH dm.menus m " +
+            "WHERE wm.store.id = :storeId " +
+            "AND :today BETWEEN wm.startDate AND wm.endDate")
+    Optional<WeeklyMenu> findByStoreIdAndRangeWithMenus(@Param("storeId") Long storeId, @Param("today") LocalDate today);
 }

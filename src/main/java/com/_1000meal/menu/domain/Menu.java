@@ -6,7 +6,7 @@ import lombok.*;
 
 @Entity
 @Getter
-@Setter(AccessLevel.PROTECTED) // DailyMenu에서만 변경 가능하도록
+@Setter(AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Menu {
 
@@ -14,10 +14,10 @@ public class Menu {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name; // 메뉴 이름
+    private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "daily_menu_id") // 외래키
+    @JoinColumn(name = "daily_menu_id")
     private DailyMenu dailyMenu;
 
     @Builder

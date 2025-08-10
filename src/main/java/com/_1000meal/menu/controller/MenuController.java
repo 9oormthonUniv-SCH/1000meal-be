@@ -21,9 +21,9 @@ public class MenuController {
 //        return ResponseEntity.status(HttpStatus.CREATED).build();
 //    }
 
-//    @GetMapping("/weekly/{storeId}")
-//    public ResponseEntity<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
-//        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
-//        return ResponseEntity.ok(response);
-//    }
+    @GetMapping("/weekly/{storeId}")
+    public ResponseEntity<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
+        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
+        return ResponseEntity.ok(response);
+    }
 }

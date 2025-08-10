@@ -1,20 +1,21 @@
 package com._1000meal.menu.service;
 
-import com._1000meal.menu.domain.Menu;
+import com._1000meal.global.error.code.StoreErrorCode;
+import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
-import com._1000meal.menu.dto.WeeklyMenuRequest;
+import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
+import com._1000meal.global.error.code.MenuErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -65,50 +66,26 @@ public class MenuService {
 //                .build();
 //    }
 
-
-    // Service
     @Transactional(readOnly = true)
     public WeeklyMenuResponse getWeeklyMenu(Long storeId) {
-        // 1) 매장 존재 검증
+        // 1. 매장 존재 검증
         Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new NoSuchElementException("Store not found: " + storeId));
+                .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        // 2) 이번 주의 시작/끝 계산 (월~일 기준)
-        LocalDate today = LocalDate.now();
-        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        LocalDate weekEnd   = today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY));
+        // 2. 오늘 날짜 기준
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        // 3) 이번 주 WeeklyMenu + DailyMenu + Menu를 한 번에 로딩 (N+1 방지)
+        // 3. 주간 메뉴 가져 오기
         WeeklyMenu weeklyMenu = weeklyMenuRepository
-                .findByStoreIdAndRangeWithMenus(storeId, weekStart, weekEnd)
-                .orElseThrow(() -> new NoSuchElementException("No weekly menu for current week: " + weekStart + " ~ " + weekEnd));
+                .findByStoreIdAndRangeWithMenus(storeId, today)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.WEEKLY_MENU_NOT_FOUND));
 
-        // 4) DailyMenu를 날짜순 정렬 후 DTO 매핑 (빈 메뉴도 안전하게)
-        List<WeeklyMenuResponse.DailyMenuResponse> dailyDtos = weeklyMenu.getDailyMenus().stream()
-                .sorted(Comparator.comparing(DailyMenu::getDate))
-                .map(daily -> {
-                    List<String> menuNames = daily.getMenus() == null
-                            ? Collections.emptyList()
-                            : daily.getMenus().stream()
-                            .map(Menu::getName)
-                            .filter(Objects::nonNull)
-                            .toList();
+        // 4. DailyMenu 매핑
+        List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
+                .map(DailyMenu::toDto)
+                .collect(Collectors.toList());
 
-                    // dayOfWeek가 필드라면 동기화 보장용(선택)
-                    DayOfWeek dow = daily.getDate() != null
-                            ? daily.getDate().getDayOfWeek()
-                            : daily.getDayOfWeek();
-
-                    return WeeklyMenuResponse.DailyMenuResponse.builder()
-                            .date(daily.getDate())
-                            .dayOfWeek(dow)
-                            .isOpen(daily.isOpen())
-                            .menuNames(menuNames)
-                            .build();
-                })
-                .toList();
-
-        // 5) 최종 응답
+        // 5. 최종 응답
         return WeeklyMenuResponse.builder()
                 .storeId(store.getId())
                 .startDate(weeklyMenu.getStartDate())
