@@ -6,5 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByEmail(String email); // OAuth 로그인 시 이메일로 유저 확인
+    boolean existsByEmail(String email);
+    boolean existsByUserId(String userId);
+    Optional<User> findByUserId(String userId);
 }

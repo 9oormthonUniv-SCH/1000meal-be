@@ -12,9 +12,6 @@ public class PasswordValidator {
             "^(?=.*[a-zA-Z])(?=.*\\d)(?=.*[!\"#$%&'()*+,\\-./:;<=>?@\\[\\\\\\]^_`{|}~])[a-zA-Z\\d!\"#$%&'()*+,\\-./:;<=>?@\begin:math:display$\\\\\\\\\\$end:math:display$^_`{|}~]{8,16}$";
 
 
-
-
-
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(PASSWORD_REGEX);
 
     public static void validatePassword(String password, String username, String phoneNumber) {

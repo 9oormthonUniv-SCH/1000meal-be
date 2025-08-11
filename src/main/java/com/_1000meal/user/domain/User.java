@@ -1,57 +1,54 @@
 package com._1000meal.user.domain;
 
-import com._1000meal.global.constant.Role;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
-@Entity
 @Getter
+@Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
 public class User {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String userID;
+    // 학번/로그인 아이디
+    @Column(nullable = false, unique = true, length = 30)
+    private String userId;
 
+    @Column(nullable = false, length = 60) // BCrypt
     private String password;
 
+    @Column(nullable = false, length = 50)
     private String name;
 
-    private String phoneNumber;
-
-    @Column(unique = true, nullable = false)
+    @Column(nullable = false, unique = true, length = 80)
     private String email;
 
     @Enumerated(EnumType.STRING)
-    private Role role;
+    @Column(nullable = false, length = 20)
+    private UserRole role; // STUDENT, ADMIN 등
 
-    private Boolean isNotificationEnabled;
+    @Column(nullable = false)
+    private boolean isNotificationEnabled;
 
-    private LocalDateTime createAt;
+    @Column(nullable = false)
+    private LocalDateTime createdAt;
 
-    public void updateInfo(String name, String phoneNumber) {
+    private User(String userId, String password, String name, String email, UserRole role) {
+        this.userId = userId;
+        this.password = password;
         this.name = name;
-        this.phoneNumber = phoneNumber;
-    }
-
-    public void updateRole(Role role) {
+        this.email = email;
         this.role = role;
+        this.isNotificationEnabled = false;
+        this.createdAt = LocalDateTime.now();
     }
 
-    @Override
-    public String toString() {
-        return "User{" +
-                "id=" + id +
-                ", userID='" + userID + '\'' +
-                ", name='" + name + '\'' +
-                ", email='" + email + '\'' +
-                ", role=" + role +
-                '}';
+    public static User create(String userId, String encodedPw, String name, String email) {
+        return new User(userId, encodedPw, name, email, UserRole.STUDENT);
     }
 }
-

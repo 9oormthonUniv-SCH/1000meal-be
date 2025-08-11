@@ -1,8 +1,8 @@
-package com._1000meal.user.controller;
+package com._1000meal.userOauth.controller;
 
 import com._1000meal.global.response.ApiResponse;
 import com._1000meal.global.error.code.SuccessCode;
-import com._1000meal.user.service.AuthService;
+import com._1000meal.userOauth.service.AuthService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
