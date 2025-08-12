@@ -26,7 +26,7 @@ public class EmailController {
         // 2. 인증 코드 생성 및 전송
         String code = emailService.generateCode();
         emailService.sendVerificationEmail(email, code);
-
+        emailService.issueAndStoreCode(request.getEmail());
         // 3. (다음 단계에서 DB 저장 예정)
 
         return ResponseEntity.ok("이메일이 전송되었습니다.");

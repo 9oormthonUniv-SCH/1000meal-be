@@ -6,6 +6,7 @@ import com._1000meal.email.repository.EmailVerificationTokenRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -44,6 +45,7 @@ public class EmailService {
         }
     }
 
+    @Transactional
     public void issueAndStoreCode(String email) {
         // 학교 도메인 체크
         if (!email.endsWith("@sch.ac.kr")) {
@@ -61,6 +63,7 @@ public class EmailService {
         tokenRepository.save(EmailVerificationToken.create(email, code, 5));
     }
 
+    @Transactional
     // 2) 코드 검증
     public void verifyCode(String email, String inputCode) {
         var token = tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc(email)
@@ -76,7 +79,8 @@ public class EmailService {
     }
 
     // 회원가입 시 사용할 “이메일 인증 여부” 체크
-    public boolean isEmailVerified(String email) {
+    public boolean isEmailVerified(String rawEmail) {
+        final String email = rawEmail.trim().toLowerCase();
         return tokenRepository.existsByEmailAndVerifiedTrue(email);
     }
 }
