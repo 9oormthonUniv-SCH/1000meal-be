@@ -5,19 +5,20 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-@Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-@Table(name = "users") // ← user(예약어) 피하기
+@Entity(name = "OauthUser")          // ★ 엔티티 이름을 고유하게
+@Table(name = "oauth_users")         // ★ 테이블도 분리
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String userID;
+    @Column(name = "user_id", length = 30, unique = true)
+    private String userId; // ★ userID → userId 로 통일
 
     private String password;
 
@@ -48,7 +49,7 @@ public class User {
     public String toString() {
         return "User{" +
                 "id=" + id +
-                ", userID='" + userID + '\'' +
+                ", userID='" + userId + '\'' +
                 ", name='" + name + '\'' +
                 ", email='" + email + '\'' +
                 ", role=" + role +

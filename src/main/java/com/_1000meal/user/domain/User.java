@@ -10,13 +10,14 @@ import java.time.LocalDateTime;
 @Getter
 @Entity
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "users") // ← user(예약어) 피하기
 public class User {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     // 학번/로그인 아이디
-    @Column(nullable = false, unique = true, length = 30)
+    @Column(name = "user_id", nullable = false, unique = true, length = 30) // ← 컬럼명 명시 추천
     private String userId;
 
     @Column(nullable = false, length = 60) // BCrypt
