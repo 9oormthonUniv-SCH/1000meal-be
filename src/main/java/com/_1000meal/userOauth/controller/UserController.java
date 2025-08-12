@@ -1,12 +1,12 @@
-package com._1000meal.user.controller;
+package com._1000meal.userOauth.controller;
 
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.response.ApiResponse;
 import com._1000meal.global.error.code.UserLoginErrorCode;
-import com._1000meal.user.domain.User;
-import com._1000meal.user.dto.UpdateUserRequest;
-import com._1000meal.user.dto.UserDto;
-import com._1000meal.user.service.UserService;
+import com._1000meal.userOauth.domain.User;
+import com._1000meal.userOauth.dto.UpdateUserRequest;
+import com._1000meal.userOauth.dto.UserDto;
+import com._1000meal.userOauth.service.UserService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

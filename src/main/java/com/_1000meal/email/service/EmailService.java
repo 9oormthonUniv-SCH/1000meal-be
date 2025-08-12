@@ -1,9 +1,12 @@
 package com._1000meal.email.service;
 
+import com._1000meal.email.domain.EmailVerificationToken;
 import com._1000meal.email.dto.EmailSendRequest;
+import com._1000meal.email.repository.EmailVerificationTokenRepository;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -17,6 +20,7 @@ import java.util.Random;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final EmailVerificationTokenRepository tokenRepository;
 
     public String generateCode() {
         return String.valueOf(new Random().nextInt(900000) + 100000);
@@ -39,5 +43,44 @@ public class EmailService {
         } catch (MessagingException | UnsupportedEncodingException e) {
             throw new RuntimeException("이메일 전송 실패", e);
         }
+    }
+
+    @Transactional
+    public void issueAndStoreCode(String email) {
+        // 학교 도메인 체크
+        if (!email.endsWith("@sch.ac.kr")) {
+            throw new IllegalArgumentException("순천향대학교 이메일만 인증할 수 있습니다.");
+        }
+        // 이미 인증된 이메일이면 차단(중복가입 방지)
+        if (tokenRepository.existsByEmailAndVerifiedTrue(email)) {
+            throw new IllegalStateException("이미 인증이 완료된 이메일입니다.");
+        }
+
+        String code = generateCode();
+        // 메일 전송
+        sendVerificationEmail(email, code);
+        // 5분 유효 토큰 저장
+        tokenRepository.save(EmailVerificationToken.create(email, code, 5));
+    }
+
+    @Transactional
+    // 2) 코드 검증
+    public void verifyCode(String email, String inputCode) {
+        var token = tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc(email)
+                .orElseThrow(() -> new IllegalStateException("유효한 인증 요청이 없습니다."));
+
+        if (token.isExpired()) {
+            throw new IllegalStateException("인증 코드가 만료되었습니다.");
+        }
+        if (!token.getCode().equals(inputCode)) {
+            throw new IllegalArgumentException("인증 코드가 일치하지 않습니다.");
+        }
+        token.markVerified();  // JPA dirty checking
+    }
+
+    // 회원가입 시 사용할 “이메일 인증 여부” 체크
+    public boolean isEmailVerified(String rawEmail) {
+        final String email = rawEmail.trim().toLowerCase();
+        return tokenRepository.existsByEmailAndVerifiedTrue(email);
     }
 }

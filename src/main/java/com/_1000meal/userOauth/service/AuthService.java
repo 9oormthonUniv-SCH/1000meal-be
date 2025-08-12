@@ -1,9 +1,8 @@
-package com._1000meal.user.service;
+package com._1000meal.userOauth.service;
 
 
 import com._1000meal.global.error.code.UserLoginErrorCode;
 import com._1000meal.global.error.exception.CustomException;
-import com._1000meal.user.domain.User;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Service;
 

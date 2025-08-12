@@ -1,6 +1,6 @@
-package com._1000meal.user.dto;
+package com._1000meal.userOauth.dto;
 
-import com._1000meal.user.domain.User;
+import com._1000meal.userOauth.domain.User;
 import com._1000meal.global.constant.Role;
 import lombok.Getter;
 
@@ -14,7 +14,7 @@ public class UserDto {
     private final Role role;
 
     public UserDto(User user) {
-        this.userID = user.getUserID();
+        this.userID = user.getUserId();
         this.name = user.getName();
         this.email = user.getEmail();
         this.phoneNumber = user.getPhoneNumber();

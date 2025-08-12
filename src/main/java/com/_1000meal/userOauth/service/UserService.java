@@ -1,11 +1,11 @@
-package com._1000meal.user.service;
+package com._1000meal.userOauth.service;
 
 
 import com._1000meal.global.error.code.UserLoginErrorCode;
 import com._1000meal.global.error.exception.CustomException;
-import com._1000meal.user.domain.User;
-import com._1000meal.user.dto.UpdateUserRequest;
-import com._1000meal.user.repository.UserRepository;
+import com._1000meal.userOauth.domain.User;
+import com._1000meal.userOauth.dto.UpdateUserRequest;
+import com._1000meal.userOauth.repository.OauthUserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserService {
 
-    private final UserRepository userRepository;
+    private final OauthUserRepository userRepository;
 
     // 사용자 정보 수정
     @Transactional

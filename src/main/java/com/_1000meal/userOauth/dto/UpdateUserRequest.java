@@ -1,4 +1,4 @@
-package com._1000meal.user.dto;
+package com._1000meal.userOauth.dto;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

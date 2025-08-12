@@ -1,7 +1,7 @@
-package com._1000meal.user.oauth;
+package com._1000meal.userOauth.oauth;
 
-import com._1000meal.user.domain.User;
-import com._1000meal.user.repository.UserRepository;
+import com._1000meal.userOauth.domain.User;
+import com._1000meal.userOauth.repository.OauthUserRepository;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -17,7 +17,7 @@ import java.util.Collections;
 @RequiredArgsConstructor
 public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
-    private final UserRepository userRepository;
+    private final OauthUserRepository userRepository;
     private final HttpSession httpSession; // 세션 주입
 
     @Override

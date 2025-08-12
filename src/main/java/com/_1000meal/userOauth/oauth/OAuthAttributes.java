@@ -1,7 +1,7 @@
-package com._1000meal.user.oauth;
+package com._1000meal.userOauth.oauth;
 
 import com._1000meal.global.constant.Role;
-import com._1000meal.user.domain.User;
+import com._1000meal.userOauth.domain.User;
 import lombok.Builder;
 import lombok.Getter;
 
