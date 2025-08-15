@@ -3,7 +3,7 @@ name: Deploy Spring + MySQL with Docker
 on:
   push:
     branches:
-      - feat/store
+      - develop
 
 jobs:
   deploy:
