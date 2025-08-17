@@ -89,3 +89,13 @@ spring:
 
 server:
   port: 8080
+
+# JWT 설정 (JwtProvider가 @Value로 주입받음)
+jwt:
+  secret: ${JWT_SECRET:CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS}
+  access-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}   # 1시간(초 단위)
+
+logging:
+  level:
+    org.hibernate.SQL: debug
+    org.hibernate.orm.jdbc.bind: trace

@@ -4,6 +4,7 @@ import com._1000meal.email.service.EmailService;
 import com._1000meal.user.domain.User;
 import com._1000meal.user.repository.UserRepository;
 import com._1000meal.user.signup.dto.UserSignupRequest;
+import com._1000meal.user.signup.dto.UserSignupResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -13,17 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserSignupService {
 
-    private final EmailService emailService;      // user → email
+    private final EmailService emailService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Transactional
-    public Long signup(UserSignupRequest req) {
-        // 0) 이메일 정규화(앞뒤 공백 제거 + 소문자)
+    public UserSignupResponse signup(UserSignupRequest req) {
+        // 0) 이메일/아이디 정규화
         final String email = req.getEmail().trim().toLowerCase();
         final String userId = req.getUserId().trim();
 
-        // 1) 이메일 인증 완료 필수
+        // 1) 이메일 인증 필수
         if (!emailService.isEmailVerified(email)) {
             throw new IllegalStateException("이메일 인증을 완료해주세요.");
         }
@@ -39,13 +40,12 @@ public class UserSignupService {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");
         }
 
-        // 3) 비밀번호 암호화 후 저장 (Role은 엔티티 팩토리에서 STUDENT로 자동 설정)
+        // 3) 저장 (Role은 User.create 내부에서 STUDENT로 설정)
         String encodedPw = passwordEncoder.encode(req.getPassword());
         User user = User.create(userId, encodedPw, req.getName(), email);
         userRepository.save(user);
 
-        // (선택) 이메일 토큰 정리 필요 시: emailService.cleanUpTokens(email);
-
-        return user.getId();
+        // 4) 응답 DTO
+        return UserSignupResponse.from(user);
     }
 }
