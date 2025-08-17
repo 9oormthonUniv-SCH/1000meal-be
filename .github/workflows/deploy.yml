@@ -30,15 +30,9 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
 
-      - name: Debug network
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y dnsutils netcat-openbsd openssh-client
-          nslookup <YOUR_HOSTNAME_OR_IP>
-          nc -zv <YOUR_HOSTNAME_OR_IP> 22 || true
-          ssh -o StrictHostKeyChecking=no -vvv -i ~/.ssh/id_rsa ubuntu@<YOUR_HOSTNAME_OR_IP> "echo ok" || true
-          
-    
+
+              
+
       # ✅ 그 다음 .env 포함해서 전체를 EC2로 전송
       - name: Copy project to EC2 (including .env)
         uses: appleboy/scp-action@v0.1.4
