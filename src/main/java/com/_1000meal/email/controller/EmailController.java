@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/signup/email")
+@RequestMapping("/api/v1/signup/email")
 @RequiredArgsConstructor
 public class EmailController {
 
