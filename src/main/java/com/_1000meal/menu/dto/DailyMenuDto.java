@@ -18,6 +18,7 @@ public class DailyMenuDto {
     private LocalDate date;
     private DayOfWeek dayOfWeek;
     private boolean isOpen;
+    private Integer stock;
     private List<String> menus;
 
 }

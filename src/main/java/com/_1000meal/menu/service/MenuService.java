@@ -5,7 +5,9 @@ import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
+import com._1000meal.menu.dto.StockResponse;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -26,6 +28,7 @@ public class MenuService {
 
     private final StoreRepository storeRepository;
     private final WeeklyMenuRepository weeklyMenuRepository;
+    private final DailyMenuRepository dailyMenuRepository;
 
 //    public WeeklyMenuResponse createWeeklyMenu(WeeklyMenuRequest request) {
 //        Store store = storeRepository.findById(request.getStoreId())
@@ -95,4 +98,16 @@ public class MenuService {
     }
 
 
+    @Transactional
+    public StockResponse deductStock(Long menuId, Integer value) {
+        DailyMenu dailyMenu = dailyMenuRepository.findById(menuId) // Lock?
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_NOT_FOUND));
+
+        if(dailyMenu.getStock() < value) {
+            throw new CustomException(MenuErrorCode.INSUFFICIENT_STOCK);
+        }
+
+        dailyMenu.deductStock(value);
+        return new StockResponse(dailyMenu.getId(), dailyMenu.getStock());
+    }
 }

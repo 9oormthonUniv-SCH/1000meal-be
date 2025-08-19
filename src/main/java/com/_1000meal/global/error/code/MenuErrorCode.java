@@ -9,7 +9,9 @@ public enum MenuErrorCode implements ErrorCodeIfs {
     WEEKLY_MENU_NOT_FOUND("WEEKLY_MENU_404", 404, "해당 주간의 메뉴가 존재하지 않습니다."),
     MENU_ALREADY_EXISTS("MENU_409", 409, "이미 존재하는 메뉴입니다."),
     INVALID_MENU_NAME("MENU_400", 400, "잘못된 메뉴 이름입니다."),
-    INTERNAL_SERVER_ERROR("MENU_500", 500, "서버 오류가 발생했습니다.");
+    INTERNAL_SERVER_ERROR("MENU_500", 500, "서버 오류가 발생했습니다."),
+    INSUFFICIENT_STOCK("DAILY_MENU_500", 500, "해당 메뉴의 재고가 요청량보다 작습니다.")
+    ;
 
     private final String code;
     private final Integer httpStatusCode;

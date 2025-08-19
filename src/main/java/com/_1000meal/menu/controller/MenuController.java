@@ -2,8 +2,10 @@ package com._1000meal.menu.controller;
 
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
+import com._1000meal.menu.dto.StockResponse;
 import com._1000meal.menu.dto.WeeklyMenuRequest;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.service.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,5 +29,14 @@ public class MenuController {
     public ApiResponse<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
         WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
         return ApiResponse.success(response, SuccessCode.OK);
+    }
+
+    @PatchMapping("/daily/deduct/{menuId}")
+    public ApiResponse<?> deductStock(
+            @PathVariable Long menuId,
+            DeductionUnit deductionUnit
+    ) {
+        StockResponse response = menuService.deductStock(menuId, deductionUnit.getValue());
+        return ApiResponse.ok(response);
     }
 }
