@@ -110,4 +110,13 @@ public class MenuService {
         dailyMenu.deductStock(value);
         return new StockResponse(dailyMenu.getId(), dailyMenu.getStock());
     }
+
+    @Transactional
+    public StockResponse operationStock(Long menuId, Integer stock) {
+        DailyMenu dailyMenu = dailyMenuRepository.findById(menuId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_NOT_FOUND));
+
+        dailyMenu.updateStock(stock);
+        return new StockResponse(dailyMenu.getId(), dailyMenu.getStock());
+    }
 }

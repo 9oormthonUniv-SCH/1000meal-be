@@ -3,10 +3,12 @@ package com._1000meal.menu.controller;
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
 import com._1000meal.menu.dto.StockResponse;
+import com._1000meal.menu.dto.StockUpdateRequest;
 import com._1000meal.menu.dto.WeeklyMenuRequest;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.service.MenuService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,5 +40,15 @@ public class MenuController {
     ) {
         StockResponse response = menuService.deductStock(menuId, deductionUnit.getValue());
         return ApiResponse.ok(response);
+    }
+
+    @PostMapping("/daily/stock/{menuId}")
+    public ApiResponse<?> updateStock(
+            @PathVariable Long menuId,
+            @Valid @RequestBody StockUpdateRequest request
+    ) {
+        StockResponse response = menuService.operationStock(menuId, request.getStock());
+
+        return ApiResponse.success(response, SuccessCode.UPDATED);
     }
 }
