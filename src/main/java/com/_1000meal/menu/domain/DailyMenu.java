@@ -33,6 +33,8 @@ public class DailyMenu {
 
     private boolean isOpen;
 
+    private Integer stock;
+
     @OneToMany(mappedBy = "dailyMenu", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<Menu> menus = new ArrayList<>();
 
@@ -42,6 +44,10 @@ public class DailyMenu {
         this.date = date;
         this.dayOfWeek = date != null ? date.getDayOfWeek() : null;
         this.isOpen = false; // 메뉴가 추가되기 전까지는 닫힘
+    }
+
+    public void updateStock(Integer stock) {
+        this.stock = stock;
     }
 
     public DailyMenuDto toDto() {

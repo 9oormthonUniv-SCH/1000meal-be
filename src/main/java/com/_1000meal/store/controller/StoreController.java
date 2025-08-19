@@ -34,6 +34,12 @@ public class StoreController {
         return ApiResponse.success(response, SuccessCode.OK);
     }
 
+    @PostMapping("/status/{storeId}")
+    public ApiResponse<?> status(@PathVariable Long storeId) {
+        String response = storeService.toggleStoreStatus(storeId);
+        return ApiResponse.ok(response);
+    }
+
 //    @PostMapping
 //    public ResponseEntity<StoreResponse> createStore(@RequestBody StoreRequest request) {
 //        StoreResponse response = storeService.createStore(request);

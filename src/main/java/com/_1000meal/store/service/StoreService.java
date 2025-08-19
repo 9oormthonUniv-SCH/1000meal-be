@@ -3,15 +3,12 @@ package com._1000meal.store.service;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
-import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
-import com._1000meal.store.dto.StoreRequest;
 import com._1000meal.store.dto.StoreResponse;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +57,23 @@ public class StoreService {
                     return store.toStoreResponse(todayMenuDto);
                 })
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public String toggleStoreStatus(Long storeId) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
+
+        boolean previousState = store.isOpen();
+        store.toggleIsOpen();
+
+        if (store.isOpen() && !previousState) {
+            LocalDate today = LocalDate.now();
+            dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
+                    .ifPresent(dailyMenu -> dailyMenu.updateStock(100));
+        }
+
+        return "가게의 운영 상태가 업데이트 되었습니다.";
     }
 
 //    public StoreResponse createStore(StoreRequest request) {

@@ -52,6 +52,10 @@ public class Store {
     @OneToMany(mappedBy = "store", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WeeklyMenu> weeklyMenus = new ArrayList<>();
 
+    public void toggleIsOpen() {
+        isOpen = !isOpen;
+    }
+
     @Builder
     public Store(String name, String address, String phone, String description, LocalTime openTime, LocalTime closeTime, boolean isOpen, int remain, String hours, double lat, double lng) {
         this.name = name;
