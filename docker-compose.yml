@@ -10,13 +10,10 @@ services:
       DB_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
-#      DB_HOST: ${DB_HOST}
-#      DB_USERNAME: ${DB_USERNAME}
-#      DB_PASSWORD: ${DB_PASSWORD}
-      DB_HOST: localhost
-      DB_USERNAME: root
-      DB_PASSWORD: 8024
-    restart: always
+      DB_HOST: ${DB_HOST}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    restart: "no"
 
 volumes:
   mysql-1000meal-data:
