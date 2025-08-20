@@ -5,10 +5,12 @@ import com._1000meal.userOauth.oauth.CustomOAuth2UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.HttpSecurityBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.ExceptionHandlingConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -41,49 +43,70 @@ public class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
+
+                // 전부 오픈
                 .authorizeHttpRequests(auth -> auth
-                        // ======== 관리자 관련 API ========
-                        .requestMatchers("/api/admin/signup", "/api/admin/login").permitAll()
-                        .requestMatchers("/api/admin/**").authenticated()
-                        // ======== 사용자 관련 API ========
-                        .requestMatchers("/", "/login/**", "/oauth2/**").permitAll()
-                        .requestMatchers("/signup/user", "/login/user").permitAll()
-                        // =======이메일 인증=====
-                        .requestMatchers("/signup/email/send").permitAll()
-                        .requestMatchers("/signup/email/verify").permitAll()
-                        .requestMatchers("/signup/email/status").permitAll()
-                        // Swagger 문서 허용 (springdoc-openapi 기준)
-                        // ======== 메뉴, 가게 관련 API ========
-                        .requestMatchers("/api/v1/stores/**").permitAll()
-                        .requestMatchers("/api/v1/menus/**").permitAll()
-                        .requestMatchers(
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs/**",
-                                "/v3/api-docs.yaml"
-                        ).permitAll()
-                        // ======== 기타 API ========
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CORS preflight
+                        .requestMatchers("/**").permitAll()
                 )
-                // ======== OAuth2 로그인 (사용자) ========
-                .oauth2Login(oauth -> oauth
-                        .userInfoEndpoint(userInfo -> userInfo
-                                .userService(customOAuth2UserService)
-                        )
-                        .defaultSuccessUrl("/login/success", true)
-                )
-                // ======== JWT 인증 필터 (관리자) ========
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // ... 기타 설정
+                // 로그인/세션/기본인증 전부 비활성화 (테스트용)
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
+                .oauth2Login(oauth -> oauth.disable())
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-                .exceptionHandling(exceptionHandling -> exceptionHandling
-                        .authenticationEntryPoint(restAuthenticationEntryPoint())
-                        .accessDeniedHandler(restAccessDeniedHandler()));
-
-        // 권한실패
         return http.build();
     }
+
+//    @Bean
+//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+//        http
+//                .csrf(csrf -> csrf.disable())
+//                .cors(Customizer.withDefaults())
+//                .authorizeHttpRequests(auth -> auth
+//                        // ======== 관리자 관련 API ========
+//                        .requestMatchers("/api/admin/signup", "/api/admin/login").permitAll()
+//                        .requestMatchers("/api/admin/**").authenticated()
+//                        // ======== 사용자 관련 API ========
+//                        .requestMatchers("/", "/login/**", "/oauth2/**").permitAll()
+//                        .requestMatchers("/signup/user", "/login/user").permitAll()
+//                        // =======이메일 인증=====
+//                        .requestMatchers("/signup/email/send").permitAll()
+//                        .requestMatchers("/signup/email/verify").permitAll()
+//                        .requestMatchers("/signup/email/status").permitAll()
+//                        // Swagger 문서 허용 (springdoc-openapi 기준)
+//                        // ======== 메뉴, 가게 관련 API ========
+//                        .requestMatchers("/api/v1/stores/**").permitAll()
+//                        .requestMatchers("/api/v1/menus/**").permitAll()
+//                        .requestMatchers(
+//                                "/swagger-ui/**",
+//                                "/swagger-ui.html",
+//                                "/v3/api-docs/**",
+//                                "/v3/api-docs.yaml"
+//                        ).permitAll()
+//                        // ======== 기타 API ========
+//                        .anyRequest().authenticated()
+//                )
+//                // ======== OAuth2 로그인 (사용자) ========
+//                .oauth2Login(oauth -> oauth
+//                        .userInfoEndpoint(userInfo -> userInfo
+//                                .userService(customOAuth2UserService)
+//                        )
+//                        .defaultSuccessUrl("/login/success", true)
+//                )
+//                // ======== JWT 인증 필터 (관리자) ========
+//                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+//
+//                // ... 기타 설정
+//
+//                .exceptionHandling(exceptionHandling -> exceptionHandling
+//                        .authenticationEntryPoint(restAuthenticationEntryPoint())
+//                        .accessDeniedHandler(restAccessDeniedHandler()));
+//
+//        // 권한실패
+//        return http.build();
+//    }
 
     private <H extends HttpSecurityBuilder<H>> ExceptionHandlingConfigurer<H> exceptionHandling() {
         return null;
