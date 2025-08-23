@@ -26,22 +26,19 @@ public class AdminAuthController {
     private final AdminService adminService;
     private final JwtProvider jwtProvider;
 
-    /** 관리자 로그인 (내부 전용; 프론트는 /auth/login 사용하는 것을 권장) */
     @PostMapping("/login")
     public ApiResponse<AdminLoginResponse> login(@RequestBody AdminLoginRequest request) {
         AdminEntity admin = adminService.authenticate(request.getUsername(), request.getPassword());
 
-        // ✅ 통합 토큰 발급
         AuthPrincipal principal = new AuthPrincipal(
                 admin.getId(),
-                admin.getUsername(),   // account
+                admin.getUsername(),
                 admin.getName(),
-                null,                  // 관리자 이메일 없으면 null
+                null,
                 "ADMIN"
         );
         String token = jwtProvider.createToken(principal);
 
-        // 기존 스펙 유지(필요 시 LoginResponse로 통합 가능)
         AdminLoginResponse body = new AdminLoginResponse(
                 token,
                 admin.getId(),
@@ -49,19 +46,20 @@ public class AdminAuthController {
                 admin.getName(),
                 admin.getPhoneNumber()
         );
+        // 200 OK
         return ApiResponse.ok(body);
     }
 
     @PostMapping("/signup")
     public ApiResponse<String> signup(@RequestBody AdminSignupRequest request) {
         adminService.signup(request);
+        // 201 Created 등 커스텀 성공코드 사용
         return ApiResponse.success("관리자 회원가입 완료", SuccessCode.CREATED);
     }
 
     @GetMapping("/me")
     public ApiResponse<AdminResponse> getMyInfo(Authentication authentication) {
-        // JwtAuthenticationFilter에서 setAuthentication(principal=account, authorities=role)로 세팅했다고 가정
-        String username = authentication.getName();  // = claims.account
+        String username = authentication.getName();
         AdminEntity admin = adminService.getAdminByUsername(username);
 
         AdminResponse response = new AdminResponse(

@@ -1,12 +1,10 @@
 package com._1000meal.auth.dto;
 
 
-import lombok.Getter; import lombok.NoArgsConstructor;
+import com._1000meal.global.constant.Role;
 
-
-@Getter
-@NoArgsConstructor
-public class LoginRequest {
-    private String username;   // 학생=학번(userId), 관리자=username (원하면 이메일도 허용 가능)
-    private String password;
-}
+public record LoginRequest(
+        Role role,              // STUDENT / ADMIN
+        String usernameOrEmail, // 로그인 식별자
+        String password
+) {}

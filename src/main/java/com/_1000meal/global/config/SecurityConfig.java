@@ -6,8 +6,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
@@ -18,11 +19,35 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import java.time.LocalDateTime;
 
 @Configuration
+@EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    // 필요 시 수정: 화이트리스트
+    private static final String[] AUTH_WHITELIST = {
+            // 통합 인증
+            "/auth/login",
+            "/auth/signup",
+            "/auth/email/**",
+            // 과도기/관리자
+            "/api/admin/login",
+            "/api/admin/signup",
+            // 공개 API
+            "/api/v1/stores/**",
+            "/api/v1/menus/**",
+            // 문서/헬스체크
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/v3/api-docs/**",
+            "/v3/api-docs.yaml",
+            "/actuator/health",
+            // 정적/루트
+            "/",
+            "/favicon.ico",
+            "/error"
+    };
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -32,53 +57,24 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                // CSRF (API 기반이면 disable)
+                // REST API 기본 세팅
                 .csrf(csrf -> csrf.disable())
-
-                // 세션은 사용하지 않음 (JWT)
-                .sessionManagement(sm ->
-                        sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-
-                // CORS (필요 시 별도 설정)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(Customizer.withDefaults())
+                // 폼로그인/베이직 인증 비활성화 (리다이렉트 방지 핵심)
+                .formLogin(form -> form.disable())
+                .httpBasic(basic -> basic.disable())
 
                 // 권한 매핑
                 .authorizeHttpRequests(auth -> auth
-                        // ------ 공용/비인증 허용 ------
-                        // 통합 로그인(또는 과도기: 기존 로그인/회원가입 허용)
-                        .requestMatchers(
-                                "/login",               // 통합 로그인 엔드포인트(예: /login)
-                                "/login/**",            // 소셜 리다이렉트 등
-                                "/signup/user",         // 과도기 – 유저 회원가입
-                                "/signup/email/**"      // 이메일 인증 플로우
-                        ).permitAll()
-
-                        // 관리자 회원가입/로그인 (과도기)
-                        .requestMatchers("/api/admin/signup", "/api/admin/login").permitAll()
-
-                        // 메뉴/가게 공개 API
-                        .requestMatchers("/api/v1/stores/**", "/api/v1/menus/**").permitAll()
-
-                        // Swagger & 문서
-                        .requestMatchers(
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs/**",
-                                "/v3/api-docs.yaml"
-                        ).permitAll()
-
-                        // 정적/기타
-                        .requestMatchers("/", "/favicon.ico", "/error").permitAll()
-
-                        // ------ 나머지는 인증 필요 ------
+                        .requestMatchers(AUTH_WHITELIST).permitAll()
                         .anyRequest().authenticated()
                 )
 
                 // JWT 필터 (UsernamePasswordAuthenticationFilter 앞)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-                // 예외 처리(JSON 응답)
+                // 예외 처리(JSON 일관 응답)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restAuthenticationEntryPoint())
                         .accessDeniedHandler(restAccessDeniedHandler())
@@ -94,10 +90,12 @@ public class SecurityConfig {
             response.setContentType("application/json; charset=UTF-8");
             response.getWriter().write("""
             {
-              "statusCode": 401,
-              "message": "로그인이 필요합니다.",
-              "timestamp": "%s",
-              "data": null
+              "data": null,
+              "result": {
+                "code": "AUTH_401",
+                "message": "인증이 필요합니다.",
+                "timestamp": "%s"
+              }
             }
             """.formatted(LocalDateTime.now()));
         };
@@ -110,10 +108,12 @@ public class SecurityConfig {
             response.setContentType("application/json; charset=UTF-8");
             response.getWriter().write("""
             {
-              "statusCode": 403,
-              "message": "권한이 없습니다.",
-              "timestamp": "%s",
-              "data": null
+              "data": null,
+              "result": {
+                "code": "AUTH_403",
+                "message": "접근이 거부되었습니다.",
+                "timestamp": "%s"
+              }
             }
             """.formatted(LocalDateTime.now()));
         };

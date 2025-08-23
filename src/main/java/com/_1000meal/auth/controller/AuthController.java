@@ -7,19 +7,39 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+
+import com._1000meal.auth.dto.*;
+import com._1000meal.auth.service.AuthService;
+import com._1000meal.global.error.code.SuccessCode;
+import com._1000meal.global.response.ApiResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping
+@RequestMapping("/auth")
 @RequiredArgsConstructor
-@Tag(name = "Auth", description = "통합 로그인 API")
 public class AuthController {
 
     private final AuthService authService;
 
+    @PostMapping("/signup")
+    public ApiResponse<SignupResponse> signup(@RequestBody SignupRequest req) {
+        var resp = authService.signup(req);
+        return ApiResponse.success(resp, SuccessCode.CREATED); // data, code 순서
+    }
+
     @PostMapping("/login")
-    @Operation(summary = "통합 로그인", description = "학생(학번) / 관리자(username) 공통 로그인")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest req) {
-        return ResponseEntity.ok(authService.login(req));
+    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest req) {
+        var resp = authService.login(req);
+        return ApiResponse.ok(resp);
+    }
+
+    @GetMapping("/me")
+    public ApiResponse<LoginResponse> me(Authentication authentication) {
+        var resp = authService.me(authentication);
+        return ApiResponse.ok(resp);
     }
 }
