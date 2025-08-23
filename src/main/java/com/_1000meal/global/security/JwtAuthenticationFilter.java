@@ -1,7 +1,7 @@
 package com._1000meal.global.security;
 
-import com._1000meal.admin.login.entity.AdminEntity;
-import com._1000meal.admin.login.repository.AdminRepository;
+import com._1000meal.adminlogin.entity.AdminEntity;
+import com._1000meal.adminlogin.repository.AdminRepository;
 import com._1000meal.user.domain.User;
 import com._1000meal.user.repository.UserRepository;
 import io.jsonwebtoken.Claims;
@@ -27,18 +27,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final AdminRepository adminRepository;
     private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtProvider jwtProvider,
-                                   AdminRepository adminRepository,
-                                   UserRepository userRepository) {
+    public JwtAuthenticationFilter(
+            JwtProvider jwtProvider,
+            AdminRepository adminRepository,
+            UserRepository userRepository
+    ) {
         this.jwtProvider = jwtProvider;
         this.adminRepository = adminRepository;
         this.userRepository = userRepository;
     }
 
     @Override
-    protected void doFilterInternal(@NonNull HttpServletRequest request,
-                                    @NonNull HttpServletResponse response,
-                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain
+    ) throws ServletException, IOException {
 
         // 이미 인증된 요청이면 패스
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
@@ -51,40 +55,67 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
 
             try {
-                if (jwtProvider.validateToken(token)) {
+                if (jwtProvider.validate(token)) {
                     Claims claims = jwtProvider.parse(token);
-                    String subject = claims.getSubject(); // "USER" or "ADMIN"
+
+                    // 통합 스키마 기준으로 읽기
+                    String subject = claims.getSubject();             // "USER" or "ADMIN"
+                    String role     = claims.get("role", String.class);    // e.g. "STUDENT" or "ADMIN"
+                    String account  = claims.get("account", String.class); // userId or admin username
+
+                    // id는 Number로 들어올 수 있으니 안전 변환
+                    Number idNum = claims.get("id", Number.class);
+                    Long id = (idNum != null) ? idNum.longValue() : null;
+
+                    if (role == null || account == null) {
+                        // 필수 클레임 없으면 인증 생략
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
+                    // 권한 부여
+                    var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
                     if ("USER".equals(subject)) {
-                        // 토큰에서 필요한 정보 추출
-                        String userId = claims.get("userId", String.class); // 학번/로그인 아이디
-                        String role = claims.get("role", String.class);     // e.g. STUDENT
+                        // 필요하면 DB 확인(없어도 토큰 신뢰 시 바로 세팅 가능)
+                        boolean ok = true;
+                        if (id != null) {
+                            ok = userRepository.findById(id).isPresent();
+                        } else {
+                            ok = userRepository.findByUserId(account).isPresent();
+                        }
 
-                        // (선택) DB 존재 확인 – 필요 없다면 주석 처리 가능
-                        User user = userRepository.findByUserId(userId).orElse(null);
-                        if (user != null) {
-                            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-                            var auth = new UsernamePasswordAuthenticationToken(userId, null, authorities);
+                        if (ok) {
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    account, // principal: 학번(userId)
+                                    null,
+                                    authorities
+                            );
                             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                             SecurityContextHolder.getContext().setAuthentication(auth);
                         }
 
                     } else if ("ADMIN".equals(subject)) {
-                        Long adminId = claims.get("adminId", Number.class).longValue();
-                        String role = claims.get("role", String.class); // "ADMIN" 넣어두었으면 그대로 사용
+                        boolean ok = true;
+                        if (id != null) {
+                            ok = adminRepository.findById(id).isPresent();
+                        } else {
+                            ok = adminRepository.findByUsername(account).isPresent();
+                        }
 
-                        // (선택) DB 조회로 유효성 체크
-                        AdminEntity admin = adminRepository.findById(adminId).orElse(null);
-                        if (admin != null) {
-                            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-                            var auth = new UsernamePasswordAuthenticationToken(admin.getUsername(), null, authorities);
+                        if (ok) {
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    account, // principal: 관리자 username
+                                    null,
+                                    authorities
+                            );
                             auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                             SecurityContextHolder.getContext().setAuthentication(auth);
                         }
                     }
                 }
             } catch (Exception ignored) {
-                // 유효하지 않은 토큰/만료 등은 무시하고 다음 필터 진행 (익명으로 처리)
+                // 만료/서명오류 등은 무시하고 익명으로 진행
             }
         }
 

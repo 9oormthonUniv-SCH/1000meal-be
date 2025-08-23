@@ -1,4 +1,4 @@
-package com._1000meal.admin.login.dto;
+package com._1000meal.adminlogin.dto;
 
 import lombok.Getter;
 

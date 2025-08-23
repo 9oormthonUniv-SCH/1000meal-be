@@ -1,9 +1,9 @@
-package com._1000meal.admin.login.service;
+package com._1000meal.adminlogin.service;
 
-import com._1000meal.admin.login.dto.AdminSignupRequest;
-import com._1000meal.admin.login.dto.PasswordChangeRequest;
-import com._1000meal.admin.login.entity.AdminEntity;
-import com._1000meal.admin.login.repository.AdminRepository;
+import com._1000meal.adminlogin.dto.AdminSignupRequest;
+import com._1000meal.adminlogin.dto.PasswordChangeRequest;
+import com._1000meal.adminlogin.entity.AdminEntity;
+import com._1000meal.adminlogin.repository.AdminRepository;
 import com._1000meal.global.error.code.AdminSignupErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.util.PasswordValidator;

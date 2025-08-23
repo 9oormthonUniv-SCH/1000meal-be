@@ -47,20 +47,16 @@ public class EmailService {
 
     @Transactional
     public void issueAndStoreCode(String email) {
-        // 학교 도메인 체크
         if (!email.endsWith("@sch.ac.kr")) {
             throw new IllegalArgumentException("순천향대학교 이메일만 인증할 수 있습니다.");
         }
-        // 이미 인증된 이메일이면 차단(중복가입 방지)
         if (tokenRepository.existsByEmailAndVerifiedTrue(email)) {
             throw new IllegalStateException("이미 인증이 완료된 이메일입니다.");
         }
 
         String code = generateCode();
-        // 메일 전송
-        sendVerificationEmail(email, code);
-        // 5분 유효 토큰 저장
-        tokenRepository.save(EmailVerificationToken.create(email, code, 5));
+        tokenRepository.save(EmailVerificationToken.create(email, code, 5)); // 1) 저장
+        sendVerificationEmail(email, code);                                  // 2) 발송(1회)
     }
 
     @Transactional

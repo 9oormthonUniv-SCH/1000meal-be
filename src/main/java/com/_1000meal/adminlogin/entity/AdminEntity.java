@@ -1,4 +1,4 @@
-package com._1000meal.admin.login.entity;
+package com._1000meal.adminlogin.entity;
 
 import jakarta.persistence.*;
 import lombok.*;

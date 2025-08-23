@@ -1,7 +1,7 @@
-package com._1000meal.admin.login.repository;
+package com._1000meal.adminlogin.repository;
 
 
-import com._1000meal.admin.login.entity.AdminEntity;
+import com._1000meal.adminlogin.entity.AdminEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
