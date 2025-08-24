@@ -7,6 +7,10 @@ services:
     ports:
       - "8080:8080"
     environment:
+      SPRING_JPA_HIBERNATE_DDL_AUTO: none
+      SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO: none
+      SPRING_SQL_INIT_MODE: never
+      
       DB_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
       DB_PORT: ${DB_PORT}
       DB_NAME: ${DB_NAME}
