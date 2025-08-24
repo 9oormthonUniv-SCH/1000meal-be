@@ -64,6 +64,9 @@ dependencies {
 
     //이메일 관련
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    //SLL 인증
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 }
 
 test {
