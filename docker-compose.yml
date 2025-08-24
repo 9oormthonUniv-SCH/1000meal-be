@@ -10,6 +10,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: none
       SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO: none
       SPRING_SQL_INIT_MODE: never
+      SPRING_AUTOCONFIGURE_EXCLUDE: "org.springframework.boot.actuate.autoconfigure.metrics.SystemMetricsAutoConfiguration,org.springframework.boot.actuate.autoconfigure.metrics.web.tomcat.TomcatMetricsAutoConfiguration"
       
       DB_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
       DB_PORT: ${DB_PORT}
