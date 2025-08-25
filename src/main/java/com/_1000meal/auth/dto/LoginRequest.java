@@ -2,9 +2,9 @@ package com._1000meal.auth.dto;
 
 
 import com._1000meal.global.constant.Role;
+import jakarta.validation.constraints.NotBlank;
 
 public record LoginRequest(
-        Role role,              // STUDENT / ADMIN
-        String usernameOrEmail, // 로그인 식별자
-        String password
+        @NotBlank String usernameOrEmail,
+        @NotBlank String password
 ) {}

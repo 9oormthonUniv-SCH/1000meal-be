@@ -1,19 +1,16 @@
 package com._1000meal.auth.repository;
 
 import com._1000meal.auth.model.Account;
-import com._1000meal.global.constant.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
+
 import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<Account, Long> {
 
-    boolean existsByUsernameOrEmail(String username, String email);
+    // ✅ 유니크 체크는 분리: 이메일이 null일 수 있는 케이스 방어에 유리
+    boolean existsByUsername(String username);
+    boolean existsByEmail(String email);
 
-    @Query("""
-        select a from Account a
-        where a.role = :role
-          and (a.username = :identifier or a.email = :identifier)
-    """)
-    Optional<Account> findByRoleAndIdentifier(Role role, String identifier);
+    // ✅ 로그인: userId 또는 email 어느 쪽으로든 단일 메서드로 조회
+    Optional<Account> findByUsernameOrEmail(String username, String email);
 }

@@ -1,23 +1,24 @@
 package com._1000meal.auth.service;
 
-import com._1000meal.auth.dto.*;
+import com._1000meal.auth.dto.LoginRequest;
+import com._1000meal.auth.dto.LoginResponse;
+import com._1000meal.auth.dto.SignupRequest;
+import com._1000meal.auth.dto.SignupResponse;
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.model.AdminProfile;
 import com._1000meal.auth.model.AuthPrincipal;
 import com._1000meal.auth.model.UserProfile;
-import com._1000meal.auth.repository.*;
+import com._1000meal.auth.repository.AccountRepository;
+import com._1000meal.auth.repository.AdminProfileRepository;
+import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.email.service.EmailService;
 import com._1000meal.global.constant.Role;
 import com._1000meal.global.security.JwtProvider;
-import com._1000meal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-
-
 
 @Service
 @RequiredArgsConstructor
@@ -32,40 +33,55 @@ public class AuthService {
 
     @Transactional
     public SignupResponse signup(SignupRequest req) {
-        // 0) 입력 정규화(선택)
-        final String username = req.username().trim();
+        // 0) 입력 정규화
+        if (req.role() == null) {
+            throw new IllegalArgumentException("역할(role)은 필수입니다.");
+        }
+        final String username = req.userId().trim();
         final String email = req.email().trim().toLowerCase();
+        final Role role = req.role();
 
-        // 1) 유니크 검사
-        if (accountRepo.existsByUsernameOrEmail(username, email)) {
-            throw new IllegalArgumentException("이미 사용 중인 아이디/이메일입니다.");
+        // 1) 유니크 검사(분리)
+        if (accountRepo.existsByUsername(username)) {
+            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
+        }
+        if (accountRepo.existsByEmail(email)) {
+            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
         }
 
-        if (req.role() == Role.STUDENT && !email.endsWith("@sch.ac.kr")) {
-            throw new IllegalArgumentException("학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
+        // 2) 역할별 정책
+        String status = "ACTIVE";
+        if (role == Role.STUDENT) {
+            // 학번 형식
+            if (!username.matches("^\\d{8}$")) {
+                throw new IllegalArgumentException("학번 형식이 올바르지 않습니다.");
+            }
+            // 도메인
+            if (!email.endsWith("@sch.ac.kr")) {
+                throw new IllegalArgumentException("학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
+            }
+            // 이메일 인증 여부에 따라 상태 결정
+            status = emailService.isEmailVerified(email) ? "ACTIVE" : "PENDING";
         }
 
-        // 2) 상태 결정: ADMIN은 즉시 ACTIVE, STUDENT는 이메일 인증 시 ACTIVE
-        final String status =
-                (req.role() == Role.ADMIN) ? "ACTIVE"
-                        : (emailService.isEmailVerified(email) ? "ACTIVE" : "PENDING");
-
-        // 3) Account 생성/저장 (결정된 status 사용)
+        // 3) Account 저장
         var account = new Account(
                 null,
                 username,
                 email,
                 passwordEncoder.encode(req.password()),
-                req.role(),     // STUDENT / ADMIN
-                status          // ★ 여기!
+                role,
+                status
         );
         accountRepo.save(account);
 
-        // 4) 역할별 프로필 저장
-        if (req.role() == Role.STUDENT) {
-            userProfileRepo.save(new UserProfile(account.getId(), req.department(), req.name(), req.phone()));
+        // 4) 역할별 프로필 – 최소정보(name만)
+        if (role == Role.STUDENT) {
+            // UserProfile(accountId, department, name, phone) 시그니처라면 나머지는 null
+            userProfileRepo.save(new UserProfile(account.getId(), null, req.name(), null));
         } else {
-            adminProfileRepo.save(new AdminProfile(account.getId(), req.displayName(), defaultLevel(req.adminLevel())));
+            // AdminProfile(accountId, displayName, adminLevel) 시그니처라면 기본레벨 1
+            adminProfileRepo.save(new AdminProfile(account.getId(), req.name(), 1));
         }
 
         // 5) 응답
@@ -80,17 +96,26 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest req) {
-        var account = accountRepo.findByRoleAndIdentifier(req.role(), req.usernameOrEmail())
-                .orElseThrow(() -> new IllegalArgumentException("계정을 찾을 수 없습니다."));
+        final String idOrEmail = req.usernameOrEmail().trim().toLowerCase();
+
+        // role 없이 username/email 중 하나로 조회
+        var account = accountRepo.findByUsernameOrEmail(idOrEmail, idOrEmail)
+                .orElseThrow(() -> new IllegalArgumentException("아이디/이메일 또는 비밀번호가 올바르지 않습니다."));
 
         if (!passwordEncoder.matches(req.password(), account.getPasswordHash())) {
-            throw new IllegalArgumentException("비밀번호가 올바르지 않습니다.");
+            throw new IllegalArgumentException("아이디/이메일 또는 비밀번호가 올바르지 않습니다.");
         }
+        if (!"ACTIVE".equals(account.getStatus())) {
+            throw new IllegalStateException("계정이 활성화되지 않았습니다.");
+        }
+
+        // 이름 조회(프로필에서)
+        String displayName = resolveName(account);
 
         AuthPrincipal principal = new AuthPrincipal(
                 account.getId(),
                 account.getUsername(),
-                resolveName(account),
+                displayName,
                 account.getEmail(),
                 account.getRole().name()
         );
@@ -122,13 +147,17 @@ public class AuthService {
         );
     }
 
+    // 프로필에서 이름 조회 – 리포지토리 메서드가 accountId 기준으로 있는 것을 권장
     private String resolveName(Account account) {
         if (account.getRole() == Role.STUDENT) {
-            return userProfileRepo.findById(account.getId()).map(UserProfile::getName).orElse(null);
+            // findByAccountId(...) 메서드가 없다면 findById(accountId) 사용(프로필 PK=account_id인 경우)
+            return userProfileRepo.findByAccountId(account.getId())
+                    .map(UserProfile::getName)
+                    .orElse(null);
         } else {
-            return adminProfileRepo.findById(account.getId()).map(AdminProfile::getDisplayName).orElse(null);
+            return adminProfileRepo.findByAccountId(account.getId())
+                    .map(AdminProfile::getDisplayName)
+                    .orElse(null);
         }
     }
-
-    private int defaultLevel(Integer lvl) { return (lvl == null ? 1 : lvl); }
 }

@@ -28,12 +28,17 @@ public class SecurityConfig {
 
     private static final String[] AUTH_WHITELIST = {
             // 통합 인증
-            "/auth/login",
-            "/auth/signup",
-            "/auth/email/**",
-            // 과도기/관리자
-            "/api/admin/login",
-            "/api/admin/signup",
+//            "/auth/login",
+//            "/auth/signup",
+//            "/auth/email/**",
+//            // 과도기/관리자
+//            "/api/admin/login",
+//            "/api/admin/signup",
+
+            "/api/v1/auth/signup",
+            "/api/v1/auth/login",
+            "/api/v1/auth/email/**",
+
             // 공개 API
             "/api/v1/stores/**",
             "/api/v1/menus/**",
