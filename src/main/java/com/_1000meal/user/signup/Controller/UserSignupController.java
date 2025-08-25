@@ -1,6 +1,7 @@
 package com._1000meal.user.signup.Controller;
 
 import com._1000meal.user.signup.dto.UserSignupRequest;
+import com._1000meal.user.signup.dto.UserSignupResponse;
 import com._1000meal.user.signup.service.UserSignupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -14,8 +15,7 @@ public class UserSignupController {
     private final UserSignupService signupService;
 
     @PostMapping
-    public ResponseEntity<?> signup(@RequestBody UserSignupRequest req) {
-        Long id = signupService.signup(req);
-        return ResponseEntity.ok(id);
+    public ResponseEntity<UserSignupResponse> signup(@RequestBody UserSignupRequest req) {
+        return ResponseEntity.ok(signupService.signup(req));
     }
 }
