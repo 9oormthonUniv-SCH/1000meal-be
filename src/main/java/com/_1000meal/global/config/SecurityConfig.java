@@ -39,6 +39,8 @@ public class SecurityConfig {
             "/api/v1/auth/login",
             "/api/v1/auth/email/**",
 
+            "/api/v1/signup/user/validate-id",
+
             // 공개 API
             "/api/v1/stores/**",
             "/api/v1/menus/**",
