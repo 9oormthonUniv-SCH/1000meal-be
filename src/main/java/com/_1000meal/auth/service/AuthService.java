@@ -47,6 +47,7 @@ public class AuthService {
 
         // 2) 역할별 정책
         AccountStatus status = AccountStatus.ACTIVE;
+
         if (role == Role.STUDENT) {
             // 학번 형식: 8자리 숫자
             if (!userId.matches("^\\d{8}$")) {
@@ -56,8 +57,11 @@ public class AuthService {
             if (!email.endsWith("@sch.ac.kr")) {
                 throw new IllegalArgumentException("학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
             }
-            // 이메일 인증 여부
-            status = emailService.isEmailVerified(email) ? AccountStatus.ACTIVE : AccountStatus.PENDING;
+            // ✅ 회원가입 직전에 'VERIFIED' 상태 요구 (만료/미검증이면 예외)
+            emailService.requireVerified(email);
+
+            // VERIFIED 까지 확인했으므로 가입 상태는 ACTIVE 로 생성
+            status = AccountStatus.ACTIVE;
         }
 
         // 3) Account 저장
@@ -73,13 +77,14 @@ public class AuthService {
 
         // 4) 역할별 프로필 최소 정보 저장 (연관관계로 주입)
         if (role == Role.STUDENT) {
-            // UserProfile.create(Account, department, name, phone)
             UserProfile profile = UserProfile.create(account, null, req.name(), null);
             userProfileRepo.save(profile);
+            // ✅ 가입 성공 후 토큰들을 최종 소비(REQUESTED/VERIFIED → CONSUMED)
+            emailService.consumeAllFor(email);
         } else {
-            // AdminProfile.create(Account, displayName, adminLevel) 라는 팩토리 메서드가 있다고 가정
             AdminProfile profile = AdminProfile.create(account, req.name(), 1);
             adminProfileRepo.save(profile);
+            // 관리자 가입은 이메일 토큰 소비 불필요
         }
 
         // 5) 응답
