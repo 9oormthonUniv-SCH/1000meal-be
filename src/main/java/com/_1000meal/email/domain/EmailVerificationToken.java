@@ -1,57 +1,63 @@
 package com._1000meal.email.domain;
 
 import jakarta.persistence.*;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "email_verification_tokens",
+        indexes = {
+                @Index(name = "idx_email_verified", columnList = "email, verified"),
+                @Index(name = "idx_email_created", columnList = "email, createdAt")
+        }
+)
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class EmailVerificationToken {
 
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false)
+    /** 인증 대상 이메일 */
+    @Column(nullable = false, length = 255)
     private String email;
 
-    @Column(nullable=false, length = 6)
+    /** 6자리 인증 코드 */
+    @Column(nullable = false, length = 6)
     private String code;
 
-    @Column(nullable=false)
-    private LocalDateTime expiredAt;
+    /** 인증 성공 여부 */
+    @Column(nullable = false)
+    private boolean verified = false;
 
-    @Column(nullable=false)
-    private boolean verified;
+    /** 만료 시각 */
+    @Column(nullable = false)
+    private LocalDateTime expiresAt;
 
-    @Column(nullable=false, updatable = false)
-    private LocalDateTime createdAt;   // ★ 추가
+    /** 생성 시각 */
+    @Column(nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    private EmailVerificationToken(String email, String code, LocalDateTime expiredAt) {
-        this.email = email;
-        this.code = code;
-        this.expiredAt = expiredAt;
-        this.verified = false;
-        this.createdAt = LocalDateTime.now(); // ★ 생성 시각 기록
+    /** ====== 정적 팩토리 메서드 ====== */
+    public static EmailVerificationToken create(String email, String code, int minutesToExpire) {
+        EmailVerificationToken t = new EmailVerificationToken();
+        t.email = email;
+        t.code = code;
+        t.expiresAt = LocalDateTime.now().plusMinutes(minutesToExpire);
+        t.verified = false;
+        return t;
     }
 
-    public static EmailVerificationToken create(String email, String code, int minutes) {
-        return new EmailVerificationToken(email, code, LocalDateTime.now().plusMinutes(minutes));
-    }
-
+    /** 만료 여부 확인 */
     public boolean isExpired() {
-        return LocalDateTime.now().isAfter(expiredAt);
+        return LocalDateTime.now().isAfter(expiresAt);
     }
 
+    /** 인증 성공 처리 */
     public void markVerified() {
         this.verified = true;
-    }
-
-    // ★ 추가: 명시적 만료
-    public void expire() {
-        this.expiredAt = LocalDateTime.now().minusSeconds(1);
     }
 }

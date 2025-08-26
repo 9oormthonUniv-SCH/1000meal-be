@@ -37,7 +37,7 @@ public class EmailVerificationListener {
 
             mailSender.send(message);
         } catch (Exception ex) {
-            // 필요 시 로깅/재시도(Outbox 패턴) 붙이기
+            // TODO: 로깅/재시도 도입 (Outbox 패턴)
             throw new RuntimeException("이메일 전송 실패", ex);
         }
     }

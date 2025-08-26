@@ -5,31 +5,40 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-@Entity @Table(name = "accounts")
+@Entity
+@Table(name = "accounts")
 @Getter @NoArgsConstructor
 public class Account {
+
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false, unique=true) private String username;
-    @Column(nullable=false, unique=true) private String email;
-    @Column(nullable=false) private String passwordHash;
+    // 학번/아이디 — DB의 username 컬럼에 매핑
+    @Column(name = "user_id", nullable = false, unique = true)
+    private String userId;
 
-    @Enumerated(EnumType.STRING) @Column(nullable=false)
-    private Role role; // STUDENT/ADMIN
+    @Column(nullable = false, unique = true)
+    private String email;
 
-    @Column(nullable=false)
-    private String status; // PENDING/ACTIVE/SUSPENDED
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
 
-    public Account(Long id, String username, String email, String passwordHash, Role role, String status) {
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role; // STUDENT / ADMIN
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountStatus status; // ACTIVE, PENDING, SUSPENDED ...
+
+    public Account(Long id, String userId, String email, String passwordHash, Role role, AccountStatus status) {
         this.id = id;
-        this.username = username;
+        this.userId = userId;
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
         this.status = status;
     }
 
-    // 상태 전이 등 명시적 메서드로 (setter 지양)
-    public void activate() { this.status = "ACTIVE"; }
+    public void activate() { this.status = AccountStatus.ACTIVE; }
 }
