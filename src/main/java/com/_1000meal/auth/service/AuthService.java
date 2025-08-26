@@ -11,11 +11,16 @@ import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.email.service.EmailService;
 import com._1000meal.global.constant.Role;
 import com._1000meal.global.security.JwtProvider;
+import com._1000meal.store.domain.Store;
+import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashMap;   // ✅ 추가
+import java.util.Map;      // ✅ 추가
 
 @Service
 @RequiredArgsConstructor
@@ -24,20 +29,23 @@ public class AuthService {
     private final AccountRepository accountRepo;
     private final UserProfileRepository userProfileRepo;
     private final AdminProfileRepository adminProfileRepo;
+    private final StoreRepository storeRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final EmailService emailService;
 
+    /* -------------------- 회원가입 -------------------- */
     @Transactional
     public SignupResponse signup(SignupRequest req) {
-        // 0) 입력 정규화
-        if (req.role() == null) throw new IllegalArgumentException("역할(role)은 필수입니다.");
+        if (req.role() == null) {
+            throw new IllegalArgumentException("역할(role)은 필수입니다.");
+        }
 
         final String userId = req.userId().trim();
         final String email  = req.email().trim().toLowerCase();
         final Role role     = req.role();
 
-        // 1) 유니크 검사
+        // 유니크 검사
         if (accountRepo.existsByUserId(userId)) {
             throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
         }
@@ -45,26 +53,23 @@ public class AuthService {
             throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
         }
 
-        // 2) 역할별 정책
+        // 역할별 정책
         AccountStatus status = AccountStatus.ACTIVE;
-
         if (role == Role.STUDENT) {
-            // 학번 형식: 8자리 숫자
+            // (1) 학번 형식: 8자리 숫자
             if (!userId.matches("^\\d{8}$")) {
                 throw new IllegalArgumentException("학번 형식이 올바르지 않습니다.");
             }
-            // 이메일 도메인
+            // (2) 이메일 도메인
             if (!email.endsWith("@sch.ac.kr")) {
                 throw new IllegalArgumentException("학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
             }
-            // ✅ 회원가입 직전에 'VERIFIED' 상태 요구 (만료/미검증이면 예외)
+            // (3) 회원가입 직전 인증 강제 확인
             emailService.requireVerified(email);
-
-            // VERIFIED 까지 확인했으므로 가입 상태는 ACTIVE 로 생성
             status = AccountStatus.ACTIVE;
         }
 
-        // 3) Account 저장
+        // Account 저장
         Account account = new Account(
                 null,
                 userId,
@@ -75,47 +80,76 @@ public class AuthService {
         );
         accountRepo.save(account);
 
-        // 4) 역할별 프로필 최소 정보 저장 (연관관계로 주입)
+        // 프로필 & 스토어(관리자만)
+        Long storeId = null;
+        String storeName = null;
+
         if (role == Role.STUDENT) {
             UserProfile profile = UserProfile.create(account, null, req.name(), null);
             userProfileRepo.save(profile);
-            // ✅ 가입 성공 후 토큰들을 최종 소비(REQUESTED/VERIFIED → CONSUMED)
+            // 가입 성공 후 해당 이메일의 인증코드 일괄 소진
             emailService.consumeAllFor(email);
-        } else {
-            AdminProfile profile = AdminProfile.create(account, req.name(), 1);
+        } else { // ADMIN
+            if (req.storeId() == null) {
+                throw new IllegalArgumentException("관리자 가입 시 storeId는 필수입니다.");
+            }
+            Store store = storeRepo.findById(req.storeId())
+                    .orElseThrow(() -> new IllegalArgumentException("해당 storeId의 매장을 찾을 수 없습니다."));
+
+            AdminProfile profile = AdminProfile.create(account, req.name(), 1, store);
             adminProfileRepo.save(profile);
-            // 관리자 가입은 이메일 토큰 소비 불필요
+
+            storeId = store.getId();
+            storeName = store.getName();
         }
 
-        // 5) 응답
+        // 응답 (SignupResponse 시그니처: 7개 필드)
         return new SignupResponse(
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
                 account.getEmail(),
-                account.getStatus().name()
+                account.getStatus().name(),
+                storeId,
+                storeName
         );
     }
 
+    /* -------------------- 로그인 -------------------- */
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest req) {
-        final String idOrEmail = req.usernameOrEmail().trim().toLowerCase();
+        final String userId = req.userId().trim(); // 요청 모델을 user_id → userId로 매핑했다고 가정
 
-        // userId 또는 email로 조회 (리포지토리 메서드 명 주의!)
-        Account account = accountRepo.findByUserIdOrEmail(idOrEmail, idOrEmail)
-                .orElseThrow(() -> new IllegalArgumentException("아이디/이메일 또는 비밀번호가 올바르지 않습니다."));
+        Account account = accountRepo.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
         if (!passwordEncoder.matches(req.password(), account.getPasswordHash())) {
-            throw new IllegalArgumentException("아이디/이메일 또는 비밀번호가 올바르지 않습니다.");
+            throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
         }
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new IllegalStateException("계정이 활성화되지 않았습니다.");
         }
 
-        // 프로필에서 표시명 조회
+        // 표시 이름(프로필)
         String displayName = resolveName(account);
 
-        // 통합 페이로드로 토큰 발급
+        // 관리자면 상점 정보 포함
+        Long storeId = null;
+        String storeName = null;
+        if (account.getRole() == Role.ADMIN) {
+            adminProfileRepo.findByAccountId(account.getId()).ifPresent(ap -> {
+                if (ap.getStore() != null) {
+                    // 람다 캡처 회피 위해 로컬 변수 대신 배열/맵 쓰거나 아래처럼 분리
+                }
+            });
+            AdminProfile ap = adminProfileRepo.findByAccountId(account.getId()).orElse(null);
+            if (ap != null && ap.getStore() != null) {
+                storeId = ap.getStore().getId();
+                storeName = ap.getStore().getName();
+            }
+        }
+
+        // JWT 발급 (extraClaims에 store 정보 실어보냄)
         AuthPrincipal principal = new AuthPrincipal(
                 account.getId(),
                 account.getUserId(),
@@ -123,40 +157,64 @@ public class AuthService {
                 account.getEmail(),
                 account.getRole().name()
         );
-        String accessToken = jwtProvider.createToken(principal);
+        Map<String, Object> extra = null;
+        if (storeId != null) {
+            extra = new HashMap<>();
+            extra.put("storeId", storeId);
+            extra.put("storeName", storeName);
+        }
+        String accessToken = jwtProvider.createToken(principal, extra);
 
+        // LoginResponse 시그니처에 맞춰 반환(마지막 두 필드가 storeId/storeName)
         return new LoginResponse(
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
                 account.getEmail(),
                 accessToken,
-                null // refresh 토큰 쓰면 여기에 세팅
+                null,           // refresh 사용 시 세팅
+                storeId,
+                storeName
         );
     }
 
+    /* -------------------- 내 정보 -------------------- */
     @Transactional(readOnly = true)
     public LoginResponse me(Authentication authentication) {
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
         Account account = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new IllegalStateException("계정이 존재하지 않습니다."));
 
+        // ADMIN이면 상점 정보도 함께 내려줌(일관성)
+        Long storeId = null;
+        String storeName = null;
+        if (account.getRole() == Role.ADMIN) {
+            AdminProfile ap = adminProfileRepo.findByAccountId(account.getId()).orElse(null);
+            if (ap != null && ap.getStore() != null) {
+                storeId = ap.getStore().getId();
+                storeName = ap.getStore().getName();
+            }
+        }
+
         return new LoginResponse(
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
                 account.getEmail(),
-                null,
-                null
+                null,   // accessToken 없음
+                null,   // refreshToken 없음
+                storeId,
+                storeName
         );
     }
 
+    /* 표시 이름 조회(역할별 프로필에서) */
     private String resolveName(Account account) {
         if (account.getRole() == Role.STUDENT) {
             return userProfileRepo.findByAccountId(account.getId())
                     .map(UserProfile::getName)
                     .orElse(null);
-        } else {
+        } else { // ADMIN
             return adminProfileRepo.findByAccountId(account.getId())
                     .map(AdminProfile::getDisplayName)
                     .orElse(null);
