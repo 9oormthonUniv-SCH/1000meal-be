@@ -118,38 +118,42 @@ public class AuthService {
     /* -------------------- 로그인 -------------------- */
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest req) {
-        final String userId = req.userId().trim(); // 요청 모델을 user_id → userId로 매핑했다고 가정
+        final String userId = req.userId().trim();
+        final Role reqRole  = req.role(); // 요청된 역할
 
+        // 1) 계정 조회 (userId 기준)
         Account account = accountRepo.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
+        // 2) 비밀번호 체크
         if (!passwordEncoder.matches(req.password(), account.getPasswordHash())) {
             throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
         }
+
+        // 3) 역할 일치 체크 (핵심)
+        if (account.getRole() != reqRole) {
+            // 프론트가 표시하기 쉬운 메시지로
+            throw new IllegalArgumentException("역할이 일치하지 않습니다. (" + reqRole + "로 로그인할 수 없습니다)");
+        }
+
+        // 4) 상태 체크
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new IllegalStateException("계정이 활성화되지 않았습니다.");
         }
 
-        // 표시 이름(프로필)
+        // 5) 표시 이름/가게 정보 조회 (생략 가능: 기존 코드 재사용)
         String displayName = resolveName(account);
-
-        // 관리자면 상점 정보 포함
         Long storeId = null;
         String storeName = null;
         if (account.getRole() == Role.ADMIN) {
-            adminProfileRepo.findByAccountId(account.getId()).ifPresent(ap -> {
-                if (ap.getStore() != null) {
-                    // 람다 캡처 회피 위해 로컬 변수 대신 배열/맵 쓰거나 아래처럼 분리
-                }
-            });
-            AdminProfile ap = adminProfileRepo.findByAccountId(account.getId()).orElse(null);
+            var ap = adminProfileRepo.findByAccountId(account.getId()).orElse(null);
             if (ap != null && ap.getStore() != null) {
                 storeId = ap.getStore().getId();
                 storeName = ap.getStore().getName();
             }
         }
 
-        // JWT 발급 (extraClaims에 store 정보 실어보냄)
+        // 6) 토큰 발급 (role은 DB 값 사용)
         AuthPrincipal principal = new AuthPrincipal(
                 account.getId(),
                 account.getUserId(),
@@ -157,22 +161,16 @@ public class AuthService {
                 account.getEmail(),
                 account.getRole().name()
         );
-        Map<String, Object> extra = null;
-        if (storeId != null) {
-            extra = new HashMap<>();
-            extra.put("storeId", storeId);
-            extra.put("storeName", storeName);
-        }
+        Map<String,Object> extra = (storeId == null) ? null : Map.of("storeId", storeId, "storeName", storeName);
         String accessToken = jwtProvider.createToken(principal, extra);
 
-        // LoginResponse 시그니처에 맞춰 반환(마지막 두 필드가 storeId/storeName)
         return new LoginResponse(
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
                 account.getEmail(),
                 accessToken,
-                null,           // refresh 사용 시 세팅
+                null,
                 storeId,
                 storeName
         );

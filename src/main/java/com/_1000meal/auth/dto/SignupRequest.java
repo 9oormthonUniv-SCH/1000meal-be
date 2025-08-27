@@ -2,16 +2,13 @@ package com._1000meal.auth.dto;
 
 import com._1000meal.global.constant.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.*;
 
 @Schema(description = "회원가입 요청")
 public record SignupRequest(
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "역할: STUDENT 또는 ADMIN")
-        Role role,
+        @NotNull Role role,
 
         @NotBlank
         @Size(min = 4, max = 30)
