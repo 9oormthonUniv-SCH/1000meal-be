@@ -43,21 +43,21 @@ public class JwtProvider {
         // 공통(통합) 클레임
         Map<String, Object> claims = new HashMap<>();
         claims.put("id",       p.id());        // account PK
-        claims.put("username", p.account());  // userId(학번) 또는 관리자ID
+        claims.put("account",  p.account());   // ★ 표준 키: 학번/관리자ID
         claims.put("name",     p.name());
         claims.put("email",    p.email());     // 관리자면 null 가능
         claims.put("role",     p.role());      // "STUDENT" | "ADMIN"
 
-        // 과도기 호환 키(안정화 후 제거 가능)
+// ─── 과도기 호환 키(안정화 후 제거 가능) ───
+        claims.put("username", p.account());   // 기존 코드 호환
         if ("STUDENT".equals(p.role())) {
             claims.put("uid",    p.id());
-            claims.put("userId", p.account());   // 학번/아이디
+            claims.put("userId", p.account()); // 학번
         } else if ("ADMIN".equals(p.role())) {
-            claims.put("aid",      p.id());
-            claims.put("username", p.account()); // 관리자 로그인 ID
+            claims.put("aid",    p.id());
+            // username은 위에서 이미 넣음
         }
 
-        // 추가 클레임 병합 (예: storeId, storeName)
         if (extraClaims != null && !extraClaims.isEmpty()) {
             claims.putAll(extraClaims);
         }
@@ -74,7 +74,6 @@ public class JwtProvider {
 
     /* ===================== 검증/파싱 ===================== */
 
-    /** 현재 코드와의 호환을 위해 validate/validateToken 둘 다 제공 */
     public boolean validate(String token) {
         try {
             Jwts.parserBuilder().setSigningKey(key()).build().parseClaimsJws(token);
@@ -84,6 +83,7 @@ public class JwtProvider {
         }
     }
 
+    // 과거 호출부 호환용
     public boolean validateToken(String token) {
         return validate(token);
     }
