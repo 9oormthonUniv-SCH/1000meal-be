@@ -66,6 +66,7 @@ public class DailyMenu {
                 .dayOfWeek(dow)
                 .isOpen(this.isOpen())
                 .menus(menuNames)
+                .stock(this.getStock())
                 .build();
     }
 
