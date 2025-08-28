@@ -44,7 +44,7 @@ public class DailyMenu {
         this.date = date;
         this.dayOfWeek = date != null ? date.getDayOfWeek() : null;
         this.isOpen = false; // 메뉴가 추가되기 전까지는 닫힘
-//        this.stock = 100; 메뉴 등록시 자동으로 100개로 시작?
+        this.stock = 100;
     }
 
     public void updateStock(Integer stock) {

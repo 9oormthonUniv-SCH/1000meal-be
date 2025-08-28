@@ -99,7 +99,7 @@ public class Store {
                 .description(this.getDescription())
                 .hours(this.getHours())
                 .isOpen(this.isOpen())
-                .remain(this.getRemain())
+                .remain(todayMenu.getStock()!= null ? remain : 0)
                 .lat(this.getLat())
                 .lng(this.getLng())
                 .todayMenu(todayMenu)
