@@ -4,6 +4,7 @@ import com._1000meal.global.error.exception.ErrorCodeIfs;
 
 public enum MenuErrorCode implements ErrorCodeIfs {
 
+    MENU_EMPTY("MENU_404", 404, "메뉴를 입력하지 않았습니다."),
     MENU_NOT_FOUND("MENU_404", 404, "존재하지 않는 메뉴입니다."),
     DAILY_MENU_NOT_FOUND("DAILY_MENU_404", 404, "해당 날짜의 메뉴가 존재하지 않습니다."),
     WEEKLY_MENU_NOT_FOUND("WEEKLY_MENU_404", 404, "해당 주간의 메뉴가 존재하지 않습니다."),
