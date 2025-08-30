@@ -36,7 +36,12 @@ public class StoreService {
 
         WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId);
 
-        return store.toDetailedResponse(weeklyMenu);
+        LocalDate todaySeoul = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        Integer remain = dailyMenuRepository.findStockByStoreIdAndDate(storeId, todaySeoul)
+                .orElse(null); // .orElse(0)로 바꾸면 기본 0
+
+        return store.toDetailedResponse(weeklyMenu, remain);
     }
 
     @Transactional(readOnly = true)

@@ -2,12 +2,15 @@ package com._1000meal.menu.service;
 
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
+import com._1000meal.menu.domain.Menu;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
+import com._1000meal.menu.dto.DailyMenuAddRequest;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.StockResponse;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.repository.MenuRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -29,45 +32,52 @@ public class MenuService {
     private final StoreRepository storeRepository;
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
+    private final MenuRepository menuRepository;
 
-//    public WeeklyMenuResponse createWeeklyMenu(WeeklyMenuRequest request) {
-//        Store store = storeRepository.findById(request.getStoreId())
-//                .orElseThrow(() -> new RuntimeException("Store not found"));
-//
-//        WeeklyMenu weeklyMenu = WeeklyMenu.builder()
-//                .store(store)
-//                .build();
-//
-//        List<DailyMenu> dailyMenus = request.getDailyMenus().stream()
-//                .map(dto -> DailyMenu.builder()
-//                        .weeklyMenu(weeklyMenu)
-//                        .date(dto.getDate())
-//                        .dayOfWeek(dto.getDayOfWeek())
-//                        .isOpen(dto.isOpen())
-//                        .menuTexts(String.join(",", dto.getMenuNames()))
-//                        .build())
-//                .collect(Collectors.toList());
-//
-//        weeklyMenu.setDailyMenus(dailyMenus);
-//        store.setWeeklyMenu(weeklyMenu); // 역방향 연관관계 설정 (optional)
-//
-//        WeeklyMenu saved = weeklyMenuRepository.save(weeklyMenu);
-//
-//        // 응답 변환
-//        List<WeeklyMenuResponse.DailyMenuResponse> dailyDtos = saved.getDailyMenus().stream()
-//                .map(d -> WeeklyMenuResponse.DailyMenuResponse.builder()
-//                        .date(d.getDate())
-//                        .dayOfWeek(d.getDayOfWeek())
-//                        .isOpen(d.isOpen())
-//                        .menuNames(d.getMenuTexts() == null ? new ArrayList<>() : Arrays.asList(d.getMenuTexts().split(",")))
-//                        .build())
-//                .collect(Collectors.toList());
-//
-//        return WeeklyMenuResponse.builder()
-//                .storeId(store.getId())
-//                .dailyMenus(dailyDtos)
-//                .build();
-//    }
+    @Transactional(readOnly = false)
+    public void addOrReplaceDailyMenu(Long storeId, DailyMenuAddRequest req) {
+        // 1) 유효성
+        if (req.getMenus() == null || req.getMenus().isEmpty()) {
+            throw new CustomException(MenuErrorCode.MENU_EMPTY);
+        }
+        // 정제: trim, 공백 제거, 중복 제거
+        List<String> cleaned = req.getMenus().stream()
+                .map(s -> s == null ? "" : s.trim())
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+        if (cleaned.isEmpty()) throw new CustomException(MenuErrorCode.MENU_EMPTY);
+
+        // 2) 필수 엔티티 로드
+        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, req.getDate())
+                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+
+        Long dailyMenuId = dm.getId();
+
+        // 4) 메뉴 교체
+        menuRepository.deleteByDailyMenuId(dailyMenuId);
+
+        List<Menu> toInsert = cleaned.stream()
+                .map(name -> {
+                    Menu m = Menu.builder().name(name).build();
+                    m.setDailyMenu(dm);
+                    return m;
+                })
+                .toList();
+
+        menuRepository.saveAll(toInsert);
+    }
+
+    @Transactional(readOnly = true)
+    public DailyMenuDto getDailyMenu(Long storeId, LocalDate date) {
+
+        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+
+        // 안정된 순서로 메뉴 반환 (id 오름차순)
+        List<Menu> menus = menuRepository.findByDailyMenu_IdOrderByIdAsc(dm.getId());
+        return dm.toDto();
+    }
 
     @Transactional(readOnly = true)
     public WeeklyMenuResponse getWeeklyMenu(Long storeId) {
