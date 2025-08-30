@@ -27,60 +27,61 @@ INSERT INTO weekly_menu (id, store_id, start_date, end_date) VALUES
 /* =========================
    DAILY_MENU: id 1부터 시작
    ========================= */
-INSERT INTO daily_menu (id, weekly_menu_id, date, day_of_week, is_open) VALUES
+INSERT INTO daily_menu (id, weekly_menu_id, date, day_of_week, is_open, stock) VALUES
 -- Store 1 - Week (ID:1) 2025-08-18 ~ 2025-08-24
-(1,  1, '2025-08-18', 'MONDAY',    true),
-(2,  1, '2025-08-19', 'TUESDAY',   true),
-(3,  1, '2025-08-20', 'WEDNESDAY', true),
-(4,  1, '2025-08-21', 'THURSDAY',  true),
-(5,  1, '2025-08-22', 'FRIDAY',    true),
-(6,  1, '2025-08-23', 'SATURDAY',  true),
-(7,  1, '2025-08-24', 'SUNDAY',    true),
+(1,  1, '2025-08-18', 'MONDAY',    true, 100),
+(2,  1, '2025-08-19', 'TUESDAY',   true, 100),
+(3,  1, '2025-08-20', 'WEDNESDAY', true, 100),
+(4,  1, '2025-08-21', 'THURSDAY',  true, 100),
+(5,  1, '2025-08-22', 'FRIDAY',    true, 100),
+(6,  1, '2025-08-23', 'SATURDAY',  true, 100),
+(7,  1, '2025-08-24', 'SUNDAY',    true, 100),
 
 -- Store 1 - Next Week (ID:2) 2025-08-25 ~ 2025-08-31
-(8,  2, '2025-08-25', 'MONDAY',    true),
-(9,  2, '2025-08-26', 'TUESDAY',   true),
-(10, 2, '2025-08-27', 'WEDNESDAY', true),
-(11, 2, '2025-08-28', 'THURSDAY',  true),
-(12, 2, '2025-08-29', 'FRIDAY',    true),
-(13, 2, '2025-08-30', 'SATURDAY',  true),
-(14, 2, '2025-08-31', 'SUNDAY',    true),
+(8,  2, '2025-08-25', 'MONDAY',    true, 100),
+(9,  2, '2025-08-26', 'TUESDAY',   true, 100),
+(10, 2, '2025-08-27', 'WEDNESDAY', true, 100),
+(11, 2, '2025-08-28', 'THURSDAY',  true, 100),
+(12, 2, '2025-08-29', 'FRIDAY',    true, 100),
+(13, 2, '2025-08-30', 'SATURDAY',  true, 100),
+(14, 2, '2025-08-31', 'SUNDAY',    true, 100),
 
 -- Store 2 - Week (ID:3)
-(15, 3, '2025-08-18', 'MONDAY',    true),
-(16, 3, '2025-08-19', 'TUESDAY',   true),
-(17, 3, '2025-08-20', 'WEDNESDAY', true),
-(18, 3, '2025-08-21', 'THURSDAY',  true),
-(19, 3, '2025-08-22', 'FRIDAY',    true),
-(20, 3, '2025-08-23', 'SATURDAY',  true),
-(21, 3, '2025-08-24', 'SUNDAY',    true),
+(15, 3, '2025-08-18', 'MONDAY',    true, 100),
+(16, 3, '2025-08-19', 'TUESDAY',   true, 100),
+(17, 3, '2025-08-20', 'WEDNESDAY', true, 100),
+(18, 3, '2025-08-21', 'THURSDAY',  true, 100),
+(19, 3, '2025-08-22', 'FRIDAY',    true, 100),
+(20, 3, '2025-08-23', 'SATURDAY',  true, 100),
+(21, 3, '2025-08-24', 'SUNDAY',    true, 100),
 
 -- Store 2 - Next Week (ID:4)
-(22, 4, '2025-08-25', 'MONDAY',    true),
-(23, 4, '2025-08-26', 'TUESDAY',   true),
-(24, 4, '2025-08-27', 'WEDNESDAY', true),
-(25, 4, '2025-08-28', 'THURSDAY',  true),
-(26, 4, '2025-08-29', 'FRIDAY',    true),
-(27, 4, '2025-08-30', 'SATURDAY',  true),
-(28, 4, '2025-08-31', 'SUNDAY',    true),
+(22, 4, '2025-08-25', 'MONDAY',    true, 100),
+(23, 4, '2025-08-26', 'TUESDAY',   true, 100),
+(24, 4, '2025-08-27', 'WEDNESDAY', true, 100),
+(25, 4, '2025-08-28', 'THURSDAY',  true, 100),
+(26, 4, '2025-08-29', 'FRIDAY',    true, 100),
+(27, 4, '2025-08-30', 'SATURDAY',  true, 100),
+(28, 4, '2025-08-31', 'SUNDAY',    true, 100),
 
 -- Store 3 - Week (ID:5)
-(29, 5, '2025-08-18', 'MONDAY',    true),
-(30, 5, '2025-08-19', 'TUESDAY',   true),
-(31, 5, '2025-08-20', 'WEDNESDAY', true),
-(32, 5, '2025-08-21', 'THURSDAY',  true),
-(33, 5, '2025-08-22', 'FRIDAY',    true),
-(34, 5, '2025-08-23', 'SATURDAY',  true),
-(35, 5, '2025-08-24', 'SUNDAY',    true),
+(29, 5, '2025-08-18', 'MONDAY',    true, 100),
+(30, 5, '2025-08-19', 'TUESDAY',   true, 100),
+(31, 5, '2025-08-20', 'WEDNESDAY', true, 100),
+(32, 5, '2025-08-21', 'THURSDAY',  true, 100),
+(33, 5, '2025-08-22', 'FRIDAY',    true, 100),
+(34, 5, '2025-08-23', 'SATURDAY',  true, 100),
+(35, 5, '2025-08-24', 'SUNDAY',    true, 100),
 
 -- Store 3 - Next Week (ID:6)
-(36, 6, '2025-08-25', 'MONDAY',    true),
-(37, 6, '2025-08-26', 'TUESDAY',   true),
-(38, 6, '2025-08-27', 'WEDNESDAY', true),
-(39, 6, '2025-08-28', 'THURSDAY',  true),
-(40, 6, '2025-08-29', 'FRIDAY',    true),
-(41, 6, '2025-08-30', 'SATURDAY',  true),
-(42, 6, '2025-08-31', 'SUNDAY',    true);
+(36, 6, '2025-08-25', 'MONDAY',    true, 100),
+(37, 6, '2025-08-26', 'TUESDAY',   true, 100),
+(38, 6, '2025-08-27', 'WEDNESDAY', true, 100),
+(39, 6, '2025-08-28', 'THURSDAY',  true, 100),
+(40, 6, '2025-08-29', 'FRIDAY',    true, 100),
+(41, 6, '2025-08-30', 'SATURDAY',  true, 100),
+(42, 6, '2025-08-31', 'SUNDAY',    true, 100);
+
 
 
 

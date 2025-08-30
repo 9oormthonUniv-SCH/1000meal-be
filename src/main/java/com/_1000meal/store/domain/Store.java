@@ -1,11 +1,8 @@
 package com._1000meal.store.domain;
 
 import com._1000meal.menu.domain.WeeklyMenu;
-import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
-import com._1000meal.menu.repository.WeeklyMenuRepository;
-import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
 import jakarta.persistence.*;
@@ -16,9 +13,7 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Entity
 @Getter
@@ -71,7 +66,7 @@ public class Store {
         this.lng = lng;
     }
 
-    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu) {
+    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu,Integer stock) {
 
         return StoreDetailedResponse.builder()
                 .id(this.getId())
@@ -82,7 +77,7 @@ public class Store {
                 .openTime(this.getOpenTime())
                 .closeTime(this.getCloseTime())
                 .isOpen(this.isOpen())
-                .remain(this.getRemain())
+                .remain(stock)
                 .hours(this.getHours())
                 .lat(this.getLat())
                 .lng(this.getLng())

@@ -14,4 +14,15 @@ public interface DailyMenuRepository extends JpaRepository<DailyMenu, Long> {
             "LEFT JOIN FETCH dm.menus " +
             "WHERE dm.weeklyMenu.store.id = :storeId AND dm.date = :date")
     Optional<DailyMenu> findDailyMenuByStoreIdAndDate(@Param("storeId") Long storeId, @Param("date") LocalDate date);
+
+    @Query("""
+        select dm.stock
+        from DailyMenu dm
+        join dm.weeklyMenu wm
+        join wm.store s
+        where s.id = :storeId
+          and dm.date = :date
+    """)
+    Optional<Integer> findStockByStoreIdAndDate(@Param("storeId") Long storeId,
+                                                @Param("date") LocalDate date);
 }
