@@ -46,7 +46,7 @@ public class MenuController {
     @GetMapping("/daily/{storeId}")
     public ApiResponse<DailyMenuDto> getDailyMenu(
             @PathVariable Long storeId,
-            @Valid @RequestBody LocalDate date
+            @RequestParam LocalDate date
     ) {
         DailyMenuDto resp = menuService.getDailyMenu(storeId, date);
         return ApiResponse.success(resp, SuccessCode.OK);
