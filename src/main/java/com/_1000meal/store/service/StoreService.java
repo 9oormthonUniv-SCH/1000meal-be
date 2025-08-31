@@ -34,7 +34,9 @@ public class StoreService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today);
 
         LocalDate todaySeoul = LocalDate.now(ZoneId.of("Asia/Seoul"));
 

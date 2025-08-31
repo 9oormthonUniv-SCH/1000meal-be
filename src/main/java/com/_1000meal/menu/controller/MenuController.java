@@ -38,8 +38,10 @@ public class MenuController {
 
 
     @GetMapping("/weekly/{storeId}")
-    public ApiResponse<WeeklyMenuResponse> getWeeklyMenu(@PathVariable Long storeId) {
-        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId);
+    public ApiResponse<WeeklyMenuResponse> getWeeklyMenu(
+            @PathVariable Long storeId,
+            @RequestParam LocalDate date) {
+        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId,date);
         return ApiResponse.success(response, SuccessCode.OK);
     }
 

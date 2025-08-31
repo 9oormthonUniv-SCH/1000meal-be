@@ -80,17 +80,17 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public WeeklyMenuResponse getWeeklyMenu(Long storeId) {
+    public WeeklyMenuResponse getWeeklyMenu(Long storeId, LocalDate date) {
         // 1. 매장 존재 검증
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
         // 2. 오늘 날짜 기준
-        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        //LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         // 3. 주간 메뉴 가져 오기
         WeeklyMenu weeklyMenu = weeklyMenuRepository
-                .findByStoreIdAndRangeWithMenus(storeId, today)
+                .findByStoreIdAndRangeWithMenus(storeId, date)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.WEEKLY_MENU_NOT_FOUND));
 
         // 4. DailyMenu 매핑
