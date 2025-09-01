@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface WeeklyMenuRepository extends JpaRepository<WeeklyMenu, Long> {
 
+
     @Query("SELECT wm FROM WeeklyMenu wm " +
             "LEFT JOIN FETCH wm.dailyMenus dm " +
             "LEFT JOIN FETCH dm.menus m " +

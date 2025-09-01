@@ -19,8 +19,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,38 +35,61 @@ public class MenuService {
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuRepository menuRepository;
 
-    @Transactional(readOnly = false)
+    @Transactional
     public void addOrReplaceDailyMenu(Long storeId, DailyMenuAddRequest req) {
-        // 1) 유효성
-        if (req.getMenus() == null || req.getMenus().isEmpty()) {
-            throw new CustomException(MenuErrorCode.MENU_EMPTY);
-        }
-        // 정제: trim, 공백 제거, 중복 제거
-        List<String> cleaned = req.getMenus().stream()
+
+        LocalDate targetDate = req.getDate();
+        if (targetDate == null) throw new CustomException(MenuErrorCode.DATE_REQUIRED);
+
+        List<String> raw = Optional.ofNullable(req.getMenus()).orElse(List.of());
+        List<String> cleaned = raw.stream()
                 .map(s -> s == null ? "" : s.trim())
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
-        if (cleaned.isEmpty()) throw new CustomException(MenuErrorCode.MENU_EMPTY);
 
-        // 2) 필수 엔티티 로드
-        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, req.getDate())
-                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+        WeeklyMenu weekly = upsertWeeklyMenu(storeId, targetDate);
+        DailyMenu dm = upsertDailyMenu(storeId, targetDate, weekly);
 
-        Long dailyMenuId = dm.getId();
+        if (cleaned.isEmpty()) {
+            dm.getMenus().clear();
+            dailyMenuRepository.save(dm);
+            return;
+        }
 
-        // 4) 메뉴 교체
-        menuRepository.deleteByDailyMenuId(dailyMenuId);
+        dm.getMenus().clear();
+        for (String name : cleaned) {
+            Menu m = Menu.builder().name(name).build();
+            m.setDailyMenu(dm);
+            dm.getMenus().add(m);
+        }
+        dailyMenuRepository.save(dm);
+    }
 
-        List<Menu> toInsert = cleaned.stream()
-                .map(name -> {
-                    Menu m = Menu.builder().name(name).build();
-                    m.setDailyMenu(dm);
-                    return m;
-                })
-                .toList();
+    private WeeklyMenu upsertWeeklyMenu(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = anyDateInWeek.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd   = weekStart.plusDays(6);
 
-        menuRepository.saveAll(toInsert);
+        return weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, weekStart)
+                .orElseGet(() -> {
+                    WeeklyMenu wm = WeeklyMenu.builder()
+                            .store(storeRepository.getReferenceById(storeId))
+                            .startDate(weekStart)
+                            .endDate(weekEnd)
+                            .build();
+                    return weeklyMenuRepository.save(wm);
+                });
+    }
+
+    private DailyMenu upsertDailyMenu(Long storeId, LocalDate date, WeeklyMenu weekly) {
+        return dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElseGet(() -> {
+                    DailyMenu dm = DailyMenu.builder()
+                            .weeklyMenu(weekly)
+                            .date(date)
+                            .build();
+                        return dailyMenuRepository.save(dm);
+                });
     }
 
     @Transactional(readOnly = true)
