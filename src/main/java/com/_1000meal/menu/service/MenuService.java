@@ -1,5 +1,6 @@
 package com._1000meal.menu.service;
 
+import com._1000meal.favoriteMenu.repository.FavoriteMenuRepository;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.Menu;
@@ -34,6 +35,7 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuRepository menuRepository;
+    private final FavoriteMenuRepository favoriteMenuRepository;
 
     @Transactional
     public void addOrReplaceDailyMenu(Long storeId, DailyMenuAddRequest req) {
@@ -70,7 +72,7 @@ public class MenuService {
         LocalDate weekStart = anyDateInWeek.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekEnd   = weekStart.plusDays(6);
 
-        return weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, weekStart)
+        WeeklyMenu weekly = weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, weekStart)
                 .orElseGet(() -> {
                     WeeklyMenu wm = WeeklyMenu.builder()
                             .store(storeRepository.getReferenceById(storeId))
@@ -79,6 +81,10 @@ public class MenuService {
                             .build();
                     return weeklyMenuRepository.save(wm);
                 });
+
+        // ★ 주간 스캐폴딩: 부족한 DailyMenu 자동 생성
+        ensureWeekDailyMenus(weekly);
+        return weekly;
     }
 
     private DailyMenu upsertDailyMenu(Long storeId, LocalDate date, WeeklyMenu weekly) {
@@ -152,5 +158,32 @@ public class MenuService {
 
         dailyMenu.updateStock(stock);
         return new StockResponse(dailyMenu.getId(), dailyMenu.getStock());
+    }
+
+    @Transactional
+    protected void ensureWeekDailyMenus(WeeklyMenu weekly) {
+        LocalDate start = weekly.getStartDate();
+
+        // 이미 있는 날짜를 한 번에 로드
+        Set<LocalDate> existing = new HashSet<>(
+                dailyMenuRepository.findDatesByWeeklyMenuId(weekly.getId())
+        );
+
+        List<DailyMenu> toCreate = new ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            LocalDate d = start.plusDays(i);
+            if (!existing.contains(d)) {
+                DailyMenu dm = DailyMenu.builder()
+                        .weeklyMenu(weekly)
+                        .date(d)
+                        .build();
+                // DailyMenu에 store NotNull 이면 주석 해제
+                // dm.setStore(weekly.getStore());
+                toCreate.add(dm);
+            }
+        }
+        if (!toCreate.isEmpty()) {
+            dailyMenuRepository.saveAll(toCreate);
+        }
     }
 }

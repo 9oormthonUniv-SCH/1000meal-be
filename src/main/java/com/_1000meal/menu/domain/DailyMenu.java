@@ -48,7 +48,7 @@ public class DailyMenu {
         this.weeklyMenu = weeklyMenu;
         this.date = date;
         this.dayOfWeek = date != null ? date.getDayOfWeek() : null;
-        this.isOpen = false; // 메뉴가 추가되기 전까지는 닫힘
+        this.isOpen = true; // 메뉴가 추가되기 전까지는 닫힘
         this.stock = 100;
     }
 
