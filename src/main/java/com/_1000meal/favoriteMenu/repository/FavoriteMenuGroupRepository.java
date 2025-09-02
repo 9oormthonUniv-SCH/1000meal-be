@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 
 
@@ -18,4 +19,7 @@ public interface FavoriteMenuGroupRepository extends JpaRepository<FavoriteMenuG
         order by g.id asc, m.id asc
     """)
     List<FavoriteMenuGroup> findByStoreIdWithMenus(@Param("storeId") Long storeId);
+
+    @Query("select g.id from FavoriteMenuGroup g where g.store.id = :storeId and g.id in :ids")
+    List<Long> findOwnedIds(@Param("storeId") Long storeId, @Param("ids") Collection<Long> ids);
 }

@@ -22,12 +22,44 @@ public class FavoriteMenuController {
             @RequestBody List<String> names) {
 
         favoriteService.createGroupAndReplaceFavorites(storeId,names);
+
         return ApiResponse.success(null, SuccessCode.OK);
     }
 
-    @GetMapping("/{storeId}")
-    public ApiResponse<FavoriteMenuGroupedResponse> listFavoritesGrouped(@PathVariable Long storeId) {
-        FavoriteMenuGroupedResponse resp = favoriteService.listFavoritesGrouped(storeId);
+    @GetMapping("/store/{storeId}")
+    public ApiResponse<FavoriteMenuGroupedResponse> listAllFavoritesGrouped(@PathVariable Long storeId) {
+
+        FavoriteMenuGroupedResponse resp = favoriteService.getAllFavoritesGrouped(storeId);
+
         return ApiResponse.success(resp, SuccessCode.OK);
+    }
+
+    @GetMapping("/group/{groupId}")
+    public ApiResponse<FavoriteMenuGroupedResponse> listFavoritesGrouped(
+            @PathVariable Long groupId) {
+
+        FavoriteMenuGroupedResponse resp = favoriteService.getFavoritesGroupedByGroup(groupId);
+
+        return ApiResponse.success(resp, SuccessCode.OK);
+    }
+
+    @PutMapping("/{groupId}")
+    public ApiResponse<Void> updateGroupItems(
+            @PathVariable Long groupId,
+            @RequestBody List<String> names) {
+
+        favoriteService.replaceFavoritesInGroup(groupId, names);
+
+        return ApiResponse.success(null, SuccessCode.OK);
+    }
+
+    @DeleteMapping("/{storeId}/groups")
+    public ApiResponse<Void> deleteGroups(
+            @PathVariable Long storeId,
+            @RequestBody List<Long> groupIds) {
+
+         favoriteService.deleteGroups(storeId, groupIds);
+
+        return ApiResponse.success(null, SuccessCode.OK);
     }
 }

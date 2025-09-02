@@ -162,26 +162,28 @@ public class MenuService {
 
     @Transactional
     protected void ensureWeekDailyMenus(WeeklyMenu weekly) {
-        LocalDate start = weekly.getStartDate();
+        LocalDate start = weekly.getStartDate(); // 반드시 주의 시작(월요일)이어야 함
 
-        // 이미 있는 날짜를 한 번에 로드
+        // 이미 있는 날짜 수집
         Set<LocalDate> existing = new HashSet<>(
                 dailyMenuRepository.findDatesByWeeklyMenuId(weekly.getId())
         );
 
-        List<DailyMenu> toCreate = new ArrayList<>(7);
-        for (int i = 0; i < 7; i++) {
+        // 월~금(5일)만 생성
+        List<DailyMenu> toCreate = new ArrayList<>(5);
+        for (int i = 0; i < 5; i++) { // 0=월, 4=금
             LocalDate d = start.plusDays(i);
             if (!existing.contains(d)) {
                 DailyMenu dm = DailyMenu.builder()
                         .weeklyMenu(weekly)
                         .date(d)
                         .build();
-                // DailyMenu에 store NotNull 이면 주석 해제
+                // DailyMenu에 store가 NotNull이면 아래 주석 해제
                 // dm.setStore(weekly.getStore());
                 toCreate.add(dm);
             }
         }
+
         if (!toCreate.isEmpty()) {
             dailyMenuRepository.saveAll(toCreate);
         }
