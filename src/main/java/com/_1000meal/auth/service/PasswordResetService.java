@@ -10,18 +10,19 @@ import com._1000meal.email.common.MailSender;
 import com._1000meal.global.constant.Role;
 import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.exception.CustomException;
-import com._1000meal.global.util.PasswordValidator;   // ← 기존 유틸 재사용
+import com._1000meal.global.util.PasswordValidator;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 
 @Service
-@lombok.RequiredArgsConstructor
+@RequiredArgsConstructor
 public class PasswordResetService {
 
     private final AccountRepository accountRepository;
@@ -35,77 +36,87 @@ public class PasswordResetService {
     @Value("${app.password-reset.request-cooldown-seconds:60}")
     private long cooldownSeconds;
 
-    @Value("${app.password-reset.reset-url-base}")
-    private String resetUrlBase;
-
-    /** 비로그인: 재설정 링크 요청 */
+    /** 비로그인: 재설정 코드(6자리) 발급 & 메일 전송 */
     @Transactional
     public void requestReset(PasswordResetRequest req) {
         Account account = accountRepository.findByEmail(req.email())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 관리자 제외
         if (account.getRole() == Role.ADMIN) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
-        // 레이트리밋: 최근 쿨타임 내 요청 거절
+        // 레이트리밋
         LocalDateTime after = LocalDateTime.now().minusSeconds(cooldownSeconds);
-        long recent = tokenRepository.countByAccountAndCreatedAtAfter(account, after);
-        if (recent > 0) {
+        if (tokenRepository.countByAccountAndCreatedAtAfter(account, after) > 0) {
             throw new CustomException(ErrorCode.TOO_MANY_REQUESTS);
         }
 
-        // 토큰 발급 & 저장
+        // ✅ 기존 미사용 토큰이 있다면 무효화 후 DB 반영
+        tokenRepository.findTopByAccountAndUsedAtIsNullOrderByIdDesc(account)
+                .ifPresent(oldToken -> {
+                    oldToken.markUsed();
+                    tokenRepository.saveAndFlush(oldToken); // 즉시 UPDATE 반영
+                });
+
+        // 새 토큰 발급
         PasswordResetToken token = PasswordResetToken.issue(account, tokenTtlMinutes);
         tokenRepository.save(token);
 
-        // 링크 생성
-        String link = resetUrlBase + "?token=" + URLEncoder.encode(token.getToken(), StandardCharsets.UTF_8);
-
-        // 메일 발송
-        String subject = "[1000Meal] 비밀번호 재설정 안내";
+        // 메일 본문: 인증 코드 표시
+        String subject = "[1000Meal] 비밀번호 재설정 인증 코드";
         String body = """
-                <p>안녕하세요.</p>
-                <p>아래 버튼을 눌러 비밀번호 재설정을 진행하세요. 유효시간은 %d분입니다.</p>
-                <p><a href="%s" style="display:inline-block;padding:10px 16px;background:#2d6cdf;color:#fff;text-decoration:none;border-radius:6px;">비밀번호 재설정</a></p>
-                <p>만약 본인이 요청하지 않았다면 이 메일은 무시하셔도 됩니다.</p>
-                """.formatted(tokenTtlMinutes, link);
+            <p>안녕하세요.</p>
+            <p>아래 인증 코드를 입력하여 비밀번호를 재설정해 주세요.</p>
+            <p style="font-size:18px;font-weight:bold;">인증 코드: %s</p>
+            <p>유효시간: %d분</p>
+            <p>본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다.</p>
+            """.formatted(token.getRawToken(), tokenTtlMinutes);
 
         mailSender.send(account.getEmail(), subject, body);
     }
 
-    /** 비로그인: 재설정 실행 */
+    /** 비로그인: 이메일 + 6자리 코드 + 새 비밀번호로 재설정 */
     @Transactional
     public void confirmReset(PasswordResetConfirmRequest req) {
-        PasswordResetToken token = tokenRepository.findByToken(req.token())
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
-
-        if (!token.isUsable()) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
-
-        Account account = token.getAccount();
+        Account account = accountRepository.findByEmail(req.email())
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         if (account.getRole() == Role.ADMIN) {
             throw new CustomException(ErrorCode.FORBIDDEN);
         }
 
+        // 토큰 조회: 평문 코드를 SHA-256 해시로 변환 후 매칭
+        String tokenHash = sha256Hex(req.token());
+        PasswordResetToken token = tokenRepository
+                .findTopByAccountAndTokenHashAndUsedAtIsNullAndExpiresAtAfterOrderByIdDesc(
+                        account, tokenHash, LocalDateTime.now())
+                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
+
+        // 비밀번호 검증
         if (!req.newPassword().equals(req.confirmPassword())) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
-
-        // 기존 유틸로 강도/금지 규칙 검증 (username = userId, phoneNumber는 없으면 null)
         PasswordValidator.validatePassword(req.newPassword(), account.getUserId(), null);
-
         if (passwordEncoder.matches(req.newPassword(), account.getPasswordHash())) {
             throw new CustomException(ErrorCode.BAD_REQUEST);
         }
 
-        // 비밀번호 변경
+        // 변경 & 토큰 사용 처리
         account.changePassword(passwordEncoder.encode(req.newPassword()));
-
-        // 토큰 1회성 처리
         token.markUsed();
+    }
+
+    /** SHA-256 해시 유틸 */
+    private static String sha256Hex(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(s.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 }
