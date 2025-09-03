@@ -47,6 +47,7 @@ public class SecurityConfig {
             // 공개 API
             "/api/v1/stores/**",
             "/api/v1/menus/**",
+            "/api/v1/favorites/**",
             // 문서/헬스체크
             "/swagger-ui/**",
             "/swagger-ui.html",

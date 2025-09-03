@@ -1,5 +1,6 @@
 package com._1000meal.menu.service;
 
+import com._1000meal.favoriteMenu.repository.FavoriteMenuRepository;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.Menu;
@@ -19,8 +20,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,39 +35,67 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuRepository menuRepository;
+    private final FavoriteMenuRepository favoriteMenuRepository;
 
-    @Transactional(readOnly = false)
+    @Transactional
     public void addOrReplaceDailyMenu(Long storeId, DailyMenuAddRequest req) {
-        // 1) 유효성
-        if (req.getMenus() == null || req.getMenus().isEmpty()) {
-            throw new CustomException(MenuErrorCode.MENU_EMPTY);
-        }
-        // 정제: trim, 공백 제거, 중복 제거
-        List<String> cleaned = req.getMenus().stream()
+
+        LocalDate targetDate = req.getDate();
+        if (targetDate == null) throw new CustomException(MenuErrorCode.DATE_REQUIRED);
+
+        List<String> raw = Optional.ofNullable(req.getMenus()).orElse(List.of());
+        List<String> cleaned = raw.stream()
                 .map(s -> s == null ? "" : s.trim())
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
-        if (cleaned.isEmpty()) throw new CustomException(MenuErrorCode.MENU_EMPTY);
 
-        // 2) 필수 엔티티 로드
-        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, req.getDate())
-                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+        WeeklyMenu weekly = upsertWeeklyMenu(storeId, targetDate);
+        DailyMenu dm = upsertDailyMenu(storeId, targetDate, weekly);
 
-        Long dailyMenuId = dm.getId();
+        if (cleaned.isEmpty()) {
+            dm.getMenus().clear();
+            dailyMenuRepository.save(dm);
+            return;
+        }
 
-        // 4) 메뉴 교체
-        menuRepository.deleteByDailyMenuId(dailyMenuId);
+        dm.getMenus().clear();
+        for (String name : cleaned) {
+            Menu m = Menu.builder().name(name).build();
+            m.setDailyMenu(dm);
+            dm.getMenus().add(m);
+        }
+        dailyMenuRepository.save(dm);
+    }
 
-        List<Menu> toInsert = cleaned.stream()
-                .map(name -> {
-                    Menu m = Menu.builder().name(name).build();
-                    m.setDailyMenu(dm);
-                    return m;
-                })
-                .toList();
+    private WeeklyMenu upsertWeeklyMenu(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = anyDateInWeek.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd   = weekStart.plusDays(6);
 
-        menuRepository.saveAll(toInsert);
+        WeeklyMenu weekly = weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, weekStart)
+                .orElseGet(() -> {
+                    WeeklyMenu wm = WeeklyMenu.builder()
+                            .store(storeRepository.getReferenceById(storeId))
+                            .startDate(weekStart)
+                            .endDate(weekEnd)
+                            .build();
+                    return weeklyMenuRepository.save(wm);
+                });
+
+        // ★ 주간 스캐폴딩: 부족한 DailyMenu 자동 생성
+        ensureWeekDailyMenus(weekly);
+        return weekly;
+    }
+
+    private DailyMenu upsertDailyMenu(Long storeId, LocalDate date, WeeklyMenu weekly) {
+        return dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElseGet(() -> {
+                    DailyMenu dm = DailyMenu.builder()
+                            .weeklyMenu(weekly)
+                            .date(date)
+                            .build();
+                        return dailyMenuRepository.save(dm);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -128,5 +158,34 @@ public class MenuService {
 
         dailyMenu.updateStock(stock);
         return new StockResponse(dailyMenu.getId(), dailyMenu.getStock());
+    }
+
+    @Transactional
+    protected void ensureWeekDailyMenus(WeeklyMenu weekly) {
+        LocalDate start = weekly.getStartDate(); // 반드시 주의 시작(월요일)이어야 함
+
+        // 이미 있는 날짜 수집
+        Set<LocalDate> existing = new HashSet<>(
+                dailyMenuRepository.findDatesByWeeklyMenuId(weekly.getId())
+        );
+
+        // 월~금(5일)만 생성
+        List<DailyMenu> toCreate = new ArrayList<>(5);
+        for (int i = 0; i < 5; i++) { // 0=월, 4=금
+            LocalDate d = start.plusDays(i);
+            if (!existing.contains(d)) {
+                DailyMenu dm = DailyMenu.builder()
+                        .weeklyMenu(weekly)
+                        .date(d)
+                        .build();
+                // DailyMenu에 store가 NotNull이면 아래 주석 해제
+                // dm.setStore(weekly.getStore());
+                toCreate.add(dm);
+            }
+        }
+
+        if (!toCreate.isEmpty()) {
+            dailyMenuRepository.saveAll(toCreate);
+        }
     }
 }

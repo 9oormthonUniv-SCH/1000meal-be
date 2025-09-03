@@ -11,7 +11,9 @@ public enum MenuErrorCode implements ErrorCodeIfs {
     MENU_ALREADY_EXISTS("MENU_409", 409, "이미 존재하는 메뉴입니다."),
     INVALID_MENU_NAME("MENU_400", 400, "잘못된 메뉴 이름입니다."),
     INTERNAL_SERVER_ERROR("MENU_500", 500, "서버 오류가 발생했습니다."),
-    INSUFFICIENT_STOCK("DAILY_MENU_500", 500, "해당 메뉴의 재고가 요청량보다 작습니다.")
+    INSUFFICIENT_STOCK("DAILY_MENU_500", 500, "해당 메뉴의 재고가 요청량보다 작습니다."),
+    DATE_REQUIRED("MENU_400", 400, "날짜가 누락됐습니다."),
+    FAVORITE_GROUP_NOT_FOUND("MENU_404", 400, "즐겨찾는 메뉴를 찾을 수 없습니다."),
     ;
 
     private final String code;

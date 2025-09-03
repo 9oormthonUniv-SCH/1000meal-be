@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface DailyMenuRepository extends JpaRepository<DailyMenu, Long> {
@@ -14,6 +15,9 @@ public interface DailyMenuRepository extends JpaRepository<DailyMenu, Long> {
             "LEFT JOIN FETCH dm.menus " +
             "WHERE dm.weeklyMenu.store.id = :storeId AND dm.date = :date")
     Optional<DailyMenu> findDailyMenuByStoreIdAndDate(@Param("storeId") Long storeId, @Param("date") LocalDate date);
+
+    @Query("select dm.date from DailyMenu dm where dm.weeklyMenu.id = :weeklyId")
+    List<LocalDate> findDatesByWeeklyMenuId(@Param("weeklyId") Long weeklyId);
 
     @Query("""
         select dm.stock
