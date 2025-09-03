@@ -104,3 +104,10 @@ logging:
   level:
     org.hibernate.SQL: debug
     org.hibernate.orm.jdbc.bind: trace
+
+
+app:
+  password-reset:
+    token-ttl-minutes: 10
+    request-cooldown-seconds: 60
+    reset-url-base: "https://your-frontend.com/reset-password" # 프론트 진입 URL

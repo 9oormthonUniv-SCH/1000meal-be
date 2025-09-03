@@ -41,6 +41,9 @@ public class SecurityConfig {
 
             "/api/v1/signup/user/validate-id",
 
+            "/api/v1/auth/password/reset/request",
+            "/api/v1/auth/password/reset/confirm",
+
             // 공개 API
             "/api/v1/stores/**",
             "/api/v1/menus/**",

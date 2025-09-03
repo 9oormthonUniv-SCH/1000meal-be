@@ -40,5 +40,11 @@ public class Account {
         this.status = status;
     }
 
+
     public void activate() { this.status = AccountStatus.ACTIVE; }
+    public void changePassword(String newPasswordHash) {
+        this.passwordHash = newPasswordHash;
+    }
+
+
 }
