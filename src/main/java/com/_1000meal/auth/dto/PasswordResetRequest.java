@@ -2,7 +2,9 @@ package com._1000meal.auth.dto;
 
 import jakarta.validation.constraints.NotBlank;
 
-/** 아이디(관리자ID) 또는 이메일로 요청 */
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
 public record PasswordResetRequest(
-        @NotBlank String userIdOrEmail
+        @NotBlank @Email String email
 ) {}
