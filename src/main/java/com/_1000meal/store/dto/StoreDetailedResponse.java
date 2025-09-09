@@ -11,6 +11,7 @@ import java.time.LocalTime;
 public class StoreDetailedResponse {
 
     private Long id;
+    private String imageUrl;
     private String name;
     private String address;
     private String phone;
