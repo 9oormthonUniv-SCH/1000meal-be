@@ -2,12 +2,11 @@ package com._1000meal.store.controller;
 
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
+import com._1000meal.store.dto.SetStoreImageUrlRequest;
 import com._1000meal.store.dto.StoreDetailedResponse;
-import com._1000meal.store.dto.StoreRequest;
 import com._1000meal.store.dto.StoreResponse;
 import com._1000meal.store.service.StoreService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -37,6 +36,12 @@ public class StoreController {
     @PostMapping("/status/{storeId}")
     public ApiResponse<?> status(@PathVariable Long storeId) {
         String response = storeService.toggleStoreStatus(storeId);
+        return ApiResponse.ok(response);
+    }
+
+    @PostMapping("/image-url")
+    public ApiResponse<?> setImageUrl(@RequestBody SetStoreImageUrlRequest req) {
+        String response = storeService.setImageUrl(req.getStoreId(), req.getImageUrl());
         return ApiResponse.ok(response);
     }
 

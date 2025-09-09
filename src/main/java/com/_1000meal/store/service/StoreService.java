@@ -83,6 +83,14 @@ public class StoreService {
         return "가게의 운영 상태가 업데이트 되었습니다.";
     }
 
+    @Transactional
+    public String setImageUrl(Long storeId, String imageUrl) {
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
+        store.updateImageUrl(imageUrl); // Dirty Checking으로 저장
+        return store.getImageUrl();
+    }
+
 //    public StoreResponse createStore(StoreRequest request) {
 //        Store store = Store.builder()
 //                .name(request.getName()).address(request.getAddress())

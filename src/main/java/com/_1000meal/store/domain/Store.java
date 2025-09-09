@@ -24,6 +24,9 @@ public class Store {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "image_url", length = 1024)
+    private String imageUrl;
+
     private String name;          // 매장 이름
     private String address;       // 위치주소
     private String phone;         // 전화번호
@@ -52,7 +55,8 @@ public class Store {
     }
 
     @Builder
-    public Store(String name, String address, String phone, String description, LocalTime openTime, LocalTime closeTime, boolean isOpen, int remain, String hours, double lat, double lng) {
+    public Store(String imageUrl, String name, String address, String phone, String description, LocalTime openTime, LocalTime closeTime, boolean isOpen, int remain, String hours, double lat, double lng) {
+        this.imageUrl = imageUrl;
         this.name = name;
         this.address = address;
         this.phone = phone;
@@ -70,6 +74,7 @@ public class Store {
 
         return StoreDetailedResponse.builder()
                 .id(this.getId())
+                .imageUrl(this.getImageUrl())
                 .name(this.getName())
                 .address(this.getAddress())
                 .phone(this.getPhone())
@@ -88,6 +93,7 @@ public class Store {
     public StoreResponse toStoreResponse(DailyMenuDto todayMenu) {
         return StoreResponse.builder()
                 .id(this.getId())
+                .imageUrl(this.getImageUrl())
                 .name(this.getName())
                 .address(this.getAddress())
                 .phone(this.getPhone())
@@ -99,5 +105,9 @@ public class Store {
                 .lng(this.getLng())
                 .todayMenu(todayMenu)
                 .build();
+    }
+
+    public void updateImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
     }
 }

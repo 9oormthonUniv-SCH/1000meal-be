@@ -1,4 +1,9 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -87,6 +92,17 @@ spring:
       mail.smtp.starttls.enable: true
     default-encoding: UTF-8
 
+cloud:
+  aws:
+    credentials:
+      access-key: ${ACCESS_KEY}
+      secret-key: ${SECRET_KEY}
+    region:
+      static: ap-northeast-2  # 버킷의 리전
+    s3:
+      bucket: 1000mealsql   # 버킷 이름
+    stack:
+      auto: false
 server:
   port: 8080
 
