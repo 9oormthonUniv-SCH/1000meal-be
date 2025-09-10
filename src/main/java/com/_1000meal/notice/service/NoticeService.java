@@ -25,8 +25,9 @@ public class NoticeService {
 
     @Transactional(readOnly = true)
     public List<NoticeResponse> list() {
-        return noticeRepository.findAll(Sort.by(Sort.Order.desc("isPinned"), Sort.Order.desc("createdAt")))
-                .stream()
+        return noticeRepository.findAllByDeletedAtIsNull(
+                        Sort.by(Sort.Order.desc("isPinned"), Sort.Order.desc("createdAt"))
+                ).stream()
                 .map(Notice::toResponse)
                 .toList();
     }
