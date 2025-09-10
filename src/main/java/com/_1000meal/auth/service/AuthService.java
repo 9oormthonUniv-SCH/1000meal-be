@@ -38,28 +38,46 @@ public class AuthService {
     /* -------------------- 회원가입 -------------------- */
     @Transactional
     public SignupResponse signup(SignupRequest req) {
+        // 0) 필수 필드/기본 정규화
         if (req.role() == null) {
             throw new CustomException(ErrorCode.VALIDATION_ERROR, "역할(role)은 필수입니다.");
         }
-
         final String rawUserId = req.userId();
         final String rawEmail  = req.email();
         final String rawPwd    = req.password();
+        final String name      = req.name(); // null 허용하되 trim은 해 둠
 
-        // 입력 정규화
         final String userId = (rawUserId == null) ? "" : rawUserId.trim();
         final String email  = (rawEmail  == null) ? "" : rawEmail.trim().toLowerCase();
+        final String nameNm = (name == null) ? null : name.trim();
         final Role   role   = req.role();
 
-        // --- 기본 형식 검증 ---
+        // 1) 입력 형식 검증
         if (userId.isEmpty() || email.isEmpty() || rawPwd == null || rawPwd.isBlank()) {
             throw new CustomException(ErrorCode.VALIDATION_ERROR, "아이디/이메일/비밀번호는 필수입니다.");
         }
 
-        // --- 비밀번호 정책 검증(인코딩 전) ---
+        // 2) 비밀번호 정책 (인코딩 전)
         com._1000meal.global.util.PasswordValidator.validatePassword(rawPwd, userId, null);
 
-        // --- 유니크 검사 (DELETED 제외) ---
+        // 3) 역할별 정책
+        AccountStatus status = AccountStatus.ACTIVE;
+        if (role == Role.STUDENT) {
+            if (!userId.matches("^\\d{8}$")) {
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학번 형식이 올바르지 않습니다. (예: 8자리 숫자)");
+            }
+            if (!email.endsWith("@sch.ac.kr")) {
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
+            }
+            // 이메일 인증 선행
+            emailService.requireVerified(email);
+        } else if (role == Role.ADMIN) {
+            if (req.storeId() == null) {
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "관리자 가입 시 storeId는 필수입니다.");
+            }
+        }
+
+        // 4) 중복 검사 (DELETED 제외)
         if (accountRepo.existsByUserIdAndStatusNot(userId, AccountStatus.DELETED)) {
             throw new CustomException(ErrorCode.DUPLICATE_USER_ID, "이미 사용 중인 아이디입니다.");
         }
@@ -67,42 +85,48 @@ public class AuthService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
         }
 
-        // --- 역할별 정책 ---
-        AccountStatus status = AccountStatus.ACTIVE;
-        if (role == Role.STUDENT) {
-            if (!userId.matches("^\\d{8}$")) {
-                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학번 형식이 올바르지 않습니다.");
+        // 5) 저장 (경합 대비: DB Unique 에러를 캐치해 사용자 친화 메시지로 변환)
+        Account account;
+        try {
+            account = new Account(
+                    null,
+                    userId,
+                    email,
+                    passwordEncoder.encode(rawPwd),
+                    role,
+                    status
+            );
+            accountRepo.save(account);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // DB Unique 제약(이메일/아이디) 충돌 시 안전망
+            String msg = String.valueOf(e.getMostSpecificCause()).toLowerCase();
+            if (msg.contains("email") || msg.contains("uk_") && msg.contains("email")) {
+                throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
             }
-            if (!email.endsWith("@sch.ac.kr")) {
-                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
+            if (msg.contains("user_id") || msg.contains("uk_") && msg.contains("user_id")) {
+                throw new CustomException(ErrorCode.DUPLICATE_USER_ID, "이미 사용 중인 아이디입니다.");
             }
-            emailService.requireVerified(email); // 선 인증 필요
+            throw new CustomException(ErrorCode.CONFLICT, "요청이 현재 리소스 상태와 충돌합니다."); // 기타 케이스
         }
 
-        // --- Account 저장 ---
-        Account account = new Account(null, userId, email, passwordEncoder.encode(rawPwd), role, status);
-        accountRepo.save(account);
-
-        // --- 프로필 & 스토어(관리자만) ---
+        // 6) 프로필/스토어
         Long storeId = null;
         String storeName = null;
-
         if (role == Role.STUDENT) {
-            UserProfile profile = UserProfile.create(account, null, req.name(), null);
+            UserProfile profile = UserProfile.create(account, null, nameNm, null);
             userProfileRepo.save(profile);
-            emailService.consumeAllFor(email); // 인증코드 소진
+            // 가입 성공 후 해당 이메일의 인증코드 소진
+            emailService.consumeAllFor(email);
         } else { // ADMIN
-            if (req.storeId() == null) {
-                throw new CustomException(ErrorCode.VALIDATION_ERROR, "관리자 가입 시 storeId는 필수입니다.");
-            }
             Store store = storeRepo.findById(req.storeId())
                     .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "해당 storeId의 매장을 찾을 수 없습니다."));
-            AdminProfile profile = AdminProfile.create(account, req.name(), 1, store);
+            AdminProfile profile = AdminProfile.create(account, nameNm, 1, store);
             adminProfileRepo.save(profile);
             storeId = store.getId();
             storeName = store.getName();
         }
 
+        // 7) 응답
         return new SignupResponse(
                 account.getId(),
                 account.getRole(),
