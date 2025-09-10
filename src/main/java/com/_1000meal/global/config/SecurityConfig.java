@@ -50,6 +50,7 @@ public class SecurityConfig {
             "/api/v1/menus/**",
             "/api/v1/favorites/**",
             "/file",
+            "/api/v1/notices/**",
             // 문서/헬스체크
             "/swagger-ui/**",
             "/swagger-ui.html",
