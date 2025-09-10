@@ -39,24 +39,36 @@ public class PasswordResetService {
     /** 비로그인: 재설정 코드(6자리) 발급 & 메일 전송 */
     @Transactional
     public void requestReset(PasswordResetRequest req) {
-        Account account = accountRepository.findByEmail(req.email())
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        final String email = req.email() == null ? "" : req.email().trim().toLowerCase();
+
+        Account account = accountRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "해당 이메일(" + email + ")로 가입된 계정을 찾을 수 없습니다.")
+                );
 
         if (account.getRole() == Role.ADMIN) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN,
+                    "관리자 계정은 비밀번호 재설정을 이메일 코드로 진행할 수 없습니다. 운영팀에 문의하세요."
+            );
         }
 
         // 레이트리밋
         LocalDateTime after = LocalDateTime.now().minusSeconds(cooldownSeconds);
-        if (tokenRepository.countByAccountAndCreatedAtAfter(account, after) > 0) {
-            throw new CustomException(ErrorCode.TOO_MANY_REQUESTS);
+        long recent = tokenRepository.countByAccountAndCreatedAtAfter(account, after);
+        if (recent > 0) {
+            throw new CustomException(
+                    ErrorCode.TOO_MANY_REQUESTS,
+                    "요청이 너무 잦습니다. " + cooldownSeconds + "초 후 다시 시도해 주세요."
+            );
         }
 
-        // ✅ 기존 미사용 토큰이 있다면 무효화 후 DB 반영
+        // 기존 미사용 토큰 무효화(1회성 보장)
         tokenRepository.findTopByAccountAndUsedAtIsNullOrderByIdDesc(account)
                 .ifPresent(oldToken -> {
                     oldToken.markUsed();
-                    tokenRepository.saveAndFlush(oldToken); // 즉시 UPDATE 반영
+                    tokenRepository.saveAndFlush(oldToken);
                 });
 
         // 새 토큰 발급
@@ -79,27 +91,57 @@ public class PasswordResetService {
     /** 비로그인: 이메일 + 6자리 코드 + 새 비밀번호로 재설정 */
     @Transactional
     public void confirmReset(PasswordResetConfirmRequest req) {
-        Account account = accountRepository.findByEmail(req.email())
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        final String email = req.email() == null ? "" : req.email().trim().toLowerCase();
+
+        Account account = accountRepository.findByEmail(email)
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.USER_NOT_FOUND,
+                        "해당 이메일(" + email + ")로 가입된 계정을 찾을 수 없습니다.")
+                );
 
         if (account.getRole() == Role.ADMIN) {
-            throw new CustomException(ErrorCode.FORBIDDEN);
+            throw new CustomException(
+                    ErrorCode.FORBIDDEN,
+                    "관리자 계정은 비밀번호 재설정을 이메일 코드로 진행할 수 없습니다. 운영팀에 문의하세요."
+            );
         }
 
-        // 토큰 조회: 평문 코드를 SHA-256 해시로 변환 후 매칭
+        // 토큰 조회: 평문 6자리 코드를 SHA-256 해시로 변환 후 조회
         String tokenHash = sha256Hex(req.token());
         PasswordResetToken token = tokenRepository
                 .findTopByAccountAndTokenHashAndUsedAtIsNullAndExpiresAtAfterOrderByIdDesc(
                         account, tokenHash, LocalDateTime.now())
-                .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.INVALID_TOKEN,
+                        "인증 코드가 유효하지 않거나 만료되었습니다. 새 코드를 요청해 주세요.")
+                );
 
         // 비밀번호 검증
         if (!req.newPassword().equals(req.confirmPassword())) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(
+                    ErrorCode.BAD_REQUEST,
+                    "새 비밀번호와 확인용 비밀번호가 일치하지 않습니다."
+            );
         }
-        PasswordValidator.validatePassword(req.newPassword(), account.getUserId(), null);
+
+        try {
+            PasswordValidator.validatePassword(req.newPassword(), account.getUserId(), null);
+        } catch (CustomException e) {
+            // PasswordValidator 내부의 코드/메시지를 그대로 전달
+            throw e;
+        } catch (Exception e) {
+            // 예기치 못한 경우 방어적 메시지
+            throw new CustomException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "비밀번호 형식이 올바르지 않습니다."
+            );
+        }
+
         if (passwordEncoder.matches(req.newPassword(), account.getPasswordHash())) {
-            throw new CustomException(ErrorCode.BAD_REQUEST);
+            throw new CustomException(
+                    ErrorCode.BAD_REQUEST,
+                    "새 비밀번호가 이전 비밀번호와 동일합니다."
+            );
         }
 
         // 변경 & 토큰 사용 처리

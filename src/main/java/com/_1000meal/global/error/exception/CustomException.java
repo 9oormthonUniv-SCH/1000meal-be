@@ -18,4 +18,10 @@ public class CustomException extends RuntimeException {
         super(errorCodeIfs.getMessage(), cause);
         this.errorCodeIfs = errorCodeIfs;
     }
+
+    // ✅ 사용자 정의 메시지 포함 생성자
+    public CustomException(ErrorCodeIfs errorCodeIfs, String customMessage) {
+        super(customMessage);  // 여기서는 전달받은 메시지를 사용
+        this.errorCodeIfs = errorCodeIfs;
+    }
 }
