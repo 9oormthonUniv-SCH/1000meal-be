@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;   // ✅ 추가
 import java.util.Map;      // ✅ 추가
-
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -57,43 +56,31 @@ public class AuthService {
             throw new CustomException(ErrorCode.VALIDATION_ERROR, "아이디/이메일/비밀번호는 필수입니다.");
         }
 
-        // --- 비밀번호 정책 검증: 인코딩 전에 수행 ---
-        // username 파라미터는 정책상 금지 문자열 체크를 위해 userId 전달 (전화번호는 없으면 null)
+        // --- 비밀번호 정책 검증(인코딩 전) ---
         com._1000meal.global.util.PasswordValidator.validatePassword(rawPwd, userId, null);
 
         // --- 유니크 검사 (DELETED 제외) ---
         if (accountRepo.existsByUserIdAndStatusNot(userId, AccountStatus.DELETED)) {
-            throw new CustomException(ErrorCode.DUPLICATE_USER_ID);
+            throw new CustomException(ErrorCode.DUPLICATE_USER_ID, "이미 사용 중인 아이디입니다.");
         }
         if (accountRepo.existsByEmailAndStatusNot(email, AccountStatus.DELETED)) {
-            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
         }
 
         // --- 역할별 정책 ---
         AccountStatus status = AccountStatus.ACTIVE;
         if (role == Role.STUDENT) {
-            // (1) 학번 형식: 8자리 숫자
             if (!userId.matches("^\\d{8}$")) {
                 throw new CustomException(ErrorCode.VALIDATION_ERROR, "학번 형식이 올바르지 않습니다.");
             }
-            // (2) 이메일 도메인
             if (!email.endsWith("@sch.ac.kr")) {
                 throw new CustomException(ErrorCode.VALIDATION_ERROR, "학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
             }
-            // (3) 이메일 인증 선행 확인
-            emailService.requireVerified(email);
-            status = AccountStatus.ACTIVE;
+            emailService.requireVerified(email); // 선 인증 필요
         }
 
         // --- Account 저장 ---
-        Account account = new Account(
-                null,
-                userId,
-                email,
-                passwordEncoder.encode(rawPwd),  // ← 검증 통과 후 인코딩
-                role,
-                status
-        );
+        Account account = new Account(null, userId, email, passwordEncoder.encode(rawPwd), role, status);
         accountRepo.save(account);
 
         // --- 프로필 & 스토어(관리자만) ---
@@ -103,8 +90,7 @@ public class AuthService {
         if (role == Role.STUDENT) {
             UserProfile profile = UserProfile.create(account, null, req.name(), null);
             userProfileRepo.save(profile);
-            // 가입 성공 후 해당 이메일의 인증코드 일괄 소진
-            emailService.consumeAllFor(email);
+            emailService.consumeAllFor(email); // 인증코드 소진
         } else { // ADMIN
             if (req.storeId() == null) {
                 throw new CustomException(ErrorCode.VALIDATION_ERROR, "관리자 가입 시 storeId는 필수입니다.");
@@ -113,12 +99,10 @@ public class AuthService {
                     .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "해당 storeId의 매장을 찾을 수 없습니다."));
             AdminProfile profile = AdminProfile.create(account, req.name(), 1, store);
             adminProfileRepo.save(profile);
-
             storeId = store.getId();
             storeName = store.getName();
         }
 
-        // --- 응답 ---
         return new SignupResponse(
                 account.getId(),
                 account.getRole(),
@@ -133,30 +117,37 @@ public class AuthService {
     /* -------------------- 로그인 -------------------- */
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest req) {
-        final String userId = req.userId().trim();
-        final Role reqRole  = req.role(); // 요청된 역할
+        final String rawUserId = req.userId();
+        final Role reqRole     = req.role();
 
-        // 1) 계정 조회 (userId 기준)
+        if (rawUserId == null || rawUserId.isBlank() || req.password() == null || reqRole == null) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "아이디/비밀번호/역할은 필수입니다.");
+        }
+        final String userId = rawUserId.trim();
+
+        // (권장) 삭제 계정 제외하고 조회하도록 레포지토리 메서드 추가해 두면 더 안전
+        // Optional<Account> findByUserIdAndStatus(String userId, AccountStatus status);
         Account account = accountRepo.findByUserId(userId)
-                .orElseThrow(() -> new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다."));
+                .orElseThrow(() -> new CustomException(
+                        ErrorCode.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다."));
 
-        // 2) 비밀번호 체크
+        // 비밀번호 확인 (실패 시 동일 메시지로 모模호화)
         if (!passwordEncoder.matches(req.password(), account.getPasswordHash())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
+            throw new CustomException(ErrorCode.UNAUTHORIZED, "아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        // 3) 역할 일치 체크 (핵심)
+        // 역할 일치 체크
         if (account.getRole() != reqRole) {
-            // 프론트가 표시하기 쉬운 메시지로
-            throw new IllegalArgumentException("역할이 일치하지 않습니다. (" + reqRole + "로 로그인할 수 없습니다)");
+            throw new CustomException(ErrorCode.ROLE_MISMATCH,
+                    "역할이 일치하지 않습니다. (" + reqRole + "로 로그인할 수 없습니다)");
         }
 
-        // 4) 상태 체크
+        // 상태 체크
         if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new IllegalStateException("계정이 활성화되지 않았습니다.");
+            throw new CustomException(ErrorCode.ACCOUNT_INACTIVE, "계정이 활성화되지 않았습니다.");
         }
 
-        // 5) 표시 이름/가게 정보 조회 (생략 가능: 기존 코드 재사용)
+        // 표시 이름/가게 정보
         String displayName = resolveName(account);
         Long storeId = null;
         String storeName = null;
@@ -168,7 +159,7 @@ public class AuthService {
             }
         }
 
-        // 6) 토큰 발급 (role은 DB 값 사용)
+        // 토큰 발급
         AuthPrincipal principal = new AuthPrincipal(
                 account.getId(),
                 account.getUserId(),
@@ -176,7 +167,7 @@ public class AuthService {
                 account.getEmail(),
                 account.getRole().name()
         );
-        Map<String,Object> extra = (storeId == null) ? null : Map.of("storeId", storeId, "storeName", storeName);
+        Map<String, Object> extra = (storeId == null) ? null : Map.of("storeId", storeId, "storeName", storeName);
         String accessToken = jwtProvider.createToken(principal, extra);
 
         return new LoginResponse(
@@ -196,9 +187,8 @@ public class AuthService {
     public LoginResponse me(Authentication authentication) {
         AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
         Account account = accountRepo.findById(principal.id())
-                .orElseThrow(() -> new IllegalStateException("계정이 존재하지 않습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "계정이 존재하지 않습니다."));
 
-        // ADMIN이면 상점 정보도 함께 내려줌(일관성)
         Long storeId = null;
         String storeName = null;
         if (account.getRole() == Role.ADMIN) {
