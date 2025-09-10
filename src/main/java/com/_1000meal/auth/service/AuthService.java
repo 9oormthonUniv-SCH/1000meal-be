@@ -10,6 +10,8 @@ import com._1000meal.auth.repository.AdminProfileRepository;
 import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.email.service.EmailService;
 import com._1000meal.global.constant.Role;
+import com._1000meal.global.error.code.ErrorCode;
+import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.security.JwtProvider;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -38,49 +40,63 @@ public class AuthService {
     @Transactional
     public SignupResponse signup(SignupRequest req) {
         if (req.role() == null) {
-            throw new IllegalArgumentException("역할(role)은 필수입니다.");
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "역할(role)은 필수입니다.");
         }
 
-        final String userId = req.userId().trim();
-        final String email  = req.email().trim().toLowerCase();
-        final Role role     = req.role();
+        final String rawUserId = req.userId();
+        final String rawEmail  = req.email();
+        final String rawPwd    = req.password();
 
-        // 유니크 검사
-        if (accountRepo.existsByUserId(userId)) {
-            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
-        }
-        if (accountRepo.existsByEmail(email)) {
-            throw new IllegalArgumentException("이미 사용 중인 이메일입니다.");
+        // 입력 정규화
+        final String userId = (rawUserId == null) ? "" : rawUserId.trim();
+        final String email  = (rawEmail  == null) ? "" : rawEmail.trim().toLowerCase();
+        final Role   role   = req.role();
+
+        // --- 기본 형식 검증 ---
+        if (userId.isEmpty() || email.isEmpty() || rawPwd == null || rawPwd.isBlank()) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "아이디/이메일/비밀번호는 필수입니다.");
         }
 
-        // 역할별 정책
+        // --- 비밀번호 정책 검증: 인코딩 전에 수행 ---
+        // username 파라미터는 정책상 금지 문자열 체크를 위해 userId 전달 (전화번호는 없으면 null)
+        com._1000meal.global.util.PasswordValidator.validatePassword(rawPwd, userId, null);
+
+        // --- 유니크 검사 (DELETED 제외) ---
+        if (accountRepo.existsByUserIdAndStatusNot(userId, AccountStatus.DELETED)) {
+            throw new CustomException(ErrorCode.DUPLICATE_USER_ID);
+        }
+        if (accountRepo.existsByEmailAndStatusNot(email, AccountStatus.DELETED)) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+        }
+
+        // --- 역할별 정책 ---
         AccountStatus status = AccountStatus.ACTIVE;
         if (role == Role.STUDENT) {
             // (1) 학번 형식: 8자리 숫자
             if (!userId.matches("^\\d{8}$")) {
-                throw new IllegalArgumentException("학번 형식이 올바르지 않습니다.");
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학번 형식이 올바르지 않습니다.");
             }
             // (2) 이메일 도메인
             if (!email.endsWith("@sch.ac.kr")) {
-                throw new IllegalArgumentException("학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "학생 계정은 @sch.ac.kr 이메일만 허용됩니다.");
             }
-            // (3) 회원가입 직전 인증 강제 확인
+            // (3) 이메일 인증 선행 확인
             emailService.requireVerified(email);
             status = AccountStatus.ACTIVE;
         }
 
-        // Account 저장
+        // --- Account 저장 ---
         Account account = new Account(
                 null,
                 userId,
                 email,
-                passwordEncoder.encode(req.password()),
+                passwordEncoder.encode(rawPwd),  // ← 검증 통과 후 인코딩
                 role,
                 status
         );
         accountRepo.save(account);
 
-        // 프로필 & 스토어(관리자만)
+        // --- 프로필 & 스토어(관리자만) ---
         Long storeId = null;
         String storeName = null;
 
@@ -91,11 +107,10 @@ public class AuthService {
             emailService.consumeAllFor(email);
         } else { // ADMIN
             if (req.storeId() == null) {
-                throw new IllegalArgumentException("관리자 가입 시 storeId는 필수입니다.");
+                throw new CustomException(ErrorCode.VALIDATION_ERROR, "관리자 가입 시 storeId는 필수입니다.");
             }
             Store store = storeRepo.findById(req.storeId())
-                    .orElseThrow(() -> new IllegalArgumentException("해당 storeId의 매장을 찾을 수 없습니다."));
-
+                    .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "해당 storeId의 매장을 찾을 수 없습니다."));
             AdminProfile profile = AdminProfile.create(account, req.name(), 1, store);
             adminProfileRepo.save(profile);
 
@@ -103,7 +118,7 @@ public class AuthService {
             storeName = store.getName();
         }
 
-        // 응답 (SignupResponse 시그니처: 7개 필드)
+        // --- 응답 ---
         return new SignupResponse(
                 account.getId(),
                 account.getRole(),
