@@ -45,6 +45,25 @@ public class Account {
     public void changePassword(String newPasswordHash) {
         this.passwordHash = newPasswordHash;
     }
+    public void deleteAndReleaseIdentifiers() {
+        // 상태만 바꾸면 유니크를 계속 점유하니 email/userId를 tombstone으로 바꿔줍니다.
+        String suffix = ".deleted." + this.id + "." + System.currentTimeMillis();
 
+        // email 보존 정책: 도메인 유지(로그 남길 필요 있으면 별도 audit에 저장)
+        if (this.email != null) {
+            int at = this.email.indexOf('@');
+            if (at > 0) {
+                String local = this.email.substring(0, at);
+                String domain = this.email.substring(at);
+                this.email = local + suffix + domain; // ex) user+deleted.123.169....@sch.ac.kr
+            } else {
+                this.email = this.email + suffix;
+            }
+        }
+        if (this.userId != null) {
+            this.userId = this.userId + suffix;     // 학번(아이디)도 동일 처리
+        }
+        this.status = AccountStatus.DELETED;
+    }
 
 }

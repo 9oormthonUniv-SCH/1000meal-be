@@ -1,10 +1,13 @@
 package com._1000meal.auth.service;
 import com._1000meal.auth.dto.ChangePasswordRequest;
+import com._1000meal.auth.dto.DeleteAccountRequest;
 import com._1000meal.auth.dto.FindIdRequest;
 import com._1000meal.auth.dto.FindIdResponse;
 import com._1000meal.auth.model.Account;
+import com._1000meal.auth.model.AccountStatus;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.auth.repository.UserProfileRepository;
+import com._1000meal.global.constant.Role;
 import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.util.PasswordValidator;
@@ -87,4 +90,29 @@ public class AccountService {
 
         account.changePassword(passwordEncoder.encode(req.newPassword()));
     }
+
+    @Transactional
+    public void deleteOwnAccountByAccountId(Long accountId, DeleteAccountRequest req) {
+        if (Boolean.FALSE.equals(req.agree())) {
+            throw new CustomException(ErrorCode.PRECONDITION_REQUIRED);
+        }
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (account.getRole() == Role.ADMIN) {
+            throw new CustomException(ErrorCode.FORBIDDEN);
+        }
+
+        if (!passwordEncoder.matches(req.currentPassword(), account.getPasswordHash())) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
+
+        if (account.getStatus() == AccountStatus.DELETED) {
+            return; // 멱등성
+        }
+
+        account.deleteAndReleaseIdentifiers();
+    }
+
 }

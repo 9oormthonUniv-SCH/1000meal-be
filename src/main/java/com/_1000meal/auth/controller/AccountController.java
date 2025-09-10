@@ -1,6 +1,7 @@
 package com._1000meal.auth.controller;
 
 import com._1000meal.auth.dto.ChangePasswordRequest;
+import com._1000meal.auth.dto.DeleteAccountRequest;
 import com._1000meal.auth.dto.FindIdRequest;
 import com._1000meal.auth.dto.FindIdResponse;
 import com._1000meal.auth.model.AuthPrincipal;
@@ -38,4 +39,14 @@ public class AccountController {
         accountService.changePasswordByAccountId(principal.id(), req);
         return ResponseEntity.ok(Map.of("message", "비밀번호가 성공적으로 변경되었습니다."));
     }
+    /** 로그인 상태 회원 탈퇴 (소프트 삭제 + 식별자 반환) */
+    @PostMapping("/delete-account")
+    public ResponseEntity<Map<String, String>> deleteAccount(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @RequestBody @Valid DeleteAccountRequest req
+    ) {
+        accountService.deleteOwnAccountByAccountId(principal.id(), req);
+        return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
+    }
+
 }
