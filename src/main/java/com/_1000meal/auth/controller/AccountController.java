@@ -1,9 +1,6 @@
 package com._1000meal.auth.controller;
 
-import com._1000meal.auth.dto.ChangePasswordRequest;
-import com._1000meal.auth.dto.DeleteAccountRequest;
-import com._1000meal.auth.dto.FindIdRequest;
-import com._1000meal.auth.dto.FindIdResponse;
+import com._1000meal.auth.dto.*;
 import com._1000meal.auth.model.AuthPrincipal;
 import com._1000meal.auth.service.AccountService;
 import com._1000meal.auth.service.AuthService;
@@ -46,6 +43,26 @@ public class AccountController {
     ) {
         accountService.deleteOwnAccountByAccountId(principal.id()); // 바디 제거
         return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
+    }
+
+    /** 1) 새 이메일로 인증코드 발송 (로그인 필요) */
+    @PostMapping("/email/change/request")
+    public ResponseEntity<Map<String, String>> requestChangeEmail(
+            @AuthenticationPrincipal com._1000meal.auth.model.AuthPrincipal principal,
+            @RequestBody @Valid ChangeEmailRequest req
+    ) {
+        accountService.requestChangeEmail(principal.id(), req);
+        return ResponseEntity.ok(Map.of("message", "인증 코드가 새 이메일로 전송되었습니다."));
+    }
+
+    /** 2) 인증코드 확인 후 실제 이메일 변경 */
+    @PostMapping("/email/change/confirm")
+    public ResponseEntity<Map<String, String>> confirmChangeEmail(
+            @AuthenticationPrincipal com._1000meal.auth.model.AuthPrincipal principal,
+            @RequestBody @Valid ChangeEmailConfirmRequest req
+    ) {
+        accountService.confirmChangeEmail(principal.id(), req);
+        return ResponseEntity.ok(Map.of("message", "이메일이 변경되었습니다."));
     }
 
 }

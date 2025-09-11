@@ -1,9 +1,6 @@
 package com._1000meal.auth.service;
 
-import com._1000meal.auth.dto.ChangePasswordRequest;
-import com._1000meal.auth.dto.DeleteAccountRequest;
-import com._1000meal.auth.dto.FindIdRequest;
-import com._1000meal.auth.dto.FindIdResponse;
+import com._1000meal.auth.dto.*;
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.model.AccountStatus;
 import com._1000meal.auth.repository.AccountRepository;
@@ -24,6 +21,8 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final UserProfileRepository userProfileRepository;
     private final PasswordEncoder passwordEncoder;
+
+    private final com._1000meal.email.service.EmailService emailService;
 
     /* 아이디(학번) 찾기: 이메일 + 이름 일치 */
     @Transactional(readOnly = true)
@@ -167,5 +166,72 @@ public class AccountService {
     public void deleteOwnAccountByAccountId(Long accountId, DeleteAccountRequest req) {
         // 바디는 무시하고 토큰만으로 진행
         deleteOwnAccountByAccountId(accountId);
+    }
+
+
+
+    /** 1) 새 이메일로 인증코드 발송 */
+    /** 1) 새 이메일로 인증코드 발송 */
+    @Transactional
+    public void requestChangeEmail(Long accountId, ChangeEmailRequest req) {
+        Account account = accountRepository.findByIdAndStatusNot(accountId, AccountStatus.DELETED)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "계정을 찾을 수 없습니다."));
+
+        // 비밀번호 재확인(reauth)
+        if (req.currentPassword() == null || !passwordEncoder.matches(req.currentPassword(), account.getPasswordHash())) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED, "현재 비밀번호가 올바르지 않습니다.");
+        }
+
+        final String newEmail = (req.newEmail() == null ? "" : req.newEmail().trim().toLowerCase());
+
+        if (newEmail.isEmpty()) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "새 이메일을 입력해 주세요.");
+        }
+        // 학교 이메일 강제 (@sch.ac.kr)
+        if (!newEmail.endsWith("@sch.ac.kr")) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "학교 이메일(@sch.ac.kr)만 사용할 수 있습니다.");
+        }
+        if (newEmail.equalsIgnoreCase(account.getEmail())) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "현재 이메일과 동일합니다.");
+        }
+        // 중복 방지: DELETED 제외
+        if (accountRepository.existsByEmailAndStatusNot(newEmail, AccountStatus.DELETED)) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
+        }
+
+        // ✉️ 새 이메일로 인증 코드 발급 + 저장 + 발송 (2분 TTL, 기존 미검증 삭제)
+        emailService.issueAndStoreCode(newEmail);
+    }
+
+    /** 2) 인증코드 확인 후 실제 이메일 변경 */
+    @Transactional
+    public void confirmChangeEmail(Long accountId, ChangeEmailConfirmRequest req) {
+        Account account = accountRepository.findByIdAndStatusNot(accountId, AccountStatus.DELETED)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "계정을 찾을 수 없습니다."));
+
+        final String newEmail = (req.newEmail() == null ? "" : req.newEmail().trim().toLowerCase());
+        final String code     = (req.code() == null ? "" : req.code().trim());
+
+        if (newEmail.isEmpty() || code.isEmpty()) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "새 이메일과 인증 코드를 모두 입력해 주세요.");
+        }
+        if (!newEmail.endsWith("@sch.ac.kr")) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "학교 이메일(@sch.ac.kr)만 사용할 수 있습니다.");
+        }
+        if (accountRepository.existsByEmailAndStatusNot(newEmail, AccountStatus.DELETED)) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
+        }
+
+        // ✅ 코드 검증 (유효 요청/만료/불일치 시 내부에서 예외 발생)
+        emailService.verifyCode(newEmail, code);
+
+        // (선택) 잔여 토큰 정리
+        emailService.consumeAllFor(newEmail);
+
+        // 실제 변경
+        account.changeEmail(newEmail);
+
+        // (선택) 로그인 토큰 무효화가 필요하면 여기서 처리
+        // sessionService.invalidateAll(accountId); refreshTokenRepo.deleteByAccountId(accountId) 등
     }
 }

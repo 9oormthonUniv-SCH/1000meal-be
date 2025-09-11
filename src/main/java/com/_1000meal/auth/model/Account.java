@@ -66,4 +66,7 @@ public class Account {
         this.status = AccountStatus.DELETED;
     }
 
+    public void changeEmail(String newEmail) {
+        this.email = newEmail;
+    }
 }
