@@ -42,10 +42,9 @@ public class AccountController {
     /** 로그인 상태 회원 탈퇴 (소프트 삭제 + 식별자 반환) */
     @PostMapping("/delete-account")
     public ResponseEntity<Map<String, String>> deleteAccount(
-            @AuthenticationPrincipal AuthPrincipal principal,
-            @RequestBody @Valid DeleteAccountRequest req
+            @AuthenticationPrincipal AuthPrincipal principal
     ) {
-        accountService.deleteOwnAccountByAccountId(principal.id(), req);
+        accountService.deleteOwnAccountByAccountId(principal.id()); // 바디 제거
         return ResponseEntity.ok(Map.of("message", "회원 탈퇴가 완료되었습니다."));
     }
 

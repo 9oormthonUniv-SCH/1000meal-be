@@ -134,20 +134,14 @@ public class AccountService {
 
     /* 회원 탈퇴 (로그인 상태) */
     @Transactional
-    public void deleteOwnAccountByAccountId(Long accountId, DeleteAccountRequest req) {
-        if (Boolean.FALSE.equals(req.agree())) {
-            throw new CustomException(
-                    ErrorCode.PRECONDITION_REQUIRED,
-                    "회원 탈퇴 동의가 필요합니다."
-            );
-        }
-
+    public void deleteOwnAccountByAccountId(Long accountId) {
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new CustomException(
                         ErrorCode.USER_NOT_FOUND,
-                        "탈퇴하려는 계정을 찾을 수 없습니다. accountId=" + accountId)
-                );
+                        "탈퇴하려는 계정을 찾을 수 없습니다. accountId=" + accountId
+                ));
 
+        // 운영 안전장치: 관리자 스스로 탈퇴 금지
         if (account.getRole() == Role.ADMIN) {
             throw new CustomException(
                     ErrorCode.FORBIDDEN,
@@ -155,17 +149,23 @@ public class AccountService {
             );
         }
 
-        if (!passwordEncoder.matches(req.currentPassword(), account.getPasswordHash())) {
-            throw new CustomException(
-                    ErrorCode.UNAUTHORIZED,
-                    "현재 비밀번호가 올바르지 않아 탈퇴를 진행할 수 없습니다."
-            );
-        }
-
+        // 멱등성 보장: 이미 탈퇴 상태면 조용히 종료
         if (account.getStatus() == AccountStatus.DELETED) {
-            return; // 멱등성 보장
+            return;
         }
 
+        // 식별자 반납 + 소프트 삭제 (email/userId를 .deleted.<id>.<ts>로 변경하는 내부 로직)
         account.deleteAndReleaseIdentifiers();
+
+        // (선택) 세션/리프레시 토큰 무효화가 있다면 여기에
+        // refreshTokenRepository.deleteByAccountId(accountId);
+        // sessionService.invalidateAll(accountId);
+    }
+
+    /** [레거시 호환] 기존 바디 있는 API는 더 이상 비밀번호/동의 검증을 하지 않고 위 메서드로 위임 */
+    @Transactional
+    public void deleteOwnAccountByAccountId(Long accountId, DeleteAccountRequest req) {
+        // 바디는 무시하고 토큰만으로 진행
+        deleteOwnAccountByAccountId(accountId);
     }
 }
