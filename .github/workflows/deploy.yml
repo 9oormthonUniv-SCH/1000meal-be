@@ -1,13 +1,73 @@
+#name: Deploy Spring + MySQL with Docker
+#
+#on:
+#  push:
+#    branches:
+#      - develop
+#
+#jobs:
+#  deploy:
+#    runs-on: ubuntu-latest
+#
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v3
+#
+#      - name: Set up JDK 17
+#        uses: actions/setup-java@v3
+#        with:
+#          java-version: '17'
+#          distribution: 'temurin'
+#
+#      - name: Grant execute permission for Gradle
+#        run: chmod +x ./gradlew
+#
+#      - name: Build Spring Boot JAR
+#        run: ./gradlew clean build -x test
+#
+#      # ✅ .env 파일을 먼저 생성한다
+#      - name: Create .env file from single GitHub Secret
+#        run: |
+#          echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+#
+#
+#
+#
+#
+#      # ✅ 그 다음 .env 포함해서 전체를 EC2로 전송
+#      - name: Copy project to EC2 (including .env)
+#        uses: appleboy/scp-action@v0.1.4
+#        with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ${{ secrets.EC2_USER }}
+#          key: ${{ secrets.EC2_KEY }}
+#          source: "."
+#          target: "/home/${{ secrets.EC2_USER }}/1000meal"
+#
+#      - name: SSH into EC2 and run Docker Compose
+#        uses: appleboy/ssh-action@v1.0.0
+#        with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ${{ secrets.EC2_USER }}
+#          key: ${{ secrets.EC2_KEY }}
+#          script: |
+#            cd 1000meal
+#            docker compose down || true
+#            docker compose --env-file .env up -d --build
+
+
 name: Deploy Spring + MySQL with Docker
 
 on:
   push:
-    branches:
-      - develop
+    branches: [ develop ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_DIR: /home/ubuntu/1000meal   # ← 배포 대상 디렉토리(단일화)
 
     steps:
       - name: Checkout code
@@ -25,31 +85,59 @@ jobs:
       - name: Build Spring Boot JAR
         run: ./gradlew clean build -x test
 
-      # ✅ .env 파일을 먼저 생성한다
-      - name: Create .env file from single GitHub Secret
+      # 러너에 .env 생성 (GitHub Secret에 전체 내용을 한 번에 넣어둔 경우)
+      - name: Create .env from secret
         run: |
-          echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+          printf '%s' "${{ secrets.ENV_FILE_CONTENT }}" > .env
+          ls -l .env
 
-
-              
-
-      # ✅ 그 다음 .env 포함해서 전체를 EC2로 전송
-      - name: Copy project to EC2 (including .env)
-        uses: appleboy/scp-action@v0.1.4
+      # 원격 서버 준비 (디렉토리 생성/권한 확인)
+      - name: SSH prepare target dir
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          source: "."
-          target: "/home/${{ secrets.EC2_USER }}/1000meal"
-
-      - name: SSH into EC2 and run Docker Compose
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
-            cd 1000meal
+            set -e
+            whoami && hostname
+            mkdir -p "${{ env.DEPLOY_DIR }}"
+            chmod 755 "${{ env.DEPLOY_DIR }}"
+            ls -ld "${{ env.DEPLOY_DIR }}"
+
+      # 산출물 업로드 (JAR + docker-compose.yml + .env)
+      - name: Upload artifacts via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: |
+            build/libs/*.jar,
+            docker-compose.yml,
+            .env
+          target: ${{ env.DEPLOY_DIR }}/
+          overwrite: true
+          rm: false
+          debug: true
+          # use_insecure_cipher: true   # 구형 OpenSSH일 때만 임시 사용
+
+      # 원격에서 docker compose 재기동
+      - name: Compose up on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            cd "${{ env.DEPLOY_DIR }}"
+            docker compose version || docker --version
+            # 컨테이너 내리기(없어도 무시)
             docker compose down || true
+            # 최신 이미지 빌드 및 기동
             docker compose --env-file .env up -d --build
+            docker compose ps
