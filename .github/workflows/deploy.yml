@@ -2,12 +2,14 @@ name: Deploy Spring + MySQL with Docker
 
 on:
   push:
-    branches:
-      - develop
+    branches: [ develop ]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_DIR: /home/${{ secrets.EC2_USER }}/1000meal
 
     steps:
       - name: Checkout code
@@ -25,28 +27,59 @@ jobs:
       - name: Build Spring Boot JAR
         run: ./gradlew clean build -x test
 
-      # ✅ .env 파일을 먼저 생성한다
+      # .env 생성 (Secret 통으로 보관 중)
       - name: Create .env file from single GitHub Secret
         run: |
-          echo "${{ secrets.ENV_FILE_CONTENT }}" > .env
+          printf '%s' "${{ secrets.ENV_FILE_CONTENT }}" > .env
+          ls -l .env
 
-      # ✅ 그 다음 .env 포함해서 전체를 EC2로 전송
-      - name: Copy project to EC2 (including .env)
-        uses: appleboy/scp-action@v0.1.4
+      # ✅ 사전 점검: SSH 접속/경로
+      - name: SSH sanity check & prepare target dir
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "."
-          target: "/home/${{ secrets.EC2_USER }}/1000meal"
-
-      - name: SSH into EC2 and run Docker Compose
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
+          # 필요시 포트가 22가 아니면 추가
+          # port: ${{ secrets.EC2_PORT }}
           script: |
-            cd 1000meal
+            set -e
+            whoami && hostname
+            echo "Home: $HOME"
+            mkdir -p "${{ env.DEPLOY_DIR }}"
+            chmod 755 "${{ env.DEPLOY_DIR }}"
+            ls -ld "${{ env.DEPLOY_DIR }}"
+
+      # ✅ 필요한 파일만 전송 (전체 프로젝트 X)
+      - name: Upload artifacts via SCP (jar + compose + .env)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          # port: ${{ secrets.EC2_PORT }}
+          source: |
+            build/libs/*.jar,
+            docker-compose.yml,
+            .env
+          target: ${{ env.DEPLOY_DIR }}/
+          overwrite: true
+          rm: false
+          debug: true
+          timeout: 120s
+          command_timeout: 10m
+
+      # ✅ Compose 재기동
+      - name: SSH compose up
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          # port: ${{ secrets.EC2_PORT }}
+          script: |
+            set -e
+            cd "${{ env.DEPLOY_DIR }}"
             docker compose down || true
             docker compose --env-file .env up -d --build
+            docker compose ps
