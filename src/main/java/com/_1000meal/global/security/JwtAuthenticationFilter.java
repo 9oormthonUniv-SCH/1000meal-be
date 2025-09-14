@@ -47,7 +47,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/actuator/health",
             "/",
             "/favicon.ico",
-            "/error"
+            "/error",
     };
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
@@ -68,10 +68,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         // 0) 화이트리스트는 무조건 통과
-        if (isWhitelisted(request)) {
-            chain.doFilter(request, response);
-            return;
-        }
+//        if (isWhitelisted(request)) {
+//            chain.doFilter(request, response);
+//            return;
+//        }
 
         // 1) 이미 인증된 요청이면 패스
         if (SecurityContextHolder.getContext().getAuthentication() != null) {
