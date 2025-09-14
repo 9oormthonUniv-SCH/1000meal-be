@@ -84,7 +84,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // Swagger 문서 전면 차단
-                        .requestMatchers(SWAGGER_PATHS).denyAll()
+                        .requestMatchers(SWAGGER_PATHS).permitAll()
 
                         // 인증/기타 화이트리스트 허용
                         .requestMatchers(AUTH_WHITELIST).permitAll()
