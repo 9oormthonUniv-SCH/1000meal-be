@@ -24,6 +24,7 @@ public class MenuController {
 //        return ResponseEntity.status(HttpStatus.CREATED).build();
 //    }
 
+
     @PostMapping("/daily/{storeId}")
     public ApiResponse<DailyMenuAddRequest> createDaillyMenu(
             @PathVariable Long storeId,
