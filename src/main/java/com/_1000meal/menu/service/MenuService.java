@@ -125,8 +125,19 @@ public class MenuService {
 
         // 4. DailyMenu 매핑
         List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
-                .map(DailyMenu::toDto)
-                .collect(Collectors.toList());
+                // (A) 일자 기준 확정 정렬
+                .sorted(Comparator.comparing(DailyMenu::getDate))
+                // (B) 메뉴 리스트도 정렬해서 DTO에 넣기
+                .map(dm -> {
+                    DailyMenuDto dto = dm.toDto();
+                    // dto.getMenus()가 List<String> 라면:
+                    List<String> sorted = dto.getMenus().stream()
+                            .sorted() // 이름 기준(가나다/알파벳) 정렬
+                            .toList();
+                    dto.setMenus(sorted);
+                    return dto;
+                })
+                .toList();
 
         // 5. 최종 응답
         return WeeklyMenuResponse.builder()
