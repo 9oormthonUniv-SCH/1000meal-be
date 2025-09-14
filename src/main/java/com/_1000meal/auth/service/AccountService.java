@@ -233,5 +233,42 @@ public class AccountService {
 
         // (선택) 로그인 토큰 무효화가 필요하면 여기서 처리
         // sessionService.invalidateAll(accountId); refreshTokenRepo.deleteByAccountId(accountId) 등
+
+
+    }
+    @Transactional(readOnly = true)
+    public void verifyCredentialForEmailChange(Long accountId, String currentEmail, String password) {
+        var account = accountRepository.findByIdAndStatusNot(accountId, AccountStatus.DELETED)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "계정을 찾을 수 없습니다."));
+
+        if (!account.getEmail().equalsIgnoreCase(
+                currentEmail == null ? "" : currentEmail.trim().toLowerCase())) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "현재 이메일이 일치하지 않습니다.");
+        }
+        if (!passwordEncoder.matches(password == null ? "" : password, account.getPasswordHash())) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED, "비밀번호가 올바르지 않습니다.");
+        }
+    }
+
+    /** (NEW) 이메일 변경 2단계: 비밀번호 없이 '새 이메일로 인증코드만 발송' */
+    @Transactional
+    public void requestChangeEmailCode(Long accountId, String newEmail) {
+        var account = accountRepository.findByIdAndStatusNot(accountId, AccountStatus.DELETED)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND, "계정을 찾을 수 없습니다."));
+
+        final String normalized = (newEmail == null ? "" : newEmail.trim().toLowerCase());
+        if (normalized.isEmpty()) throw new CustomException(ErrorCode.VALIDATION_ERROR, "새 이메일을 입력해 주세요.");
+        if (!normalized.endsWith("@sch.ac.kr")) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "학교 이메일(@sch.ac.kr)만 사용할 수 있습니다.");
+        }
+        if (normalized.equalsIgnoreCase(account.getEmail())) {
+            throw new CustomException(ErrorCode.VALIDATION_ERROR, "현재 이메일과 동일합니다.");
+        }
+        if (accountRepository.existsByEmailAndStatusNot(normalized, AccountStatus.DELETED)) {
+            throw new CustomException(ErrorCode.DUPLICATE_EMAIL, "이미 사용 중인 이메일입니다.");
+        }
+
+        // ✉️ 코드 발급/저장/발송 (기존 메일 서비스 사용)
+        emailService.issueAndStoreCode(normalized);
     }
 }
