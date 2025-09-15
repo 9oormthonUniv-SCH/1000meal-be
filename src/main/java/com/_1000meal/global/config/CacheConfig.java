@@ -19,7 +19,7 @@ public class CacheConfig {
     public CacheManager cacheManager() {
         var shortTtl = Caffeine.newBuilder()
                 .maximumSize(2_000)
-                .expireAfterWrite(Duration.ofSeconds(60)) // 조회 API 캐시 60초
+                .expireAfterWrite(Duration.ofSeconds(3)) // 조회 API 캐시 60초
                 .build();
 
         return new SimpleCacheManager() {{
