@@ -12,7 +12,7 @@ import java.util.List;
 
 @Getter
 @Setter
-@Builder
+@Builder(toBuilder = true)
 public class DailyMenuDto {
 
     private Long id;
