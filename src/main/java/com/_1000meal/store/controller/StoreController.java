@@ -6,7 +6,9 @@ import com._1000meal.store.dto.SetStoreImageUrlRequest;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
 import com._1000meal.store.service.StoreService;
+import com._1000meal.store.service.StoreViewService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,6 +19,7 @@ import java.util.List;
 public class StoreController {
 
     private final StoreService storeService;
+    private final StoreViewService storeViewService;
 
     @GetMapping("/{storeId}")
     public ApiResponse<StoreDetailedResponse> getStoreDetail(@PathVariable Long storeId) {
@@ -51,5 +54,10 @@ public class StoreController {
 //        return ResponseEntity.status(201).body(response);
 //    }
 
+    @GetMapping("/list")
+    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores() {
+        var list = storeViewService.getAllStoresView();
+        return ResponseEntity.ok(ApiResponse.success(list, SuccessCode.OK));
+    }
 
 }
