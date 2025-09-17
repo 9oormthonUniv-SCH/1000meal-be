@@ -106,11 +106,24 @@ cloud:
 server:
   port: 8080
 
+
+# 프로메테우스 관련 설정 및 태그 추가
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: "health,info,metrics,prometheus"
+  endpoint:
+    health:
+      show-details: "always"
+  metrics:
+    tags:
+      application: "1000meal-api"   # 공통 태그
+
+
+
+
+
 # JWT 설정 (JwtProvider가 @Value로 주입받음)
 jwt:
   secret: ${JWT_SECRET:CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS}
