@@ -40,7 +40,6 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          # 필요시 포트가 22가 아니면 추가
           # port: ${{ secrets.EC2_PORT }}
           script: |
             set -e
@@ -49,6 +48,32 @@ jobs:
             mkdir -p "${{ env.DEPLOY_DIR }}"
             chmod 755 "${{ env.DEPLOY_DIR }}"
             ls -ld "${{ env.DEPLOY_DIR }}"
+
+      # 디스크 점검 & 자동 정리 (루트 사용량 85% 이상 시)
+      - name: Disk check & cleanup on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            echo "[precheck] current disk usage"
+            df -h /
+            USAGE=$(df -h / | awk 'NR==2 {gsub("%",""); print $5}')
+            echo "Root usage: ${USAGE}%"
+            if [ "$USAGE" -ge 85 ]; then
+              echo "[cleanup] docker/journal/apt cache prune..."
+              sudo docker system prune -af --volumes || true
+              # 컨테이너 로그 급증 완화 (필요시 크기 기준 조정)
+              sudo find /var/lib/docker/containers -type f -name "*.log" -size +50M -print -delete || true
+              sudo journalctl --vacuum-time=7d || true
+              sudo apt-get clean || true
+              echo "[post-clean] disk usage"
+              df -h /
+            else
+              echo "[precheck] usage < 85%, skip cleanup"
+            fi
 
       # ✅ 필요한 파일만 전송 (전체 프로젝트 X)
       - name: Upload artifacts via SCP (jar + compose + .env)
@@ -79,6 +104,9 @@ jobs:
           # port: ${{ secrets.EC2_PORT }}
           script: |
             set -e
+            echo "[predeploy] disk usage before compose"
+            df -h /
+            sudo docker system df || true
             cd "${{ env.DEPLOY_DIR }}"
             docker compose down || true
             docker compose --env-file .env up -d --build
