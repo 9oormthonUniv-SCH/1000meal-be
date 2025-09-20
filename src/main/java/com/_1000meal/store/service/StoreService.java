@@ -1,6 +1,7 @@
 package com._1000meal.store.service;
 
 import com._1000meal.global.error.code.StoreErrorCode;
+import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
@@ -57,7 +58,9 @@ public class StoreService {
                     Store store = storeRepository.findById(id)
                             .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-                    DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(id, today).orElse(null);
+                    DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(id, today)
+                            .orElse(null);
+
                     DailyMenuDto todayMenuDto = (dailyMenu != null) ? dailyMenu.toDto() : null;
 
                     // 4. Store 엔티티의 메서드를 사용하여 DTO를 생성하고 반환합니다.

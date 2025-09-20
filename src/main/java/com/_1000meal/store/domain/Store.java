@@ -42,10 +42,6 @@ public class Store {
     private double lat;           // 위도
     private double lng;           // 경도
 
-    // 현재 활성화된 주간 메뉴는 OneToOne 관계로
-    // @OneToOne(mappedBy = "store", cascade = CascadeType.ALL)
-    // private WeeklyMenu weeklyMenu;
-
     // 이전 주간 메뉴 이력은 별도의 필드로 관리 가능 (선택 사항)
     @OneToMany(mappedBy = "store", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<WeeklyMenu> weeklyMenus = new ArrayList<>();
@@ -91,6 +87,16 @@ public class Store {
     }
 
     public StoreResponse toStoreResponse(DailyMenuDto todayMenu) {
+        int remainVal = 0;
+        boolean openVal = false;
+
+        if (todayMenu != null) {
+            if (todayMenu.getStock() != null) {
+                remainVal = todayMenu.getStock();
+            }
+            openVal = todayMenu.isOpen(); // todayMenu 자체가 있으면 실제 값 반영
+        }
+
         return StoreResponse.builder()
                 .id(this.getId())
                 .imageUrl(this.getImageUrl())
@@ -99,8 +105,8 @@ public class Store {
                 .phone(this.getPhone())
                 .description(this.getDescription())
                 .hours(this.getHours())
-                .isOpen(this.isOpen())
-                .remain(todayMenu.getStock() != null ? todayMenu.getStock() : 0)
+                .isOpen(openVal)
+                .remain(remainVal)
                 .lat(this.getLat())
                 .lng(this.getLng())
                 .todayMenu(todayMenu)
