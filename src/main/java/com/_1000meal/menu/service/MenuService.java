@@ -109,43 +109,37 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public WeeklyMenuResponse getWeeklyMenu(Long storeId, LocalDate date) {
-        // 1. 매장 존재 검증
+    public Optional<WeeklyMenuResponse> getWeeklyMenu(Long storeId, LocalDate date) {
+        // 1. 매장 존재 검증 (매장 없으면 예외 유지)
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        // 2. 오늘 날짜 기준
-        //LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-
-        // 3. 주간 메뉴 가져 오기
-        WeeklyMenu weeklyMenu = weeklyMenuRepository
-                .findByStoreIdAndRangeWithMenus(storeId, date)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.WEEKLY_MENU_NOT_FOUND));
-
-        // 4. DailyMenu 매핑
-        List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
-                // (A) 일자 기준 확정 정렬
-                .sorted(Comparator.comparing(DailyMenu::getDate))
-                // (B) 메뉴 리스트도 정렬해서 DTO에 넣기
-                .map(dm -> {
-                    DailyMenuDto dto = dm.toDto();
-                    // dto.getMenus()가 List<String> 라면:
-                    List<String> sorted = dto.getMenus().stream()
-                            .sorted() // 이름 기준(가나다/알파벳) 정렬
+        // 2. 주간 메뉴 조회 (없으면 Optional.empty 반환)
+        return weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, date)
+                .map(weeklyMenu -> {
+                    // 3. DailyMenu 매핑 + 정렬
+                    List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
+                            .sorted(Comparator.comparing(DailyMenu::getDate))   // 날짜 정렬
+                            .map(dm -> {
+                                DailyMenuDto dto = dm.toDto();
+                                List<String> sorted = dto.getMenus().stream()
+                                        .sorted() // 메뉴명 정렬(가나다/알파벳)
+                                        .toList();
+                                dto.setMenus(sorted);
+                                return dto;
+                            })
                             .toList();
-                    dto.setMenus(sorted);
-                    return dto;
-                })
-                .toList();
 
-        // 5. 최종 응답
-        return WeeklyMenuResponse.builder()
-                .storeId(store.getId())
-                .startDate(weeklyMenu.getStartDate())
-                .endDate(weeklyMenu.getEndDate())
-                .dailyMenus(dailyDtos)
-                .build();
+                    // 4. 최종 응답
+                    return WeeklyMenuResponse.builder()
+                            .storeId(store.getId())
+                            .startDate(weeklyMenu.getStartDate())
+                            .endDate(weeklyMenu.getEndDate())
+                            .dailyMenus(dailyDtos)
+                            .build();
+                });
     }
+
 
 
     @Transactional
