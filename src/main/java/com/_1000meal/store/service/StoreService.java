@@ -37,8 +37,7 @@ public class StoreService {
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today)
-                .orElse(null);;
+        WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today);
 
         LocalDate todaySeoul = LocalDate.now(ZoneId.of("Asia/Seoul"));
 

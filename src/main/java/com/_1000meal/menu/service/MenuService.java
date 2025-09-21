@@ -109,35 +109,36 @@ public class MenuService {
     }
 
     @Transactional(readOnly = true)
-    public Optional<WeeklyMenuResponse> getWeeklyMenu(Long storeId, LocalDate date) {
-        // 1. 매장 존재 검증 (매장 없으면 예외 유지)
+    public WeeklyMenuResponse getWeeklyMenu(Long storeId, LocalDate date) {
+        // 1. 매장 존재 검증
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        // 2. 주간 메뉴 조회 (없으면 Optional.empty 반환)
+        // 2. 주간 메뉴 조회
         return weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, date)
                 .map(weeklyMenu -> {
-                    // 3. DailyMenu 매핑 + 정렬
+                    // (있으면) DailyMenu 매핑 + 정렬
                     List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
-                            .sorted(Comparator.comparing(DailyMenu::getDate))   // 날짜 정렬
+                            .sorted(Comparator.comparing(DailyMenu::getDate))
                             .map(dm -> {
                                 DailyMenuDto dto = dm.toDto();
                                 List<String> sorted = dto.getMenus().stream()
-                                        .sorted() // 메뉴명 정렬(가나다/알파벳)
+                                        .sorted()
                                         .toList();
                                 dto.setMenus(sorted);
                                 return dto;
                             })
                             .toList();
 
-                    // 4. 최종 응답
                     return WeeklyMenuResponse.builder()
                             .storeId(store.getId())
                             .startDate(weeklyMenu.getStartDate())
                             .endDate(weeklyMenu.getEndDate())
                             .dailyMenus(dailyDtos)
                             .build();
-                });
+                })
+                // (없으면) 스켈레톤 주간 메뉴 반환
+                .orElseGet(() -> buildEmptyWeeklyMenu(store.getId(), date));
     }
 
 
@@ -192,4 +193,30 @@ public class MenuService {
             dailyMenuRepository.saveAll(toCreate);
         }
     }
+
+    private WeeklyMenuResponse buildEmptyWeeklyMenu(Long storeId, LocalDate refDate) {
+        // 이번 주 월요일 ~ 일요일
+        LocalDate start = refDate.with(java.time.temporal.TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        LocalDate end = start.plusDays(6);
+
+        List<DailyMenuDto> daily = new ArrayList<>(7);
+        for (int i = 0; i < 5; i++) {
+            LocalDate d = start.plusDays(i);
+            daily.add(DailyMenuDto.builder()
+                    .id(null) // DB에 없으니 id는 null
+                    .date(d)
+                    .dayOfWeek(d.getDayOfWeek())
+                    .stock(0)   // 기본 재고 0
+                    .menus(List.of()) // 빈 리스트
+                    .build());
+        }
+
+        return WeeklyMenuResponse.builder()
+                .storeId(storeId)
+                .startDate(start)
+                .endDate(end)
+                .dailyMenus(daily)
+                .build();
+    }
+
 }

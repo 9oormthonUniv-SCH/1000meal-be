@@ -40,8 +40,7 @@ public class MenuController {
     public ApiResponse<WeeklyMenuResponse> getWeeklyMenu(
             @PathVariable Long storeId,
             @RequestParam LocalDate date) {
-        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId,date)
-                .orElse(null);;
+        WeeklyMenuResponse response = menuService.getWeeklyMenu(storeId,date);
         return ApiResponse.success(response, SuccessCode.OK);
     }
 
