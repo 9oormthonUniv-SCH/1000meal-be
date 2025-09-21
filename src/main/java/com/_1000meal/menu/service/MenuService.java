@@ -208,6 +208,7 @@ public class MenuService {
                     .dayOfWeek(d.getDayOfWeek())
                     .stock(0)   // 기본 재고 0
                     .menus(List.of()) // 빈 리스트
+                    .isOpen(true)
                     .build());
         }
 
