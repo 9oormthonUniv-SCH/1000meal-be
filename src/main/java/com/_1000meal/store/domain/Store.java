@@ -66,7 +66,9 @@ public class Store {
         this.lng = lng;
     }
 
-    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu,Integer stock) {
+    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu,
+                                                    Integer stock,
+                                                    boolean isOpen) {
 
         return StoreDetailedResponse.builder()
                 .id(this.getId())
@@ -77,7 +79,7 @@ public class Store {
                 .description(this.getDescription())
                 .openTime(this.getOpenTime())
                 .closeTime(this.getCloseTime())
-                .isOpen(this.isOpen())
+                .isOpen(isOpen)
                 .remain(stock)
                 .hours(this.getHours())
                 .lat(this.getLat())

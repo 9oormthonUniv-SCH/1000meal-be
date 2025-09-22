@@ -39,12 +39,13 @@ public class StoreService {
 
         WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today);
 
-        LocalDate todaySeoul = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
+                .orElse(null);
 
-        Integer remain = dailyMenuRepository.findStockByStoreIdAndDate(storeId, todaySeoul)
-                .orElse(0); // .orElse(0)로 바꾸면 기본 0
+        int remain = (dm != null && dm.getStock() != null) ? dm.getStock() : 0;
+        boolean isOpen = (dm != null) && dm.isOpen();
 
-        return store.toDetailedResponse(weeklyMenu, remain);
+        return store.toDetailedResponse(weeklyMenu, remain, isOpen);
     }
 
     @Transactional(readOnly = true)
@@ -71,19 +72,27 @@ public class StoreService {
 
     @Transactional
     public String toggleStoreStatus(Long storeId) {
+
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
         boolean previousState = store.isOpen();
-        store.toggleIsOpen();
+        store.toggleIsOpen(); // Store isOpen 토글
 
-        if (store.isOpen() && !previousState) {
-            LocalDate today = LocalDate.now();
-            dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
-                    .ifPresent(dailyMenu -> dailyMenu.updateStock(100));
-        }
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        return "가게의 운영 상태가 업데이트 되었습니다.";
+        dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
+                .ifPresent(dailyMenu -> {
+                    // DailyMenu isOpen도 Store와 동일하게 토글
+                    dailyMenu.toggleIsOpen();
+
+                    // 가게가 닫힘→열림으로 바뀐 경우, stock 초기화
+                    if (store.isOpen() && !previousState) {
+                        dailyMenu.updateStock(100);
+                    }
+                });
+
+        return "가게와 오늘의 메뉴 운영 상태가 업데이트 되었습니다.";
     }
 
     @Transactional
