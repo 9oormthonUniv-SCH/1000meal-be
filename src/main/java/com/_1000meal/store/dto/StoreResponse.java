@@ -19,6 +19,7 @@ public class StoreResponse {
     private String description;
     private String hours;
     private boolean isOpen;
+    private boolean isHoliday;
     private int remain;
     private double lat;
     private double lng;

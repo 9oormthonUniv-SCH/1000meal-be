@@ -64,8 +64,10 @@ public class StoreService {
 
                     DailyMenuDto todayMenuDto = (dailyMenu != null) ? dailyMenu.toDto() : null;
 
-                    // 4. Store 엔티티의 메서드를 사용하여 DTO를 생성하고 반환합니다.
-                    return store.toStoreResponse(todayMenuDto);
+                    // holiday 판별 로직
+                    boolean holiday = (dailyMenu == null) || dailyMenu.isHoliday();
+
+                    return store.toStoreResponse(todayMenuDto, holiday);
                 })
                 .collect(Collectors.toList());
     }

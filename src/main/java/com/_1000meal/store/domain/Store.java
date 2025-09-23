@@ -88,7 +88,7 @@ public class Store {
                 .build();
     }
 
-    public StoreResponse toStoreResponse(DailyMenuDto todayMenu) {
+    public StoreResponse toStoreResponse(DailyMenuDto todayMenu, boolean isHoliday) {
         int remainVal = 0;
         boolean openVal = false;
 
@@ -108,6 +108,7 @@ public class Store {
                 .description(this.getDescription())
                 .hours(this.getHours())
                 .isOpen(openVal)
+                .isHoliday(isHoliday)
                 .remain(remainVal)
                 .lat(this.getLat())
                 .lng(this.getLng())
