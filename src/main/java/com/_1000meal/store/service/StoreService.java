@@ -82,15 +82,7 @@ public class StoreService {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
-                .ifPresent(dailyMenu -> {
-                    // DailyMenu isOpen도 Store와 동일하게 토글
-                    dailyMenu.toggleIsOpen();
-
-                    // 가게가 닫힘→열림으로 바뀐 경우, stock 초기화
-                    if (store.isOpen() && !previousState) {
-                        dailyMenu.updateStock(100);
-                    }
-                });
+                .ifPresent(dailyMenu -> {dailyMenu.toggleIsOpen();});
 
         return "가게와 오늘의 메뉴 운영 상태가 업데이트 되었습니다.";
     }
