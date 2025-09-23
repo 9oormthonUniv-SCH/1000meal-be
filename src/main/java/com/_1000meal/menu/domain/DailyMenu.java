@@ -38,6 +38,8 @@ public class DailyMenu {
 
     private boolean isOpen;
 
+    private boolean isHoliday;   // ✅ 휴무 여부 추가
+
     private Integer stock;
 
     @OneToMany(mappedBy = "dailyMenu", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
@@ -48,7 +50,8 @@ public class DailyMenu {
         this.weeklyMenu = weeklyMenu;
         this.date = date;
         this.dayOfWeek = date != null ? date.getDayOfWeek() : null;
-        this.isOpen = true; // 메뉴가 추가되기 전까지는 닫힘
+        this.isOpen = true;   // 기본값: 운영 중
+        this.isHoliday = false; // 기본값: 휴무 아님
         this.stock = 100;
     }
 
@@ -70,6 +73,7 @@ public class DailyMenu {
                 .date(this.getDate())
                 .dayOfWeek(dow)
                 .isOpen(this.isOpen())
+                .isHoliday(this.isHoliday)   // ✅ DTO로 전달
                 .menus(menuNames)
                 .stock(this.getStock())
                 .build();
@@ -83,4 +87,12 @@ public class DailyMenu {
         isOpen = !isOpen;
     }
 
+    public void markHoliday(boolean holiday) {
+        this.isHoliday = holiday;
+        if (holiday) {
+            this.isOpen = false;  // 휴무일이면 자동으로 닫힘 처리
+            this.stock = 0;       // 재고도 0으로 처리
+        }
+    }
 }
+
