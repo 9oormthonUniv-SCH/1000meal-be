@@ -1,6 +1,4 @@
-# Dockerfile
-FROM openjdk:17-jdk-slim
-ARG JAR_FILE=build/libs/*.jar
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
-COPY ${JAR_FILE} app.jar
-ENTRYPOINT ["java", "-jar", "app.jar"]
+COPY build/libs/*.jar app.jar
+ENTRYPOINT ["java","-jar","/app/app.jar"]
