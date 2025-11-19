@@ -14,7 +14,7 @@ public class CorsConfig implements WebMvcConfigurer {
                         "http://localhost:3000",
                         "https://1000meal-fe.vercel.app",
                         "https://1000meal.store/",
-                        "https://54.180.97.8/"
+                        "https://www.1000meal.store/"
                 )
                 .allowedMethods("GET","POST","PUT","PATCH","DELETE","OPTIONS")
                 .allowedHeaders("*")
