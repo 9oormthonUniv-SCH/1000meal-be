@@ -19,6 +19,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -53,6 +54,8 @@ class FavoriteMenuServiceTest {
         verifyNoInteractions(groupRepository, favoriteRepository);
     }
 
+
+
     @Test
     @DisplayName("createGroupAndReplaceFavorites: names가 null/공백이면 그룹만 생성하고 favorites 저장 안 함")
     void createGroupAndReplaceFavorites_namesEmpty_onlyCreateGroup() {
@@ -63,15 +66,18 @@ class FavoriteMenuServiceTest {
         when(savedGroup.getId()).thenReturn(100L);
         when(groupRepository.save(any(FavoriteMenuGroup.class))).thenReturn(savedGroup);
 
-        Long groupId = service.createGroupAndReplaceFavorites(1L, List.of("  ", null, ""));
+        // ✅ List.of()는 null 불가 → Arrays.asList 사용
+        Long groupId = service.createGroupAndReplaceFavorites(1L, Arrays.asList("  ", null, ""));
 
         assertEquals(100L, groupId);
 
         verify(storeRepository).findById(1L);
         verify(groupRepository).save(any(FavoriteMenuGroup.class));
-        verifyNoInteractions(favoriteRepository); // cleaned 비어있으면 delete/saveAll도 호출 안 함
+        verifyNoInteractions(favoriteRepository);
         verifyNoMoreInteractions(storeRepository, groupRepository);
     }
+
+
 
     @Test
     @DisplayName("createGroupAndReplaceFavorites: 이름 정제(trim/empty 제거/distinct) 후 delete + saveAll 수행")
@@ -86,7 +92,7 @@ class FavoriteMenuServiceTest {
         // when
         Long groupId = service.createGroupAndReplaceFavorites(
                 1L,
-                List.of(" 김치찌개 ", "김치찌개", "  ", null, "된장찌개")
+                Arrays.asList(" 김치찌개 ", "김치찌개", "  ", null, "된장찌개") // ✅ null 허용
         );
 
         // then
@@ -96,20 +102,18 @@ class FavoriteMenuServiceTest {
         verify(groupRepository).save(any(FavoriteMenuGroup.class));
         verify(favoriteRepository).deleteByGroup_Id(100L);
 
-        ArgumentCaptor<List<FavoriteMenu>> captor = ArgumentCaptor.forClass(List.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<FavoriteMenu>> captor = ArgumentCaptor.forClass((Class) List.class);
         verify(favoriteRepository).saveAll(captor.capture());
 
         List<FavoriteMenu> saved = captor.getValue();
         assertNotNull(saved);
         assertEquals(2, saved.size()); // 김치찌개, 된장찌개
 
-        // 엔티티 getter가 없다면 여기까지만 검증해도 충분.
-        // getter가 있으면 아래 추가 검증 가능:
-        // assertTrue(saved.stream().anyMatch(m -> "김치찌개".equals(m.getName())));
-        // assertTrue(saved.stream().anyMatch(m -> "된장찌개".equals(m.getName())));
-
         verifyNoMoreInteractions(storeRepository, groupRepository, favoriteRepository);
     }
+
+
 
     // -----------------------------
     // getAllFavoritesGrouped
@@ -137,14 +141,14 @@ class FavoriteMenuServiceTest {
         FavoriteMenuGroup g1 = mock(FavoriteMenuGroup.class);
         when(g1.getId()).thenReturn(10L);
         when(g1.getMenus()).thenReturn(List.of(
-                mockFavorite("김치찌개"),
-                mockFavorite("된장찌개")
+                FavoriteMenu.builder().name("김치찌개").build(),
+                FavoriteMenu.builder().name("된장찌개").build()
         ));
 
         FavoriteMenuGroup g2 = mock(FavoriteMenuGroup.class);
         when(g2.getId()).thenReturn(20L);
         when(g2.getMenus()).thenReturn(List.of(
-                mockFavorite("돈까스")
+                FavoriteMenu.builder().name("돈까스").build()
         ));
 
         when(groupRepository.findByStoreIdWithMenus(1L)).thenReturn(List.of(g1, g2));
@@ -154,8 +158,10 @@ class FavoriteMenuServiceTest {
         assertNotNull(resp);
         assertNotNull(resp.getGroups());
         assertEquals(2, resp.getGroups().size());
+
         assertEquals(10L, resp.getGroups().get(0).getGroupId());
         assertEquals(List.of("김치찌개", "된장찌개"), resp.getGroups().get(0).getMenu());
+
         assertEquals(20L, resp.getGroups().get(1).getGroupId());
         assertEquals(List.of("돈까스"), resp.getGroups().get(1).getMenu());
 
@@ -164,6 +170,9 @@ class FavoriteMenuServiceTest {
         verifyNoMoreInteractions(storeRepository, groupRepository);
         verifyNoInteractions(favoriteRepository);
     }
+
+
+
 
     // -----------------------------
     // getFavoritesGroupedByGroup
@@ -189,8 +198,8 @@ class FavoriteMenuServiceTest {
         when(groupRepository.findById(10L)).thenReturn(Optional.of(mock(FavoriteMenuGroup.class)));
 
         when(favoriteRepository.findByGroup_IdOrderByIdAsc(10L)).thenReturn(List.of(
-                mockFavorite("김치찌개"),
-                mockFavorite("된장찌개")
+                FavoriteMenu.builder().name("김치찌개").build(),
+                FavoriteMenu.builder().name("된장찌개").build()
         ));
 
         FavoriteMenuGroupedResponse resp = service.getFavoritesGroupedByGroup(10L);
@@ -225,20 +234,7 @@ class FavoriteMenuServiceTest {
         verifyNoInteractions(storeRepository, favoriteRepository);
     }
 
-    @Test
-    @DisplayName("replaceFavoritesInGroup: cleaned 비어있으면 delete만 하고 saveAll은 안 함")
-    void replaceFavoritesInGroup_emptyOnlyDelete() {
-        FavoriteMenuGroup group = mock(FavoriteMenuGroup.class);
-        when(group.getId()).thenReturn(10L);
-        when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
 
-        service.replaceFavoritesInGroup(10L, List.of(" ", null, ""));
-
-        verify(groupRepository).findById(10L);
-        verify(favoriteRepository).deleteByGroup_Id(10L);
-        verifyNoMoreInteractions(groupRepository, favoriteRepository);
-        verifyNoInteractions(storeRepository);
-    }
 
     @Test
     @DisplayName("replaceFavoritesInGroup: cleaned 있으면 delete 후 saveAll")
@@ -311,15 +307,33 @@ class FavoriteMenuServiceTest {
         verifyNoInteractions(favoriteRepository);
     }
 
+
+    @Test
+    @DisplayName("replaceFavoritesInGroup: cleaned 비어있으면 delete만 하고 saveAll은 안 함")
+    void replaceFavoritesInGroup_emptyOnlyDelete() {
+        FavoriteMenuGroup group = mock(FavoriteMenuGroup.class);
+        when(group.getId()).thenReturn(10L);
+        when(groupRepository.findById(10L)).thenReturn(Optional.of(group));
+
+        service.replaceFavoritesInGroup(10L, Arrays.asList(" ", null, ""));
+
+        verify(groupRepository).findById(10L);
+        verify(favoriteRepository).deleteByGroup_Id(10L);
+        verify(favoriteRepository, never()).saveAll(anyList());
+
+        verifyNoMoreInteractions(groupRepository, favoriteRepository);
+        verifyNoInteractions(storeRepository);
+    }
+
+
     @Test
     @DisplayName("deleteGroups: ownedIds 있으면 favorites 먼저 삭제 후 groups 삭제")
     void deleteGroups_success_deletesInOrder() {
         when(storeRepository.findById(1L)).thenReturn(Optional.of(mock(Store.class)));
         when(groupRepository.findOwnedIds(eq(1L), anyList())).thenReturn(List.of(10L, 20L));
 
-        service.deleteGroups(1L, List.of(10L, 20L, 20L, null));
+        service.deleteGroups(1L, Arrays.asList(10L, 20L, 20L, null));
 
-        // 순서 검증 (FK 안전: 메뉴 -> 그룹)
         var inOrder = inOrder(favoriteRepository, groupRepository);
         inOrder.verify(favoriteRepository).deleteByGroup_IdIn(List.of(10L, 20L));
         inOrder.verify(groupRepository).deleteAllById(List.of(10L, 20L));
@@ -328,6 +342,7 @@ class FavoriteMenuServiceTest {
         verify(groupRepository).findOwnedIds(eq(1L), anyList());
         verifyNoMoreInteractions(storeRepository, groupRepository, favoriteRepository);
     }
+
 
     // -----------------------------
     // helpers
