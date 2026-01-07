@@ -1,4 +1,4 @@
-package com._1000meal.auth.fixture;
+package com._1000meal.auth.support.fixture;
 
 import com._1000meal.auth.dto.SignupRequest;
 import com._1000meal.global.constant.Role;
