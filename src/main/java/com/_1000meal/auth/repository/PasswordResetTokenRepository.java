@@ -3,7 +3,7 @@ package com._1000meal.auth.repository;
 
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.model.PasswordResetToken;
-import com._1000meal.user.domain.User;
+//import com._1000meal.user.domain.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

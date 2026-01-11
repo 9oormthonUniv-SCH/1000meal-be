@@ -2,7 +2,7 @@ package com._1000meal.global.security;
 
 import com._1000meal.auth.model.AuthPrincipal;
 import com._1000meal.adminlogin.repository.AdminRepository;
-import com._1000meal.user.repository.UserRepository;
+//import com._1000meal.user.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -29,7 +29,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     // 레거시 확인이 꼭 필요할 때만 사용 (기본 OFF 권장)
     private final AdminRepository adminRepository;
-    private final UserRepository userRepository;
+    //private final UserRepository userRepository;
 
     /** SecurityConfig와 반드시 동일하게 유지 */
     private static final String[] WHITELIST = {

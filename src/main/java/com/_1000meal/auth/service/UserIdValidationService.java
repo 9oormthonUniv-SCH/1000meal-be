@@ -3,7 +3,7 @@ package com._1000meal.auth.service;
 
 import com._1000meal.auth.dto.UserIdValidateResponse;
 import com._1000meal.auth.repository.AccountRepository;
-import com._1000meal.user.repository.UserRepository;
+//import com._1000meal.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 // com._1000meal.auth.service.UserIdValidationService
