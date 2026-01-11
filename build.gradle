@@ -63,12 +63,18 @@ dependencies {
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
+
+    //FCM
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
     testImplementation 'org.mockito:mockito-inline:5.2.0' // ✅ static mocking
+
+
 }
 
 test {
