@@ -8,10 +8,9 @@ import com._1000meal.fcm.repository.NotificationPreferenceRepository;
 import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -34,30 +33,54 @@ public class FcmService {
         }
         FcmPlatform p = (platform == null) ? FcmPlatform.WEB : platform;
 
-        Optional<FcmToken> existing = tokenRepository.findByToken(cleanedToken);
-        if (existing.isPresent()) {
-            existing.get().relink(accountId, p);
-        } else {
-            tokenRepository.save(FcmToken.create(accountId, cleanedToken, p));
+        // 1) 토큰 upsert (동시성/유니크 충돌 방어)
+        try {
+            tokenRepository.findByToken(cleanedToken)
+                    .ifPresentOrElse(
+                            t -> t.relink(accountId, p),
+                            () -> tokenRepository.save(FcmToken.create(accountId, cleanedToken, p))
+                    );
+        } catch (DataIntegrityViolationException e) {
+            // 동시성으로 unique(token) 충돌이 날 수 있음 → 다시 조회해서 relink로 수습
+            FcmToken existing = tokenRepository.findByToken(cleanedToken)
+                    .orElseThrow(() -> e);
+            existing.relink(accountId, p);
         }
 
-        // preference 없으면 기본 ON 생성
-        preferenceRepository.findByAccountId(accountId)
-                .orElseGet(() -> preferenceRepository.save(NotificationPreference.createDefaultOn(accountId)));
+        // 2) preference 기본 ON 보장 (동시성/유니크 충돌 방어)
+        ensurePreferenceExistsDefaultOn(accountId);
     }
 
     @Transactional(readOnly = true)
     public boolean getEnabled(Long accountId) {
         return preferenceRepository.findByAccountId(accountId)
                 .map(NotificationPreference::isEnabled)
-                .orElse(true); // 기본 ON
+                .orElse(true); // 정책: 기본 ON
     }
 
     @Transactional
     public void setEnabled(Long accountId, boolean enabled) {
-        NotificationPreference pref = preferenceRepository.findByAccountId(accountId)
-                .orElseGet(() -> preferenceRepository.save(NotificationPreference.createDefaultOn(accountId)));
-
+        NotificationPreference pref = ensurePreferenceExistsDefaultOn(accountId);
         pref.setEnabled(enabled);
     }
+
+    private NotificationPreference ensurePreferenceExistsDefaultOn(Long accountId) {
+        return preferenceRepository.findByAccountId(accountId)
+                .orElseGet(() -> {
+                    try {
+                        return preferenceRepository.save(NotificationPreference.createDefaultOn(accountId));
+                    } catch (DataIntegrityViolationException e) {
+                        // 동시성으로 unique(account_id) 충돌 → 다시 조회해서 반환
+                        return preferenceRepository.findByAccountId(accountId)
+                                .orElseThrow(() -> e);
+                    }
+                });
+    }
+
+    @Transactional
+    public void ensureDefaultPreferenceOn(Long accountId) {
+        preferenceRepository.findByAccountId(accountId)
+                .orElseGet(() -> preferenceRepository.save(NotificationPreference.createDefaultOn(accountId)));
+    }
+
 }

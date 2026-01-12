@@ -9,6 +9,7 @@ import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.auth.repository.AdminProfileRepository;
 import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.email.service.EmailService;
+import com._1000meal.fcm.service.FcmService;
 import com._1000meal.global.constant.Role;
 import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.exception.CustomException;
@@ -34,6 +35,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final EmailService emailService;
+
+    private final FcmService fcmService;
 
     /* -------------------- 회원가입 -------------------- */
     @Transactional
@@ -139,7 +142,7 @@ public class AuthService {
     }
 
     /* -------------------- 로그인 -------------------- */
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest req) {
         final String rawUserId = req.userId();
         final Role reqRole     = req.role();
@@ -183,6 +186,8 @@ public class AuthService {
             }
         }
 
+        fcmService.ensureDefaultPreferenceOn(account.getId());
+
         // 토큰 발급
         AuthPrincipal principal = new AuthPrincipal(
                 account.getId(),
@@ -193,6 +198,7 @@ public class AuthService {
         );
         Map<String, Object> extra = (storeId == null) ? null : Map.of("storeId", storeId, "storeName", storeName);
         String accessToken = jwtProvider.createToken(principal, extra);
+
 
         return new LoginResponse(
                 account.getId(),
