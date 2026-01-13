@@ -1,8 +1,8 @@
-name: Deploy Spring + MySQL with Docker
+name: Deploy to PROD (main)
 
 on:
   push:
-    branches: [ develop ]
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -27,30 +27,25 @@ jobs:
       - name: Build Spring Boot JAR
         run: ./gradlew clean build -x test
 
-      # .env 생성 (Secret 통으로 보관 중)
-      - name: Create .env file from single GitHub Secret
+      - name: Create .env file (PROD)
         run: |
           printf '%s' "${{ secrets.ENV_FILE_CONTENT }}" > .env
           ls -l .env
 
-      # ✅ 사전 점검: SSH 접속/경로
-      - name: SSH sanity check & prepare target dir
+      - name: SSH sanity check & prepare target dir (PROD)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          # port: ${{ secrets.EC2_PORT }}
           script: |
             set -e
             whoami && hostname
-            echo "Home: $HOME"
             mkdir -p "${{ env.DEPLOY_DIR }}"
             chmod 755 "${{ env.DEPLOY_DIR }}"
             ls -ld "${{ env.DEPLOY_DIR }}"
 
-      # 디스크 점검 & 자동 정리 (루트 사용량 85% 이상 시)
-      - name: Disk check & cleanup on EC2
+      - name: Disk check & cleanup on EC2 (PROD)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -58,56 +53,44 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           script: |
             set -e
-            echo "[precheck] current disk usage"
             df -h /
             USAGE=$(df -h / | awk 'NR==2 {gsub("%",""); print $5}')
             echo "Root usage: ${USAGE}%"
             if [ "$USAGE" -ge 85 ]; then
-              echo "[cleanup] docker/journal/apt cache prune..."
               sudo docker system prune -af --volumes || true
-              # 컨테이너 로그 급증 완화 (필요시 크기 기준 조정)
               sudo find /var/lib/docker/containers -type f -name "*.log" -size +50M -print -delete || true
               sudo journalctl --vacuum-time=7d || true
               sudo apt-get clean || true
-              echo "[post-clean] disk usage"
               df -h /
-            else
-              echo "[precheck] usage < 85%, skip cleanup"
             fi
 
-      # ✅ 필요한 파일만 전송 (전체 프로젝트 X)
-      - name: Upload artifacts via SCP (jar + compose + .env)
+      - name: Upload artifacts via SCP (PROD)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          # port: ${{ secrets.EC2_PORT }}
           source: |
             build/libs/*.jar,
             docker-compose.yml,
             .env
           target: ${{ env.DEPLOY_DIR }}/
           overwrite: true
-          rm: false
           debug: true
           timeout: 120s
           command_timeout: 10m
 
-      # ✅ Compose 재기동
-      - name: SSH compose up
+      - name: SSH compose up (PROD)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          # port: ${{ secrets.EC2_PORT }}
           script: |
             set -e
-            echo "[predeploy] disk usage before compose"
-            df -h /
-            sudo docker system df || true
             cd "${{ env.DEPLOY_DIR }}"
+            echo "[check] files in deploy dir"
+            ls -al
             docker compose down || true
             docker compose --env-file .env up -d --build
             docker compose ps
