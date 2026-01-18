@@ -46,8 +46,9 @@ public class NoticeService {
                 .isPublished(req.isPublished())
                 .isPinned(req.isPinned())
                 .build();
+
         Notice saved = noticeRepository.save(n);
-        return toResponse(n);
+        return toResponse(saved);
     }
 
     @Transactional
