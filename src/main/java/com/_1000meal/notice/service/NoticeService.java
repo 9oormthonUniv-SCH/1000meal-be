@@ -58,7 +58,7 @@ public class NoticeService {
                 .build();
 
         Notice saved = noticeRepository.save(n);
-        return toResponse(saved, List.of());
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
