@@ -80,17 +80,25 @@ public class EmailService {
     }
 
     /** 가입 직전 강제확인(verified=true 최신 토큰이 유효해야 함) */
+//    @Transactional(readOnly = true)
+//    public void requireVerified(String email) {
+//        final String normalized = email.trim().toLowerCase();
+//
+//        EmailVerificationToken token = tokenRepository
+//                .findTop1ByEmailAndVerifiedTrueOrderByIdDesc(normalized)
+//                .orElseThrow(() -> new IllegalStateException("이메일 인증이 완료되지 않았습니다."));
+//
+//        if (token.isExpired()) {
+//            throw new IllegalStateException("이메일 인증이 만료되었습니다. 다시 인증해 주세요.");
+//        }
+//    }
+    /** 가입 직전 강제확인(verified=true면 OK) */
     @Transactional(readOnly = true)
     public void requireVerified(String email) {
         final String normalized = email.trim().toLowerCase();
 
-        EmailVerificationToken token = tokenRepository
-                .findTop1ByEmailAndVerifiedTrueOrderByIdDesc(normalized)
+        tokenRepository.findTop1ByEmailAndVerifiedTrueOrderByIdDesc(normalized)
                 .orElseThrow(() -> new IllegalStateException("이메일 인증이 완료되지 않았습니다."));
-
-        if (token.isExpired()) {
-            throw new IllegalStateException("이메일 인증이 만료되었습니다. 다시 인증해 주세요.");
-        }
     }
 
     /** 가입 완료 후 깔끔 정리: 해당 이메일의 모든 토큰 제거 */

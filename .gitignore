@@ -48,6 +48,6 @@ application-*.yml
 application.properties
 src/main/resources/
 
-!.github/
-!.github/workflows/
-!.github/workflows/*.yml
+# Firebase service account
+**/*firebase-adminsdk*.json
+**/serviceAccountKey*.json

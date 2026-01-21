@@ -1,5 +1,6 @@
 package com._1000meal.global.error.exception;
 
+import com._1000meal.global.error.code.ErrorCode;
 import lombok.Getter;
 
 
@@ -36,4 +37,8 @@ public class CustomException extends RuntimeException {
                 ? errorCodeIfs.getMessage()
                 : customMessage;
     }
+
+
+
+
 }

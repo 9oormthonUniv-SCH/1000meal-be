@@ -48,4 +48,9 @@ public class CustomExceptionHandler {
         return ResponseEntity.status(code.getHttpStatusCode())
                 .body(Result.error(code, code.getMessage()));
     }
+
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<?> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        return ResponseEntity.status(404).build();
+    }
 }
