@@ -9,4 +9,7 @@ import java.util.Optional;
 public interface FcmTokenRepository extends JpaRepository<FcmToken, Long> {
     Optional<FcmToken> findByToken(String token);
     List<FcmToken> findAllByAccountIdAndActiveTrue(Long accountId);
+
+    // ON 계정들 토큰을 한번에
+    List<FcmToken> findAllByAccountIdInAndActiveTrue(List<Long> accountIds);
 }

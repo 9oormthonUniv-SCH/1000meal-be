@@ -11,8 +11,10 @@ import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
+import com._1000meal.store.event.StoreOpenedEvent;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class StoreService {
     private final StoreRepository storeRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuService menuService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
     public StoreDetailedResponse getStoreDetail(Long storeId) {
@@ -74,17 +77,21 @@ public class StoreService {
 
     @Transactional
     public String toggleStoreStatus(Long storeId) {
-
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
         boolean previousState = store.isOpen();
-        store.toggleIsOpen(); // Store isOpen 토글
+        store.toggleIsOpen();
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-
         dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
-                .ifPresent(dailyMenu -> {dailyMenu.toggleIsOpen();});
+                .ifPresent(DailyMenu::toggleIsOpen);
+
+        // ✅ OFF -> ON 일 때만 오픈 알림 이벤트 발행
+        boolean openedNow = !previousState && store.isOpen();
+        if (openedNow) {
+            eventPublisher.publishEvent(new StoreOpenedEvent(store.getId(), store.getName()));
+        }
 
         return "가게와 오늘의 메뉴 운영 상태가 업데이트 되었습니다.";
     }
