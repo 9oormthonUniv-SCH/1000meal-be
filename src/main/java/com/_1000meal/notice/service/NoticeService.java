@@ -29,7 +29,7 @@ public class NoticeService {
     private final NoticeImageService noticeImageService;
 
     @Transactional(readOnly = true)
-    public List<NoticeResponse> list() {
+    public List<NoticeResponse> getAllNotice() {
         return noticeRepository.findAllByDeletedAtIsNull(
                         Sort.by(Sort.Order.desc("isPinned"), Sort.Order.desc("createdAt"))
                 ).stream()
