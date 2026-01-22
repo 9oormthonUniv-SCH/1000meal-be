@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls:*)",
+      "Bash(xargs:*)",
+      "Bash(./gradlew test:*)",
+      "Bash(./gradlew clean test:*)",
+      "Bash(done)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\n[test] FavoriteStoreService 테스트 추가 및 테스트 코드 정리\n\n- FavoriteStoreServiceTest 9개 테스트 케이스 추가\n  - addFavorite: 성공, 멱등성, 계정/매장 없음, 동시요청 처리\n  - removeFavorite: 성공, 멱등성\n  - getMyFavorites: 목록 반환, 빈 목록\n- 삭제된 FavoriteMenu 모듈의 테스트 파일 제거\n- MenuServiceTest에서 미사용 FavoriteMenuRepository 의존성 제거\n- CLAUDE.md 프로젝트 가이드 문서 추가\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(find:*)",
+      "Bash(./gradlew clean build:*)"
+    ]
+  }
+}

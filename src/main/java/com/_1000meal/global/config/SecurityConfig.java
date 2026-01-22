@@ -7,8 +7,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,7 +17,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 
 import java.time.LocalDateTime;
 
@@ -27,8 +27,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
-    // 1) 화이트리스트에서 아래 2가지만 남겨두세요(예: 인증/비밀번호/헬스/루트 등)
-    //   - ★ Swagger 경로/공개 API 경로는 화이트리스트에서 제거(아래 authorize 규칙으로 처리)
+    // 1) 인증/기타 화이트리스트
     private static final String[] AUTH_WHITELIST = {
             "/api/v1/auth/signup",
             "/api/v1/auth/login",
@@ -42,16 +41,15 @@ public class SecurityConfig {
             "/error"
     };
 
-    // 2) 공개 조회 허용 대상 (GET만 permitAll, 그 외 메서드는 ADMIN)
+    // 2) 공개 조회 허용 대상 (GET만 permitAll)
     private static final String[] PUBLIC_GET_API = {
             "/api/v1/stores/**",
             "/api/v1/menus/**",
-            "/api/v1/favorites/**",
             "/file",
             "/api/v1/notices/**"
     };
 
-    // 3) Swagger 전면 차단
+    // 3) Swagger 경로 (원하면 permitAll로 열어두고, 운영에서만 막는 식으로도 가능)
     private static final String[] SWAGGER_PATHS = {
             "/swagger-ui/**",
             "/swagger-ui.html",
@@ -60,9 +58,11 @@ public class SecurityConfig {
     };
 
     @Bean
-    public PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
-    // 선택: 전체 actuator 무시(보안상 운영에선 최소화 권장)
+    // 선택: actuator 무시(운영에서는 최소화 권장)
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
         return web -> web.ignoring().requestMatchers("/actuator/**");
@@ -75,33 +75,36 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(Customizer.withDefaults())
-                // 폼/베이직 비활성화 (리다이렉트 방지)
                 .formLogin(form -> form.disable())
                 .httpBasic(basic -> basic.disable())
-                // 권한 매핑
+
+                // 권한 규칙
                 .authorizeHttpRequests(auth -> auth
-                        // CORS 프리플라이트 통과
+                        // CORS 프리플라이트
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Swagger 문서 전면 차단
+                        // Swagger (지금은 열어둠)
                         .requestMatchers(SWAGGER_PATHS).permitAll()
 
-                        // 인증/기타 화이트리스트 허용
+                        // 인증/기타 화이트리스트
                         .requestMatchers(AUTH_WHITELIST).permitAll()
 
                         // 공개 API: GET만 허용
                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_API).permitAll()
-                        // 같은 경로의 비-GET은 ADMIN만
-                        .requestMatchers(PUBLIC_GET_API).hasRole("ADMIN")
 
-                        // 관리자 전용 API (예시)
+                        // ✅ favorites: 로그인한 사용자면 OK (GET/POST/DELETE 모두)
+                        .requestMatchers("/api/v1/favorites/**").authenticated()
+
+                        // 관리자 전용
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
 
                         // 나머지는 인증 필요
                         .anyRequest().authenticated()
                 )
+
                 // JWT 필터
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
                 // 예외 처리(JSON)
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint(restAuthenticationEntryPoint())

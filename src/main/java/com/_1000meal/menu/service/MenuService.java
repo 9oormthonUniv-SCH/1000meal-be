@@ -1,6 +1,6 @@
 package com._1000meal.menu.service;
 
-import com._1000meal.favoriteMenu.repository.FavoriteMenuRepository;
+
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.Menu;
@@ -34,7 +34,7 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuRepository menuRepository;
-    private final FavoriteMenuRepository favoriteMenuRepository;
+
 
     @Transactional
     public void addOrReplaceDailyMenu(Long storeId, DailyMenuAddRequest req) {
