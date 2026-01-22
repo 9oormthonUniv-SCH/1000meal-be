@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -27,46 +28,103 @@ public class AwsS3Service {
 
     private final AmazonS3 amazonS3;
 
-    public List<String> uploadFile(List<MultipartFile> multipartFiles){
-        List<String> fileNameList = new ArrayList<>();
+    // 업로드 결과(키 + URL + 메타)
+    public record UploadedFile(
+            String s3Key,
+            String url,
+            String originalName,
+            String contentType,
+            long size
+    ) {}
 
-        // forEach 구문을 통해 multipartFiles 리스트로 넘어온 파일들을 순차적으로 fileNameList 에 추가
-        multipartFiles.forEach(file -> {
-            String fileName = createFileName(file.getOriginalFilename());
+    /**
+     * ✅ 도메인별 폴더(prefix) 지원 업로드
+     * 예) prefix = "notices/123"
+     */
+    public List<UploadedFile> uploadFiles(String prefix, List<MultipartFile> multipartFiles) {
+        if (multipartFiles == null || multipartFiles.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "업로드할 파일이 없습니다.");
+        }
+
+        String normalizedPrefix = normalizePrefix(prefix);
+
+        List<UploadedFile> results = new ArrayList<>();
+
+        for (MultipartFile file : multipartFiles) {
+            if (file == null || file.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "빈 파일이 포함되어 있습니다.");
+            }
+
+            String key = createFileName(normalizedPrefix, file.getOriginalFilename());
             ObjectMetadata objectMetadata = new ObjectMetadata();
             objectMetadata.setContentLength(file.getSize());
             objectMetadata.setContentType(file.getContentType());
 
-            try(InputStream inputStream = file.getInputStream()){
-                amazonS3.putObject(new PutObjectRequest(bucket, fileName, inputStream, objectMetadata)
+            try (InputStream inputStream = file.getInputStream()) {
+                amazonS3.putObject(new PutObjectRequest(bucket, key, inputStream, objectMetadata)
                         .withCannedAcl(CannedAccessControlList.PublicRead));
-            } catch (IOException e){
+            } catch (IOException e) {
+                // 업로드 실패
                 throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패했습니다.");
             }
-            fileNameList.add(fileName);
 
-        });
+            String url = amazonS3.getUrl(bucket, key).toString();
 
-        return fileNameList;
+            results.add(new UploadedFile(
+                    key,
+                    url,
+                    safeOriginalName(file.getOriginalFilename()),
+                    file.getContentType(),
+                    file.getSize()
+            ));
+        }
+
+        return results;
     }
 
-    // 파일명을 난수화하기 위해 UUID 를 활용하여 난수를 돌린다.
-    public String createFileName(String fileName){
-        return UUID.randomUUID().toString().concat(getFileExtension(fileName));
+    /**
+     * 파일명 난수화 + prefix 적용
+     * 예) notices/123/uuid.jpg
+     */
+    public String createFileName(String prefix, String originalFileName) {
+        return prefix + "/" + UUID.randomUUID() + getFileExtension(originalFileName);
     }
 
-    //  "."의 존재 유무만 판단
-    private String getFileExtension(String fileName){
-        try{
-            return fileName.substring(fileName.lastIndexOf("."));
-        } catch (StringIndexOutOfBoundsException e){
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 형식의 파일" + fileName + ") 입니다.");
+    // 확장자 추출
+    private String getFileExtension(String fileName) {
+        if (fileName == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일명이 없습니다.");
+        }
+        try {
+            String ext = fileName.substring(fileName.lastIndexOf(".")).toLowerCase(Locale.ROOT);
+            if (ext.length() > 10) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 확장자입니다. (" + fileName + ")");
+            }
+            return ext;
+        } catch (StringIndexOutOfBoundsException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "잘못된 형식의 파일(" + fileName + ") 입니다.");
         }
     }
 
+    // prefix 정규화: 앞/뒤 슬래시 제거, null이면 uploads
+    private String normalizePrefix(String prefix) {
+        if (prefix == null || prefix.isBlank()) return "uploads";
+        String p = prefix.trim();
+        while (p.startsWith("/")) p = p.substring(1);
+        while (p.endsWith("/")) p = p.substring(0, p.length() - 1);
+        if (p.isBlank()) return "uploads";
+        return p;
+    }
 
-    public void deleteFile(String fileName){
-        amazonS3.deleteObject(new DeleteObjectRequest(bucket, fileName));
-        System.out.println(bucket);
+    private String safeOriginalName(String name) {
+        if (name == null) return null;
+        return name.length() > 255 ? name.substring(0, 255) : name;
+    }
+
+    /**
+     * key(=파일명/경로)로 삭제
+     */
+    public void deleteFile(String s3Key) {
+        amazonS3.deleteObject(new DeleteObjectRequest(bucket, s3Key));
     }
 }

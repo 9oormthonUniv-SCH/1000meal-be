@@ -1,5 +1,6 @@
 package com._1000meal.notice.domain;
 
+import com._1000meal.notice.dto.NoticeImageResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,6 +8,7 @@ import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -63,6 +65,10 @@ public class Notice {
     private static final DateTimeFormatter F = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public static NoticeResponse toResponse(Notice n) {
+        return toResponse(n, List.of());
+    }
+
+    public static NoticeResponse toResponse(Notice n, List<NoticeImageResponse> images) {
         final DateTimeFormatter F = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
         return new NoticeResponse(
                 n.getId(),
@@ -71,7 +77,8 @@ public class Notice {
                 n.isPublished(),
                 n.isPinned(),
                 n.getCreatedAt().format(F),
-                n.getUpdatedAt().format(F)
+                n.getUpdatedAt().format(F),
+                images
         );
     }
 }
