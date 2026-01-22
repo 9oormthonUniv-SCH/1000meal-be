@@ -124,7 +124,7 @@ class NoticeServiceTest {
                 });
 
         // when
-        NoticeResponse resp = noticeService.create(req,null);
+        NoticeResponse resp = noticeService.create(req);
 
         // then
         assertNotNull(resp);
