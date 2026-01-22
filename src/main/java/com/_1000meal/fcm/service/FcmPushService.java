@@ -2,7 +2,6 @@ package com._1000meal.fcm.service;
 
 import com._1000meal.fcm.domain.FcmToken;
 import com._1000meal.fcm.repository.FcmTokenRepository;
-import com._1000meal.fcm.repository.NotificationPreferenceRepository;
 import com.google.firebase.messaging.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,21 +14,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class FcmPushService {
 
-    private final NotificationPreferenceRepository preferenceRepository;
     private final FcmTokenRepository tokenRepository;
 
     public void sendStoreOpened(Long storeId, String storeName) {
-        List<Long> enabledAccountIds = preferenceRepository.findEnabledAccountIds();
-        if (enabledAccountIds.isEmpty()) {
-            log.info("[FCM][OPEN] enabledAccountIds empty. skip");
-            return;
-        }
-
-        List<FcmToken> tokens = tokenRepository.findAllByAccountIdInAndActiveTrue(enabledAccountIds);
+        // 해당 매장을 즐겨찾기한 사용자 중 알림 ON + active 토큰 보유자만 대상
+        List<FcmToken> tokens = tokenRepository.findActiveTokensForFavoriteStore(storeId);
         List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
 
         if (tokenStrings.isEmpty()) {
-            log.info("[FCM][OPEN] active tokens empty. skip");
+            log.info("[FCM][OPEN] storeId={}, success=0, failure=0, skipped=no_favorite_subscribers",
+                    storeId);
             return;
         }
 
