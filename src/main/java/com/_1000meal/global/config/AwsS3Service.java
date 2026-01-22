@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -38,6 +39,16 @@ public class AwsS3Service {
     public record UploadedFile(
             String s3Key,
             String url,
+            String originalName,
+            String contentType,
+            long size
+    ) {}
+
+    public record PresignedUpload(
+            String s3Key,
+            String url,
+            String uploadUrl,
+            Map<String, String> headers,
             String originalName,
             String contentType,
             long size
@@ -94,6 +105,40 @@ public class AwsS3Service {
      */
     public String createFileName(String prefix, String originalFileName) {
         return prefix + "/" + UUID.randomUUID() + getFileExtension(originalFileName);
+    }
+
+    public PresignedUpload createPresignedUpload(
+            String prefix,
+            String originalFileName,
+            String contentType,
+            long size
+    ) {
+        String normalizedPrefix = normalizePrefix(prefix);
+        String key = createFileName(normalizedPrefix, originalFileName);
+        Date expiration = new Date(System.currentTimeMillis() + presignTtlSeconds * 1000);
+
+        GeneratePresignedUrlRequest request =
+                new GeneratePresignedUrlRequest(bucket, key)
+                        .withMethod(HttpMethod.PUT)
+                        .withExpiration(expiration);
+        request.setContentType(contentType);
+        request.addRequestParameter("x-amz-acl", "public-read");
+
+        String uploadUrl = amazonS3.generatePresignedUrl(request).toString();
+        String url = amazonS3.getUrl(bucket, key).toString();
+
+        return new PresignedUpload(
+                key,
+                url,
+                uploadUrl,
+                Map.of(
+                        "Content-Type", contentType,
+                        "x-amz-acl", "public-read"
+                ),
+                safeOriginalName(originalFileName),
+                contentType,
+                size
+        );
     }
 
     // 확장자 추출

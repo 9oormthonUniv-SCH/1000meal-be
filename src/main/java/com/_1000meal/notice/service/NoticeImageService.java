@@ -3,6 +3,9 @@ package com._1000meal.notice.service;
 import com._1000meal.global.config.AwsS3Service;
 import com._1000meal.notice.domain.Notice;
 import com._1000meal.notice.domain.NoticeImage;
+import com._1000meal.notice.dto.NoticeImagePresignRequest;
+import com._1000meal.notice.dto.NoticeImagePresignResponse;
+import com._1000meal.notice.dto.NoticeImageRegisterRequest;
 import com._1000meal.notice.dto.NoticeImageResponse;
 import com._1000meal.notice.repository.NoticeImageRepository;
 import com._1000meal.notice.repository.NoticeRepository;
@@ -93,6 +96,103 @@ public class NoticeImageService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public List<NoticeImagePresignResponse> presign(
+            Long noticeId,
+            NoticeImagePresignRequest request
+    ) {
+        if (request == null || request.files() == null || request.files().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "files required");
+        }
+        if (request.files().size() > MAX_COUNT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "too many files (max " + MAX_COUNT + ")");
+        }
+
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "notice not found"));
+
+        List<NoticeImagePresignResponse> responses = new ArrayList<>();
+        String prefix = "notices/" + notice.getId();
+
+        for (NoticeImagePresignRequest.FileMeta f : request.files()) {
+            validateFileMeta(f.originalName(), f.contentType(), f.size());
+
+            AwsS3Service.PresignedUpload presigned =
+                    awsS3Service.createPresignedUpload(
+                            prefix,
+                            f.originalName(),
+                            f.contentType(),
+                            f.size()
+                    );
+
+            responses.add(new NoticeImagePresignResponse(
+                    presigned.s3Key(),
+                    presigned.url(),
+                    presigned.uploadUrl(),
+                    presigned.headers(),
+                    presigned.originalName(),
+                    presigned.contentType(),
+                    presigned.size()
+            ));
+        }
+
+        return responses;
+    }
+
+    @Transactional
+    public List<NoticeImageResponse> register(
+            Long noticeId,
+            NoticeImageRegisterRequest request
+    ) {
+        if (request == null || request.images() == null || request.images().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "images required");
+        }
+        if (request.images().size() > MAX_COUNT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "too many images (max " + MAX_COUNT + ")");
+        }
+
+        Notice notice = noticeRepository.findById(noticeId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "notice not found"));
+
+        String prefix = "notices/" + notice.getId() + "/";
+        List<NoticeImageResponse> responses = new ArrayList<>();
+
+        for (NoticeImageRegisterRequest.ImageMeta img : request.images()) {
+            validateFileMeta(img.originalName(), img.contentType(), img.size());
+            if (img.s3Key() == null || !img.s3Key().startsWith(prefix)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid s3Key");
+            }
+            if (img.url() == null || img.url().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "url required");
+            }
+
+            NoticeImage saved = noticeImageRepository.save(
+                    NoticeImage.of(
+                            notice,
+                            img.s3Key(),
+                            img.url(),
+                            img.originalName(),
+                            img.contentType(),
+                            img.size()
+                    )
+            );
+
+            responses.add(new NoticeImageResponse(
+                    saved.getId(),
+                    saved.getUrl(),
+                    saved.getOriginalName(),
+                    saved.getContentType(),
+                    saved.getSize()
+            ));
+        }
+
+        return responses;
+    }
+
     @Transactional
     public void delete(Long noticeId, Long imageId) {
         NoticeImage img = noticeImageRepository.findById(imageId)
@@ -139,6 +239,20 @@ public class NoticeImageService {
             if (ct == null || !ALLOWED_CONTENT_TYPES.contains(ct)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid contentType: " + ct);
             }
+        }
+    }
+
+    private void validateFileMeta(String originalName, String contentType, long size) {
+        if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "invalid contentType: " + contentType);
+        }
+        if (size <= 0 || size > MAX_SIZE_BYTES) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "file too large (max 5MB)");
+        }
+        if (originalName == null || originalName.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "originalName required");
         }
     }
 }
