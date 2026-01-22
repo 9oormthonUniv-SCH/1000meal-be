@@ -1,4 +1,4 @@
-package com._1000meal.notice.image.service;
+package com._1000meal.notice.service;
 
 import com._1000meal.global.config.AwsS3Service;
 import com._1000meal.notice.domain.Notice;
@@ -27,21 +27,20 @@ public class NoticeImageService {
     private static final int MAX_COUNT = 10;
     private static final long MAX_SIZE_BYTES = 5L * 1024 * 1024; // 5MB
 
-    // 필요하면 gif까지 열어줘도 됨
     private static final List<String> ALLOWED_CONTENT_TYPES =
-            List.of("image/jpeg", "image/png", "image/webp");
+            List.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
     @Transactional
     public List<NoticeImageResponse> upload(Long noticeId, List<MultipartFile> files) {
         if (files == null || files.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "files is empty");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "파일이 비었습니다.");
         }
         if (files.size() > MAX_COUNT) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "too many files (max " + MAX_COUNT + ")");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "사진은 최대 " + MAX_COUNT + "장까지 추가 가능합니다.");
         }
 
         Notice notice = noticeRepository.findById(noticeId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "notice not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "공지를 찾을 수 없습니다."));
 
         validateFiles(files);
 
@@ -55,7 +54,7 @@ public class NoticeImageService {
             // AwsS3Service에서 이미 적절한 상태코드로 던짐
             throw e;
         } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "image upload failed");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 업로드에 실패하였습니다.");
         }
 
         // ✅ DB 저장 + 보상삭제(여기서 실패하면 S3에 올라간 것들 제거)
@@ -90,14 +89,14 @@ public class NoticeImageService {
             for (AwsS3Service.UploadedFile u : uploaded) {
                 try { awsS3Service.deleteFile(u.s3Key()); } catch (Exception ignore) {}
             }
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "db save failed after s3 upload");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "데이터베이스 저장에 실패하였습니다.");
         }
     }
 
     @Transactional
     public void delete(Long noticeId, Long imageId) {
         NoticeImage img = noticeImageRepository.findById(imageId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "image not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다."));
 
         if (!img.getNotice().getId().equals(noticeId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "image does not belong to notice");
