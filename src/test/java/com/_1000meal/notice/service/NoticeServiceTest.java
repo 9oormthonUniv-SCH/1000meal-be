@@ -62,7 +62,7 @@ class NoticeServiceTest {
                 .thenReturn(List.of(pinned, normal));
 
         // when
-        var result = noticeService.list();
+        var result = noticeService.getAllNotice();
 
         // then
         assertNotNull(result);
@@ -90,7 +90,7 @@ class NoticeServiceTest {
         when(noticeRepository.findById(1L)).thenReturn(Optional.empty());
 
         // when
-        CustomException ex = assertThrows(CustomException.class, () -> noticeService.get(1L));
+        CustomException ex = assertThrows(CustomException.class, () -> noticeService.getNotice(1L));
 
         // then
         assertEquals(NoticeErrorCode.NOTICE_NOT_FOUND, ex.getErrorCodeIfs());
@@ -124,7 +124,7 @@ class NoticeServiceTest {
                 });
 
         // when
-        NoticeResponse resp = noticeService.create(req);
+        NoticeResponse resp = noticeService.create(req,null);
 
         // then
         assertNotNull(resp);
