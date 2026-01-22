@@ -20,6 +20,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 
 @Tag(name = "Notice", description = "공지사항 API")
@@ -52,9 +54,8 @@ public class NoticeController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항을 찾을 수 없음")
     })
     @GetMapping("/{id}")
-    public ApiResponse<NoticeResponse> get(@PathVariable Long id) {
-        NoticeResponse response = noticeService.getNotice(id);
-        return ApiResponse.success(response, SuccessCode.OK);
+    public NoticeResponse get(@PathVariable Long id) {
+        return noticeService.getNotice(id);
     }
 
     @Operation(
@@ -98,28 +99,11 @@ public class NoticeController {
             )
     })
     @PostMapping
-    public ApiResponse<NoticeResponse> create(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    required = true,
-                    content = @Content(
-                            schema = @Schema(implementation = NoticeCreateRequest.class),
-                            examples = @ExampleObject(
-                                    name = "request",
-                                    value = """
-                                    {
-                                      "title": "공지 제목",
-                                      "content": "공지 내용",
-                                      "isPublished": true,
-                                      "isPinned": false
-                                    }
-                                    """
-                            )
-                    )
-            )
-            @RequestBody @Valid NoticeCreateRequest req
+    public NoticeResponse create(
+            @ModelAttribute @Valid NoticeCreateRequest req,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
-        NoticeResponse response = noticeService.create(req);
-        return ApiResponse.success(response, SuccessCode.OK);
+        return noticeService.create(req, files);
     }
 
     @Operation(

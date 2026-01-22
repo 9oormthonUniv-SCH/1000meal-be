@@ -3,9 +3,6 @@ package com._1000meal.notice.service;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.notice.domain.Notice;
 import com._1000meal.notice.dto.NoticeCreateRequest;
-import com._1000meal.notice.dto.NoticeImagePresignRequest;
-import com._1000meal.notice.dto.NoticeImagePresignResponse;
-import com._1000meal.notice.dto.NoticeImageRegisterRequest;
 import com._1000meal.notice.dto.NoticeImageResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import com._1000meal.notice.dto.NoticeUpdateRequest;
@@ -16,6 +13,7 @@ import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -49,7 +47,8 @@ public class NoticeService {
     }
 
     @Transactional
-    public NoticeResponse create(NoticeCreateRequest req) {
+    public NoticeResponse create(NoticeCreateRequest req, List<MultipartFile> files) {
+
         Notice n = Notice.builder()
                 .title(req.title())
                 .content(req.content())
@@ -57,8 +56,14 @@ public class NoticeService {
                 .isPinned(req.isPinned())
                 .build();
 
-        Notice saved = noticeRepository.save(n);
-        return toResponse(saved);
+        Notice saved = noticeRepository.save(n); // ✅ 여기서 저장
+
+        List<NoticeImageResponse> images =
+                (files == null || files.isEmpty())
+                        ? List.of()
+                        : noticeImageService.upload(saved.getId(), files);
+
+        return toResponse(saved, images); // 네가 수정한 toResponse(Notice, images) 사용
     }
 
     @Transactional(readOnly = true)
