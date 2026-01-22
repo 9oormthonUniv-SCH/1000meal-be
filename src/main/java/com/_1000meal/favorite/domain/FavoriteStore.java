@@ -17,7 +17,8 @@ import java.time.LocalDateTime;
                 @UniqueConstraint(name = "uk_favorite_store_account_store", columnNames = {"account_id", "store_id"})
         },
         indexes = {
-                @Index(name = "idx_favorite_store_store", columnList = "store_id")
+                @Index(name = "idx_favorite_store_store", columnList = "store_id"),
+                @Index(name = "idx_favorite_store_account", columnList = "account_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
