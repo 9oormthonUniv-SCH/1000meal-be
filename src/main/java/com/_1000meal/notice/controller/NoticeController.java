@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -46,12 +47,8 @@ public class NoticeController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항을 찾을 수 없음")
     })
     @GetMapping("/{id}")
-    public ApiResponse<NoticeResponse> get(
-            @Parameter(description = "공지사항 ID", example = "1")
-            @PathVariable Long id
-    ) {
-        NoticeResponse response = noticeService.get(id);
-        return ApiResponse.success(response, SuccessCode.OK);
+    public NoticeResponse get(@PathVariable Long id) {
+        return noticeService.getNotice(id);
     }
 
     @Operation(
@@ -63,11 +60,11 @@ public class NoticeController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "요청 값 검증 실패")
     })
     @PostMapping
-    public ApiResponse<NoticeResponse> create(
-            @RequestBody @Valid NoticeCreateRequest request
+    public NoticeResponse create(
+            @ModelAttribute @Valid NoticeCreateRequest req,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
-        NoticeResponse response = noticeService.create(request);
-        return ApiResponse.success(response, SuccessCode.OK);
+        return noticeService.create(req, files);
     }
 
     @Operation(
