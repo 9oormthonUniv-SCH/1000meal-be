@@ -54,8 +54,9 @@ public class NoticeController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "공지사항을 찾을 수 없음")
     })
     @GetMapping("/{id}")
-    public NoticeResponse get(@PathVariable Long id) {
-        return noticeService.getNotice(id);
+    public ApiResponse<NoticeResponse> get(@PathVariable Long id) {
+        NoticeResponse response = noticeService.getNotice(id);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
 
     @Operation(
@@ -99,11 +100,12 @@ public class NoticeController {
             )
     })
     @PostMapping
-    public NoticeResponse create(
+    public ApiResponse<NoticeResponse> create(
             @ModelAttribute @Valid NoticeCreateRequest req,
             @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
-        return noticeService.create(req, files);
+        NoticeResponse response = noticeService.create(req, files);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
 
     @Operation(
