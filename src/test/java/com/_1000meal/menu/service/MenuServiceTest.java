@@ -1,6 +1,5 @@
 package com._1000meal.menu.service;
 
-import com._1000meal.favoriteMenu.repository.FavoriteMenuRepository;
 import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
@@ -38,7 +37,6 @@ class MenuServiceTest {
     @Mock WeeklyMenuRepository weeklyMenuRepository;
     @Mock DailyMenuRepository dailyMenuRepository;
     @Mock MenuRepository menuRepository;
-    @Mock FavoriteMenuRepository favoriteMenuRepository;
 
     @InjectMocks MenuService service;
 
