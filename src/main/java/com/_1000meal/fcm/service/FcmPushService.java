@@ -52,4 +52,45 @@ public class FcmPushService {
             log.error("[FCM][OPEN] send failed: {}", e.getMessage(), e);
         }
     }
+
+    /**
+     * 품절 임박 알림 발송
+     * 해당 매장을 즐겨찾기한 사용자 중 알림 ON + active 토큰 보유자에게 푸시
+     */
+    public void sendLowStockNotification(Long storeId, String storeName,
+                                          Long groupId, String groupName, int remaining) {
+        List<FcmToken> tokens = tokenRepository.findActiveTokensForFavoriteStore(storeId);
+        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
+
+        if (tokenStrings.isEmpty()) {
+            log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success=0, failure=0, skipped=no_favorite_subscribers",
+                    storeId, groupId);
+            return;
+        }
+
+        String title = "품절 임박 알림";
+        String body = String.format("[%s] 수량이 곧 품절돼요! (남은 수량: %d개)", storeName, remaining);
+
+        MulticastMessage msg = MulticastMessage.builder()
+                .addAllTokens(tokenStrings)
+                .setNotification(Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .build())
+                .putData("type", "LOW_STOCK")
+                .putData("storeId", String.valueOf(storeId))
+                .putData("storeName", storeName)
+                .putData("groupId", String.valueOf(groupId))
+                .putData("groupName", groupName)
+                .putData("remaining", String.valueOf(remaining))
+                .build();
+
+        try {
+            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
+            log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success={}, failure={}",
+                    storeId, groupId, res.getSuccessCount(), res.getFailureCount());
+        } catch (FirebaseMessagingException e) {
+            log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
+        }
+    }
 }

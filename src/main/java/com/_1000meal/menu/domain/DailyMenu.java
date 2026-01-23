@@ -45,6 +45,10 @@ public class DailyMenu {
     @OneToMany(mappedBy = "dailyMenu", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
     private final List<Menu> menus = new ArrayList<>();
 
+    @OneToMany(mappedBy = "dailyMenu", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC")
+    private final List<MenuGroup> menuGroups = new ArrayList<>();
+
     @Builder
     public DailyMenu(WeeklyMenu weeklyMenu, LocalDate date) {
         this.weeklyMenu = weeklyMenu;
@@ -93,6 +97,20 @@ public class DailyMenu {
             this.isOpen = false;  // 휴무일이면 자동으로 닫힘 처리
             this.stock = 0;       // 재고도 0으로 처리
         }
+    }
+
+    /**
+     * 모든 그룹의 재고 합계를 반환
+     */
+    public int getTotalGroupStock() {
+        return menuGroups.stream()
+                .filter(g -> g.getStock() != null)
+                .mapToInt(g -> g.getStock().getStock())
+                .sum();
+    }
+
+    public void addMenuGroup(MenuGroup menuGroup) {
+        this.menuGroups.add(menuGroup);
     }
 }
 
