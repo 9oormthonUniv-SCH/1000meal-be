@@ -15,3 +15,5 @@ VALUES
                          hours=VALUES(hours),
                          lat=VALUES(lat),
                          lng=VALUES(lng);
+
+
