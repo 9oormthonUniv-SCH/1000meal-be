@@ -6,6 +6,9 @@ services:
     container_name: app-1000meal
     ports:
       - "8080:8080"
+    env_file:
+      - .env
+
     environment:
       SPRING_JPA_HIBERNATE_DDL_AUTO: none
       SPRING_JPA_PROPERTIES_HIBERNATE_HBM2DDL_AUTO: none
@@ -24,6 +27,10 @@ services:
 
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+      FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
+
+
 
 
     restart: "no"
