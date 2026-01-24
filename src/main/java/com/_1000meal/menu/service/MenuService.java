@@ -4,19 +4,25 @@ package com._1000meal.menu.service;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.Menu;
+import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuAddRequest;
 import com._1000meal.menu.dto.DailyMenuDto;
+import com._1000meal.menu.dto.DailyMenuGroupResponse;
+import com._1000meal.menu.dto.MenuGroupResponse;
 import com._1000meal.menu.dto.StockResponse;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.MenuRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
 import com._1000meal.global.error.code.MenuErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +30,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MenuService {
@@ -34,6 +42,7 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuRepository menuRepository;
+    private final MenuGroupRepository menuGroupRepository;
 
 
     @Transactional
@@ -217,6 +226,93 @@ public class MenuService {
                 .startDate(start)
                 .endDate(end)
                 .dailyMenus(daily)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public WeeklyMenuWithGroupsResponse getWeeklyMenuWithGroups(Long storeId, LocalDate date) {
+        log.info("[MENU][WEEKLY_GROUP] storeId={}, date={}", storeId, date);
+
+        // 1. 매장 존재 검증
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
+
+        // 2. 주간 시작/종료 계산 (월~일)
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekEnd = weekStart.plusDays(6);
+
+        // 3. WeeklyMenu 조회 (dailyMenus만 fetch)
+        Optional<WeeklyMenu> weeklyMenuOpt = weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, date);
+
+        if (weeklyMenuOpt.isEmpty()) {
+            // skeleton 반환
+            WeeklyMenuWithGroupsResponse skeleton = buildEmptyWeeklyMenuWithGroups(storeId, date);
+            log.info("[MENU][WEEKLY_GROUP] storeId={}, days={}", storeId, skeleton.getDailyMenus().size());
+            return skeleton;
+        }
+
+        WeeklyMenu weeklyMenu = weeklyMenuOpt.get();
+
+        // 4. DailyMenu IDs 수집
+        List<Long> dailyMenuIds = weeklyMenu.getDailyMenus().stream()
+                .map(DailyMenu::getId)
+                .toList();
+
+        // 5. MenuGroups batch 조회 (N+1 방지)
+        List<MenuGroup> allMenuGroups = dailyMenuIds.isEmpty()
+                ? List.of()
+                : menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(dailyMenuIds);
+
+        // 6. DailyMenu ID 기준으로 그룹화
+        Map<Long, List<MenuGroup>> groupsByDailyMenuId = allMenuGroups.stream()
+                .collect(Collectors.groupingBy(mg -> mg.getDailyMenu().getId()));
+
+        // 7. 날짜별 DailyMenu 매핑
+        Map<LocalDate, DailyMenu> dailyMenuByDate = weeklyMenu.getDailyMenus().stream()
+                .collect(Collectors.toMap(DailyMenu::getDate, dm -> dm));
+
+        // 8. 월~금만 응답 구성
+        List<DailyMenuGroupResponse> dailyResponses = new ArrayList<>(5);
+        for (int i = 0; i < 5; i++) {
+            LocalDate d = weekStart.plusDays(i);
+            DailyMenu dm = dailyMenuByDate.get(d);
+
+            if (dm != null) {
+                List<MenuGroup> groups = groupsByDailyMenuId.getOrDefault(dm.getId(), List.of());
+                List<MenuGroupResponse> groupResponses = groups.stream()
+                        .map(MenuGroupResponse::from)
+                        .toList();
+                dailyResponses.add(DailyMenuGroupResponse.from(dm, groupResponses));
+            } else {
+                dailyResponses.add(DailyMenuGroupResponse.skeleton(d));
+            }
+        }
+
+        log.info("[MENU][WEEKLY_GROUP] storeId={}, days={}", storeId, dailyResponses.size());
+
+        return WeeklyMenuWithGroupsResponse.builder()
+                .storeId(store.getId())
+                .startDate(weeklyMenu.getStartDate())
+                .endDate(weeklyMenu.getEndDate())
+                .dailyMenus(dailyResponses)
+                .build();
+    }
+
+    private WeeklyMenuWithGroupsResponse buildEmptyWeeklyMenuWithGroups(Long storeId, LocalDate refDate) {
+        LocalDate start = refDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate end = start.plusDays(6);
+
+        List<DailyMenuGroupResponse> dailyResponses = new ArrayList<>(5);
+        for (int i = 0; i < 5; i++) {
+            LocalDate d = start.plusDays(i);
+            dailyResponses.add(DailyMenuGroupResponse.skeleton(d));
+        }
+
+        return WeeklyMenuWithGroupsResponse.builder()
+                .storeId(storeId)
+                .startDate(start)
+                .endDate(end)
+                .dailyMenus(dailyResponses)
                 .build();
     }
 

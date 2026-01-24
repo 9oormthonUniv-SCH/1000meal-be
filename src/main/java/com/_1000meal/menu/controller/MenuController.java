@@ -70,6 +70,31 @@ public class MenuController {
     }
 
     // ================================
+    // 주간 메뉴 그룹 조회
+    // ================================
+    @Operation(
+            summary = "주간 메뉴 그룹 조회",
+            description = """
+                    기준 날짜가 포함된 주간(월~금) 메뉴를 그룹 단위로 조회합니다.
+
+                    - 주간 메뉴가 없으면 빈 스켈레톤 구조를 반환합니다.
+                    - 재고는 MenuGroupStock 기준으로 반환됩니다.
+                    - 월~금(영업일) 기준으로 반환됩니다.
+                    """
+    )
+    @GetMapping("/weekly/{storeId}/groups")
+    public ApiResponse<WeeklyMenuWithGroupsResponse> getWeeklyMenuWithGroups(
+            @Parameter(description = "매장 ID", example = "1")
+            @PathVariable Long storeId,
+
+            @Parameter(description = "기준 날짜 (YYYY-MM-DD)", example = "2026-01-06")
+            @RequestParam LocalDate date
+    ) {
+        WeeklyMenuWithGroupsResponse response = menuService.getWeeklyMenuWithGroups(storeId, date);
+        return ApiResponse.success(response, SuccessCode.OK);
+    }
+
+    // ================================
     // 일간 메뉴 조회
     // ================================
     @Operation(

@@ -18,4 +18,10 @@ public interface WeeklyMenuRepository extends JpaRepository<WeeklyMenu, Long> {
             "WHERE wm.store.id = :storeId " +
             "AND :today BETWEEN wm.startDate AND wm.endDate")
     Optional<WeeklyMenu> findByStoreIdAndRangeWithMenus(@Param("storeId") Long storeId, @Param("today") LocalDate today);
+
+    @Query("SELECT wm FROM WeeklyMenu wm " +
+            "LEFT JOIN FETCH wm.dailyMenus dm " +
+            "WHERE wm.store.id = :storeId " +
+            "AND :today BETWEEN wm.startDate AND wm.endDate")
+    Optional<WeeklyMenu> findByStoreIdAndRangeWithDailyMenus(@Param("storeId") Long storeId, @Param("today") LocalDate today);
 }
