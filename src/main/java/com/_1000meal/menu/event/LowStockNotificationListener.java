@@ -27,4 +27,18 @@ public class LowStockNotificationListener {
                 event.remainingStock()
         );
     }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onLowStock30(LowStock30Event event) {
+        log.info("[LOW_STOCK_30 EVENT] storeId={}, groupId={}, groupName={}, remaining={}",
+                event.storeId(), event.groupId(), event.groupName(), event.remainingStock());
+
+        fcmPushService.sendLowStock30Notification(
+                event.storeId(),
+                event.storeName(),
+                event.groupId(),
+                event.groupName(),
+                event.remainingStock()
+        );
+    }
 }

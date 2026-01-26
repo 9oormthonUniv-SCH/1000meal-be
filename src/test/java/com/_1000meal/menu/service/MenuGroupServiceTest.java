@@ -6,6 +6,7 @@ import com._1000meal.menu.domain.*;
 import com._1000meal.menu.dto.DailyMenuWithGroupsDto;
 import com._1000meal.menu.dto.MenuGroupStockResponse;
 import com._1000meal.menu.enums.DeductionUnit;
+import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
@@ -46,12 +47,12 @@ class MenuGroupServiceTest {
     MenuGroupService service;
 
     @Test
-    @DisplayName("재고 차감 성공 - 알림 조건 미충족 (11 초과에서 11 초과)")
+    @DisplayName("재고 차감 성공 - 알림 조건 미충족 (31 초과에서 31 초과)")
     void deductStock_noNotification() {
         // given
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(50);
-        when(stock.deduct(5)).thenReturn(false);  // 알림 불필요
+        when(stock.deduct(5)).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // when
@@ -64,11 +65,11 @@ class MenuGroupServiceTest {
     }
 
     @Test
-    @DisplayName("재고 차감 성공 - 알림 조건 충족 (11 → 10 이하)")
-    void deductStock_withNotification() {
+    @DisplayName("재고 차감 성공 - 10 임계치 알림 조건 충족 (11 → 10 이하)")
+    void deductStock_withNotification10() {
         // given
         MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.deduct(5)).thenReturn(true);  // 알림 필요
+        when(stock.deduct(5)).thenReturn(new StockDeductResult(false, true));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // Store 모의 설정
@@ -87,7 +88,7 @@ class MenuGroupServiceTest {
         when(group.getDailyMenu()).thenReturn(dailyMenu);
         when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
-        // 차감 후 재고값 설정 (stock.getStock() 호출 시점에 반환될 값)
+        // 차감 후 재고값 설정
         when(stock.getStock()).thenReturn(8);
 
         // when
@@ -136,10 +137,10 @@ class MenuGroupServiceTest {
     @Test
     @DisplayName("중복 알림 방지 - 이미 알림 발송된 경우")
     void deductStock_duplicateNotificationPrevented() {
-        // given: 이미 lowStockNotified = true인 상태에서 10 이하로 차감
+        // given: 이미 알림 발송된 상태에서 10 이하로 차감
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(5);
-        when(stock.deduct(1)).thenReturn(false);  // 이미 알림 발송됨
+        when(stock.deduct(1)).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // when
@@ -227,7 +228,7 @@ class MenuGroupServiceTest {
         // given: 그룹A 설정
         MenuGroupStock stockA = mock(MenuGroupStock.class);
         when(stockA.getStock()).thenReturn(85);
-        when(stockA.deduct(5)).thenReturn(false);
+        when(stockA.deduct(5)).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stockA));
 
         // when: 그룹A만 차감
@@ -236,5 +237,109 @@ class MenuGroupServiceTest {
         // then: 그룹A만 차감됨 (그룹B에 대한 stockRepository 조회는 발생하지 않음)
         verify(stockA).deduct(5);
         verify(stockRepository, times(1)).findByMenuGroupIdForUpdate(anyLong());
+    }
+
+    // ========== 30 임계치 관련 신규 테스트 ==========
+
+    @Test
+    @DisplayName("30 임계치 하향 돌파 - LowStock30Event 1회 발행")
+    void deductStock_lowStock30Notification() {
+        // given: before=31, after=30 → 30 임계치 돌파
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.deduct(1)).thenReturn(new StockDeductResult(true, false));
+        when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(100L);
+        when(store.getName()).thenReturn("향설 1관");
+
+        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        when(weeklyMenu.getStore()).thenReturn(store);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenu.getWeeklyMenu()).thenReturn(weeklyMenu);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getDailyMenu()).thenReturn(dailyMenu);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        when(stock.getStock()).thenReturn(30);
+
+        // when
+        service.deductStock(1L, DeductionUnit.SINGLE);
+
+        // then: LowStock30Event만 발행됨
+        ArgumentCaptor<LowStock30Event> eventCaptor = ArgumentCaptor.forClass(LowStock30Event.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+        LowStock30Event event = eventCaptor.getValue();
+        assertEquals(100L, event.storeId());
+        assertEquals("향설 1관", event.storeName());
+        assertEquals(1L, event.groupId());
+        assertEquals("기본 메뉴", event.groupName());
+        assertEquals(30, event.remainingStock());
+    }
+
+    @Test
+    @DisplayName("30 임계치 중복 방지 - 이미 30 알림 발송 후 추가 차감 시 이벤트 없음")
+    void deductStock_lowStock30_noDuplicate() {
+        // given: 이미 30 알림 발송된 상태 (29→28)
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(28);
+        when(stock.deduct(1)).thenReturn(new StockDeductResult(false, false));
+        when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
+
+        // when
+        service.deductStock(1L, DeductionUnit.SINGLE);
+
+        // then: 이벤트 발행 없음
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("31 → 5 대량 차감 시 30 + 10 두 이벤트 모두 발행")
+    void deductStock_bothThresholdsCrossed() {
+        // given: 31에서 5로 대량 차감 → 30 및 10 동시 돌파
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.deduct(10)).thenReturn(new StockDeductResult(true, true));
+        when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(100L);
+        when(store.getName()).thenReturn("향설 1관");
+
+        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        when(weeklyMenu.getStore()).thenReturn(store);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenu.getWeeklyMenu()).thenReturn(weeklyMenu);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getDailyMenu()).thenReturn(dailyMenu);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        when(stock.getStock()).thenReturn(5);
+
+        // when
+        service.deductStock(1L, DeductionUnit.MULTI_TEN);
+
+        // then: 두 이벤트 모두 발행
+        ArgumentCaptor<LowStock30Event> event30Captor = ArgumentCaptor.forClass(LowStock30Event.class);
+        verify(eventPublisher).publishEvent(event30Captor.capture());
+
+        LowStock30Event event30 = event30Captor.getValue();
+        assertEquals(100L, event30.storeId());
+        assertEquals("향설 1관", event30.storeName());
+        assertEquals(5, event30.remainingStock());
+
+        ArgumentCaptor<LowStockEvent> event10Captor = ArgumentCaptor.forClass(LowStockEvent.class);
+        verify(eventPublisher).publishEvent(event10Captor.capture());
+
+        LowStockEvent event10 = event10Captor.getValue();
+        assertEquals(100L, event10.storeId());
+        assertEquals("향설 1관", event10.storeName());
+        assertEquals(5, event10.remainingStock());
     }
 }

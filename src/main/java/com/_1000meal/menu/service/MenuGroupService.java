@@ -8,6 +8,8 @@ import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
 import com._1000meal.menu.dto.*;
 import com._1000meal.menu.enums.DeductionUnit;
+import com._1000meal.menu.domain.StockDeductResult;
+import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
@@ -62,27 +64,40 @@ public class MenuGroupService {
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
         int beforeStock = stock.getStock();
-        boolean shouldNotify = stock.deduct(value);
+        StockDeductResult result = stock.deduct(value);
         int afterStock = stock.getStock();
 
         log.info("[STOCK][DEDUCT] groupId={}, before={}, after={}, unit={}",
                 groupId, beforeStock, afterStock, unit.name());
 
-        if (shouldNotify) {
+        if (result.shouldNotify()) {
             // 그룹 정보와 매장 정보 조회
             MenuGroup group = menuGroupRepository.findByIdWithStore(groupId)
                     .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
             Store store = group.getDailyMenu().getWeeklyMenu().getStore();
 
-            // 트랜잭션 커밋 후 알림 발송을 위해 이벤트 발행
-            eventPublisher.publishEvent(new LowStockEvent(
-                    store.getId(),
-                    store.getName(),
-                    groupId,
-                    group.getName(),
-                    afterStock
-            ));
+            // 30 임계치 하향 돌파 알림 이벤트
+            if (result.notifyLowStock30()) {
+                eventPublisher.publishEvent(new LowStock30Event(
+                        store.getId(),
+                        store.getName(),
+                        groupId,
+                        group.getName(),
+                        afterStock
+                ));
+            }
+
+            // 10 임계치 하향 돌파 알림 이벤트
+            if (result.notifyLowStock10()) {
+                eventPublisher.publishEvent(new LowStockEvent(
+                        store.getId(),
+                        store.getName(),
+                        groupId,
+                        group.getName(),
+                        afterStock
+                ));
+            }
         }
 
         return new MenuGroupStockResponse(groupId, afterStock);

@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 public class MenuGroupStock {
 
     private static final int LOW_STOCK_THRESHOLD = 10;
+    private static final int LOW_STOCK_30_THRESHOLD = 30;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,25 +30,25 @@ public class MenuGroupStock {
     @Column(nullable = false)
     private Integer capacity;
 
-    @Column(nullable = false)
-    private boolean lowStockNotified;
+    @Column(name = "last_notified_threshold")
+    private Integer lastNotifiedThreshold;
 
     public static MenuGroupStock of(MenuGroup menuGroup, int capacity) {
         MenuGroupStock s = new MenuGroupStock();
         s.menuGroup = menuGroup;
         s.stock = capacity;
         s.capacity = capacity;
-        s.lowStockNotified = false;
+        s.lastNotifiedThreshold = null;
         return s;
     }
 
     /**
      * 재고 차감
      * @param value 차감할 수량
-     * @return 품절 임박 알림이 필요한 경우 true (11 초과 -> 10 이하로 떨어지고 아직 미발송인 경우)
+     * @return 각 임계치(30, 10)별 알림 발송 필요 여부
      * @throws CustomException 재고 부족 시
      */
-    public boolean deduct(int value) {
+    public StockDeductResult deduct(int value) {
         if (this.stock < value) {
             throw new CustomException(MenuErrorCode.INSUFFICIENT_STOCK);
         }
@@ -55,16 +56,24 @@ public class MenuGroupStock {
         int previousStock = this.stock;
         this.stock -= value;
 
-        // 11 초과에서 10 이하로 떨어지는 순간 + 아직 알림 미발송
-        boolean crossedThreshold = previousStock > LOW_STOCK_THRESHOLD
-                && this.stock <= LOW_STOCK_THRESHOLD
-                && !this.lowStockNotified;
+        // 31 초과에서 30 이하로 떨어지는 순간 + 아직 어떤 임계치도 알림 미발송
+        boolean crossedThreshold30 = previousStock > LOW_STOCK_30_THRESHOLD
+                && this.stock <= LOW_STOCK_30_THRESHOLD
+                && this.lastNotifiedThreshold == null;
 
-        if (crossedThreshold) {
-            this.lowStockNotified = true;
-            return true;
+        // 11 초과에서 10 이하로 떨어지는 순간 + 10 임계치 알림 미발송
+        boolean crossedThreshold10 = previousStock > LOW_STOCK_THRESHOLD
+                && this.stock <= LOW_STOCK_THRESHOLD
+                && (this.lastNotifiedThreshold == null || this.lastNotifiedThreshold > LOW_STOCK_THRESHOLD);
+
+        // 더 낮은 임계치가 우선 (10이 30보다 우선)
+        if (crossedThreshold10) {
+            this.lastNotifiedThreshold = LOW_STOCK_THRESHOLD;
+        } else if (crossedThreshold30) {
+            this.lastNotifiedThreshold = LOW_STOCK_30_THRESHOLD;
         }
-        return false;
+
+        return new StockDeductResult(crossedThreshold30, crossedThreshold10);
     }
 
     /**
@@ -73,10 +82,16 @@ public class MenuGroupStock {
      */
     public void updateStock(int stock) {
         this.stock = stock;
-        // 재고가 threshold 초과로 복구되면 알림 플래그 리셋
-        if (stock > LOW_STOCK_THRESHOLD) {
-            this.lowStockNotified = false;
+        if (stock > LOW_STOCK_30_THRESHOLD) {
+            // 30 초과로 복구 → 전체 리셋
+            this.lastNotifiedThreshold = null;
+        } else if (stock > LOW_STOCK_THRESHOLD) {
+            // 10 초과 ~ 30 이하 → 10 알림만 리셋 (30 알림 상태는 유지)
+            if (this.lastNotifiedThreshold != null && this.lastNotifiedThreshold < LOW_STOCK_30_THRESHOLD) {
+                this.lastNotifiedThreshold = LOW_STOCK_30_THRESHOLD;
+            }
         }
+        // stock <= 10 → 변경 없음
     }
 
     /**
@@ -84,7 +99,7 @@ public class MenuGroupStock {
      */
     public void resetDaily() {
         this.stock = this.capacity;
-        this.lowStockNotified = false;
+        this.lastNotifiedThreshold = null;
     }
 
     /**
