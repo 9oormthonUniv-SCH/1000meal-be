@@ -3,6 +3,7 @@ package com._1000meal.menu.service;
 
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
+import com._1000meal.menu.domain.GroupDailyMenu;
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
@@ -12,6 +13,7 @@ import com._1000meal.menu.dto.MenuGroupResponse;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
@@ -36,6 +38,7 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuGroupRepository menuGroupRepository;
+    private final GroupDailyMenuRepository groupDailyMenuRepository;
 
     @Transactional(readOnly = true)
     public WeeklyMenuResponse getWeeklyMenu(Long storeId, LocalDate date) {
@@ -141,51 +144,61 @@ public class MenuService {
         LocalDate weekEnd = weekStart.plusDays(6);
 
         Optional<WeeklyMenu> weeklyMenuOpt = weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, date);
+        WeeklyMenu weeklyMenu = weeklyMenuOpt.orElse(null);
 
-        if (weeklyMenuOpt.isEmpty()) {
-            WeeklyMenuWithGroupsResponse skeleton = buildEmptyWeeklyMenuWithGroups(storeId, date);
-            log.info("[MENU][WEEKLY_GROUP] storeId={}, days={}", storeId, skeleton.getDailyMenus().size());
-            return skeleton;
-        }
+        Map<LocalDate, DailyMenu> dailyMenuByDate = weeklyMenu == null
+                ? Map.of()
+                : weeklyMenu.getDailyMenus().stream()
+                        .collect(Collectors.toMap(DailyMenu::getDate, dm -> dm));
 
-        WeeklyMenu weeklyMenu = weeklyMenuOpt.get();
+        List<MenuGroup> storeGroups = menuGroupRepository.findByStoreIdWithStock(storeId);
+        List<Long> groupIds = storeGroups.stream().map(MenuGroup::getId).toList();
 
-        List<Long> dailyMenuIds = weeklyMenu.getDailyMenus().stream()
-                .map(DailyMenu::getId)
-                .toList();
-
-        List<MenuGroup> allMenuGroups = dailyMenuIds.isEmpty()
-                ? List.of()
-                : menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(dailyMenuIds);
-
-        Map<Long, List<MenuGroup>> groupsByDailyMenuId = allMenuGroups.stream()
-                .collect(Collectors.groupingBy(mg -> mg.getDailyMenu().getId()));
-
-        Map<LocalDate, DailyMenu> dailyMenuByDate = weeklyMenu.getDailyMenus().stream()
-                .collect(Collectors.toMap(DailyMenu::getDate, dm -> dm));
+        Map<LocalDate, Map<Long, GroupDailyMenu>> dailyMenusByDateAndGroup = groupIds.isEmpty()
+                ? Map.of()
+                : groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(groupIds, weekStart, weekEnd).stream()
+                        .collect(Collectors.groupingBy(
+                                GroupDailyMenu::getDate,
+                                Collectors.toMap(
+                                        gdm -> gdm.getMenuGroup().getId(),
+                                        gdm -> gdm
+                                )
+                        ));
 
         List<DailyMenuGroupResponse> dailyResponses = new ArrayList<>(5);
         for (int i = 0; i < 5; i++) {
             LocalDate d = weekStart.plusDays(i);
             DailyMenu dm = dailyMenuByDate.get(d);
+            Map<Long, GroupDailyMenu> dailyMenuMap = dailyMenusByDateAndGroup.getOrDefault(d, Map.of());
 
-            if (dm != null) {
-                List<MenuGroup> groups = groupsByDailyMenuId.getOrDefault(dm.getId(), List.of());
-                List<MenuGroupResponse> groupResponses = groups.stream()
-                        .map(MenuGroupResponse::from)
-                        .toList();
-                dailyResponses.add(DailyMenuGroupResponse.from(dm, groupResponses));
-            } else {
-                dailyResponses.add(DailyMenuGroupResponse.skeleton(d));
-            }
+            List<MenuGroupResponse> groupResponses = storeGroups.stream()
+                    .map(group -> {
+                        GroupDailyMenu gdm = dailyMenuMap.get(group.getId());
+                        List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
+                        return MenuGroupResponse.from(group, menus);
+                    })
+                    .toList();
+
+            int totalStock = groupResponses.stream()
+                    .mapToInt(gr -> gr.getStock() != null ? gr.getStock() : 0)
+                    .sum();
+
+            dailyResponses.add(DailyMenuGroupResponse.storeBased(
+                    dm,
+                    d,
+                    groupResponses,
+                    totalStock,
+                    dm != null ? dm.isOpen() : true,
+                    dm != null && dm.isHoliday()
+            ));
         }
 
         log.info("[MENU][WEEKLY_GROUP] storeId={}, days={}", storeId, dailyResponses.size());
 
         return WeeklyMenuWithGroupsResponse.builder()
                 .storeId(store.getId())
-                .startDate(weeklyMenu.getStartDate())
-                .endDate(weeklyMenu.getEndDate())
+                .startDate(weekStart)
+                .endDate(weekEnd)
                 .dailyMenus(dailyResponses)
                 .build();
     }
