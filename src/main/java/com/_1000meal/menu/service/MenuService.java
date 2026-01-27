@@ -92,6 +92,7 @@ public class MenuService {
             Store store = weekly.getStore();
             for (DailyMenu dm : saved) {
                 MenuGroup defaultGroup = MenuGroup.builder()
+                        .store(store)
                         .dailyMenu(dm)
                         .name(store.getName())
                         .sortOrder(0)
