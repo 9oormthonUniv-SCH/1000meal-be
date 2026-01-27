@@ -66,9 +66,7 @@ public class Store {
         this.lng = lng;
     }
 
-    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu,
-                                                    Integer stock,
-                                                    boolean isOpen) {
+    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu) {
 
         return StoreDetailedResponse.builder()
                 .id(this.getId())
@@ -79,8 +77,8 @@ public class Store {
                 .description(this.getDescription())
                 .openTime(this.getOpenTime())
                 .closeTime(this.getCloseTime())
-                .isOpen(isOpen)
-                .remain(stock)
+                .isOpen(this.isOpen())
+                .remain(this.getRemain())
                 .hours(this.getHours())
                 .lat(this.getLat())
                 .lng(this.getLng())
@@ -89,16 +87,6 @@ public class Store {
     }
 
     public StoreResponse toStoreResponse(DailyMenuDto todayMenu, boolean isHoliday) {
-        int remainVal = 0;
-        boolean openVal = false;
-
-        if (todayMenu != null) {
-            if (todayMenu.getStock() != null) {
-                remainVal = todayMenu.getStock();
-            }
-            openVal = todayMenu.isOpen(); // todayMenu 자체가 있으면 실제 값 반영
-        }
-
         return StoreResponse.builder()
                 .id(this.getId())
                 .imageUrl(this.getImageUrl())
@@ -107,9 +95,9 @@ public class Store {
                 .phone(this.getPhone())
                 .description(this.getDescription())
                 .hours(this.getHours())
-                .isOpen(openVal)
+                .isOpen(this.isOpen())
                 .isHoliday(isHoliday)
-                .remain(remainVal)
+                .remain(this.getRemain())
                 .lat(this.getLat())
                 .lng(this.getLng())
                 .todayMenu(todayMenu)

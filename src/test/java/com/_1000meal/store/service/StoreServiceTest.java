@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -32,6 +33,7 @@ class StoreServiceTest {
     @Mock private StoreRepository storeRepository;
     @Mock private DailyMenuRepository dailyMenuRepository;
     @Mock private MenuService menuService;
+    @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private StoreService storeService;
 
@@ -50,64 +52,67 @@ class StoreServiceTest {
     }
 
     @Test
-    @DisplayName("getStoreDetail: 오늘 날짜 기준 weeklyMenu 조회 + dailyMenu 재고/오픈 반영")
-    void getStoreDetail_success_reflectsRemainAndIsOpen() {
+    @DisplayName("getStoreDetail: 오늘 날짜 기준 weeklyMenu 조회 + store remain/isOpen 반영")
+    void getStoreDetail_success_reflectsStoreFields() {
         Long storeId = 1L;
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
-        Store store = mock(Store.class);
+        Store store = Store.builder()
+                .name("store")
+                .address("addr")
+                .phone("010-0000-0000")
+                .description("desc")
+                .isOpen(true)
+                .remain(12)
+                .build();
         WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
-
-        DailyMenu dm = mock(DailyMenu.class);
-        when(dm.getStock()).thenReturn(12);
-        when(dm.isOpen()).thenReturn(true);
-
-        StoreDetailedResponse expected = mock(StoreDetailedResponse.class);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
         when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
-        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, fixedToday)).thenReturn(Optional.of(dm));
-        when(store.toDetailedResponse(weekly, 12, true)).thenReturn(expected);
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
 
             StoreDetailedResponse res = storeService.getStoreDetail(storeId);
 
-            assertSame(expected, res);
+            assertTrue(res.isOpen());
+            assertEquals(12, res.getRemain());
         }
 
         verify(storeRepository).findById(storeId);
         verify(menuService).getWeeklyMenu(storeId, fixedToday);
-        verify(dailyMenuRepository).findDailyMenuByStoreIdAndDate(storeId, fixedToday);
-        verify(store).toDetailedResponse(weekly, 12, true);
+        verifyNoInteractions(dailyMenuRepository);
     }
 
     @Test
-    @DisplayName("getStoreDetail: dailyMenu 없으면 remain=0, isOpen=false")
-    void getStoreDetail_dailyMenuNull_defaults() {
+    @DisplayName("getStoreDetail: dailyMenu 없이도 store remain/isOpen 유지")
+    void getStoreDetail_noDailyMenu_stillUsesStoreFields() {
         Long storeId = 1L;
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
-        Store store = mock(Store.class);
+        Store store = Store.builder()
+                .name("store")
+                .address("addr")
+                .phone("010-0000-0000")
+                .description("desc")
+                .isOpen(true)
+                .remain(50)
+                .build();
         WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
-
-        StoreDetailedResponse expected = mock(StoreDetailedResponse.class);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
         when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
-        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, fixedToday)).thenReturn(Optional.empty());
-        when(store.toDetailedResponse(weekly, 0, false)).thenReturn(expected);
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
 
             StoreDetailedResponse res = storeService.getStoreDetail(storeId);
 
-            assertSame(expected, res);
+            assertTrue(res.isOpen());
+            assertEquals(50, res.getRemain());
         }
 
-        verify(store).toDetailedResponse(weekly, 0, false);
+        verifyNoInteractions(dailyMenuRepository);
     }
 
     @Test
@@ -198,6 +203,36 @@ class StoreServiceTest {
         verify(store).toggleIsOpen();
         // dailyMenu 없으므로 토글 호출 없어야 함
         verifyNoMoreInteractions(menuService);
+    }
+
+    @Test
+    @DisplayName("toggleStoreStatus 이후 getStoreDetail: 메뉴와 무관하게 store.isOpen 반영")
+    void toggleStoreStatus_thenGetStoreDetail_reflectsStoreOpen() {
+        Long storeId = 1L;
+        LocalDate fixedToday = LocalDate.of(2026, 1, 7);
+
+        Store store = Store.builder()
+                .name("store")
+                .address("addr")
+                .phone("010-0000-0000")
+                .description("desc")
+                .isOpen(false)
+                .remain(10)
+                .build();
+        WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
+
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
+        when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
+        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, fixedToday)).thenReturn(Optional.empty());
+
+        try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
+            mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
+
+            storeService.toggleStoreStatus(storeId);
+            StoreDetailedResponse res = storeService.getStoreDetail(storeId);
+
+            assertTrue(res.isOpen());
+        }
     }
 
     @Test
