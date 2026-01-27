@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -91,13 +92,14 @@ public class MenuGroupService {
     @Transactional
     public MenuGroupStockResponse deductStock(Long groupId, DeductionUnit unit) {
         int value = unit.getValue();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         // 비관적 락으로 재고 조회
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
         int beforeStock = stock.getStock();
-        StockDeductResult result = stock.deduct(value);
+        StockDeductResult result = stock.deduct(value, today);
         int afterStock = stock.getStock();
 
         log.info("[STOCK][DEDUCT] groupId={}, before={}, after={}, unit={}",

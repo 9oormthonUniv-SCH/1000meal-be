@@ -7,6 +7,8 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -33,33 +35,45 @@ public class MenuGroupStock {
     @Column(name = "last_notified_threshold")
     private Integer lastNotifiedThreshold;
 
+    @Column(name = "last_notified_date")
+    private LocalDate lastNotifiedDate;
+
     public static MenuGroupStock of(MenuGroup menuGroup, int capacity) {
         MenuGroupStock s = new MenuGroupStock();
         s.menuGroup = menuGroup;
         s.stock = capacity;
         s.capacity = capacity;
         s.lastNotifiedThreshold = null;
+        s.lastNotifiedDate = null;
         return s;
     }
 
     /**
      * 재고 차감
      * @param value 차감할 수량
+     * @param today 오늘 날짜
      * @return 각 임계치(30, 10)별 알림 발송 필요 여부
      * @throws CustomException 재고 부족 시
      */
-    public StockDeductResult deduct(int value) {
+    public StockDeductResult deduct(int value, LocalDate today) {
         if (this.stock < value) {
             throw new CustomException(MenuErrorCode.INSUFFICIENT_STOCK);
+        }
+
+        if (this.lastNotifiedDate == null || !this.lastNotifiedDate.equals(today)) {
+            this.lastNotifiedThreshold = null;
         }
 
         int previousStock = this.stock;
         this.stock -= value;
 
-        // 31 초과에서 30 이하로 떨어지는 순간 + 아직 어떤 임계치도 알림 미발송
-        boolean crossedThreshold30 = previousStock > LOW_STOCK_30_THRESHOLD
-                && this.stock <= LOW_STOCK_30_THRESHOLD
-                && this.lastNotifiedThreshold == null;
+        boolean notifiedTodayFor30 = this.lastNotifiedDate != null
+                && this.lastNotifiedDate.equals(today)
+                && this.lastNotifiedThreshold != null
+                && this.lastNotifiedThreshold <= LOW_STOCK_30_THRESHOLD;
+
+        boolean crossedThreshold30 = this.stock <= LOW_STOCK_30_THRESHOLD
+                && !notifiedTodayFor30;
 
         // 11 초과에서 10 이하로 떨어지는 순간 + 10 임계치 알림 미발송
         boolean crossedThreshold10 = previousStock > LOW_STOCK_THRESHOLD
@@ -69,8 +83,10 @@ public class MenuGroupStock {
         // 더 낮은 임계치가 우선 (10이 30보다 우선)
         if (crossedThreshold10) {
             this.lastNotifiedThreshold = LOW_STOCK_THRESHOLD;
+            this.lastNotifiedDate = today;
         } else if (crossedThreshold30) {
             this.lastNotifiedThreshold = LOW_STOCK_30_THRESHOLD;
+            this.lastNotifiedDate = today;
         }
 
         return new StockDeductResult(crossedThreshold30, crossedThreshold10);
@@ -100,6 +116,7 @@ public class MenuGroupStock {
     public void resetDaily() {
         this.stock = this.capacity;
         this.lastNotifiedThreshold = null;
+        this.lastNotifiedDate = null;
     }
 
     /**

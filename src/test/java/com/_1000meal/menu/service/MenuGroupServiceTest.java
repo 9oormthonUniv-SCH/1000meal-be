@@ -22,10 +22,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,7 +64,7 @@ class MenuGroupServiceTest {
         // given
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(50);
-        when(stock.deduct(5)).thenReturn(new StockDeductResult(false, false));
+        when(stock.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // when
@@ -79,7 +81,7 @@ class MenuGroupServiceTest {
     void deductStock_withNotification10() {
         // given
         MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.deduct(5)).thenReturn(new StockDeductResult(false, true));
+        when(stock.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, true));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // Store 모의 설정
@@ -115,7 +117,7 @@ class MenuGroupServiceTest {
     void deductStock_insufficient() {
         // given
         MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.deduct(10)).thenThrow(new CustomException(MenuErrorCode.INSUFFICIENT_STOCK));
+        when(stock.deduct(eq(10), any(LocalDate.class))).thenThrow(new CustomException(MenuErrorCode.INSUFFICIENT_STOCK));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // when & then
@@ -144,7 +146,7 @@ class MenuGroupServiceTest {
         // given: 이미 알림 발송된 상태에서 10 이하로 차감
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(5);
-        when(stock.deduct(1)).thenReturn(new StockDeductResult(false, false));
+        when(stock.deduct(eq(1), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         // when
@@ -225,14 +227,14 @@ class MenuGroupServiceTest {
         // given: 그룹A 설정
         MenuGroupStock stockA = mock(MenuGroupStock.class);
         when(stockA.getStock()).thenReturn(85);
-        when(stockA.deduct(5)).thenReturn(new StockDeductResult(false, false));
+        when(stockA.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stockA));
 
         // when: 그룹A만 차감
         service.deductStock(1L, DeductionUnit.MULTI_FIVE);
 
         // then: 그룹A만 차감됨 (그룹B에 대한 stockRepository 조회는 발생하지 않음)
-        verify(stockA).deduct(5);
+        verify(stockA).deduct(eq(5), any(LocalDate.class));
         verify(stockRepository, times(1)).findByMenuGroupIdForUpdate(anyLong());
     }
 
@@ -242,8 +244,7 @@ class MenuGroupServiceTest {
     @DisplayName("30 임계치 하향 돌파 - LowStock30Event 1회 발행")
     void deductStock_lowStock30Notification() {
         // given: before=31, after=30 → 30 임계치 돌파
-        MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.deduct(1)).thenReturn(new StockDeductResult(true, false));
+        MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 31);
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         Store store = mock(Store.class);
@@ -255,10 +256,12 @@ class MenuGroupServiceTest {
         when(group.getStore()).thenReturn(store);
         when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
-        when(stock.getStock()).thenReturn(30);
-
         // when
-        service.deductStock(1L, DeductionUnit.SINGLE);
+        LocalDate fixedToday = LocalDate.of(2026, 1, 23);
+        try (MockedStatic<LocalDate> mocked = mockStatic(LocalDate.class)) {
+            mocked.when(() -> LocalDate.now(ZoneId.of("Asia/Seoul"))).thenReturn(fixedToday);
+            service.deductStock(1L, DeductionUnit.SINGLE);
+        }
 
         // then: LowStock30Event만 발행됨
         ArgumentCaptor<LowStock30Event> eventCaptor = ArgumentCaptor.forClass(LowStock30Event.class);
@@ -275,17 +278,56 @@ class MenuGroupServiceTest {
     @Test
     @DisplayName("30 임계치 중복 방지 - 이미 30 알림 발송 후 추가 차감 시 이벤트 없음")
     void deductStock_lowStock30_noDuplicate() {
-        // given: 이미 30 알림 발송된 상태 (29→28)
-        MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.getStock()).thenReturn(28);
-        when(stock.deduct(1)).thenReturn(new StockDeductResult(false, false));
+        // given: 같은 날 31→30 알림 발송 후 추가 차감
+        MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 31);
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        // when
-        service.deductStock(1L, DeductionUnit.SINGLE);
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(100L);
+        when(store.getName()).thenReturn("향설 1관");
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        LocalDate fixedToday = LocalDate.of(2026, 1, 23);
+        try (MockedStatic<LocalDate> mocked = mockStatic(LocalDate.class)) {
+            mocked.when(() -> LocalDate.now(ZoneId.of("Asia/Seoul"))).thenReturn(fixedToday);
+            // when
+            service.deductStock(1L, DeductionUnit.SINGLE); // 31 -> 30 (notify)
+            service.deductStock(1L, DeductionUnit.SINGLE); // 30 -> 29 (no notify)
+        }
 
         // then: 이벤트 발행 없음
-        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, times(1)).publishEvent(any(LowStock30Event.class));
+    }
+
+    @Test
+    @DisplayName("30 임계치 - 전날 알림이면 오늘 다시 발송")
+    void deductStock_lowStock30_notifiedYesterday_triggersToday() throws Exception {
+        MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 30);
+        when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(100L);
+        when(store.getName()).thenReturn("향설 1관");
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        LocalDate fixedToday = LocalDate.of(2026, 1, 23);
+        setField(stock, "lastNotifiedDate", fixedToday.minusDays(1));
+        setField(stock, "lastNotifiedThreshold", 30);
+
+        try (MockedStatic<LocalDate> mocked = mockStatic(LocalDate.class)) {
+            mocked.when(() -> LocalDate.now(ZoneId.of("Asia/Seoul"))).thenReturn(fixedToday);
+            service.deductStock(1L, DeductionUnit.SINGLE); // 30 -> 29 (notify again)
+        }
+
+        verify(eventPublisher, times(1)).publishEvent(any(LowStock30Event.class));
     }
 
     @Test
@@ -293,7 +335,7 @@ class MenuGroupServiceTest {
     void deductStock_bothThresholdsCrossed() {
         // given: 31에서 5로 대량 차감 → 30 및 10 동시 돌파
         MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.deduct(10)).thenReturn(new StockDeductResult(true, true));
+        when(stock.deduct(eq(10), any(LocalDate.class))).thenReturn(new StockDeductResult(true, true));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
         Store store = mock(Store.class);
@@ -326,6 +368,12 @@ class MenuGroupServiceTest {
         assertEquals(100L, event10.storeId());
         assertEquals("향설 1관", event10.storeName());
         assertEquals(5, event10.remainingStock());
+    }
+
+    private static void setField(Object target, String fieldName, Object value) throws Exception {
+        var field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 
     // ========== 메뉴 등록/교체 테스트 (GroupDailyMenu 기반) ==========
