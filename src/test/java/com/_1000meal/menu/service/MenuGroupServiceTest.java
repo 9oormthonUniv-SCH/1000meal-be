@@ -342,4 +342,142 @@ class MenuGroupServiceTest {
         assertEquals("향설 1관", event10.storeName());
         assertEquals(5, event10.remainingStock());
     }
+
+    // ========== 메뉴 등록/교체 테스트 ==========
+
+    @Test
+    @DisplayName("updateMenusInGroup: 성공 - 메뉴 교체")
+    void updateMenusInGroup_success() {
+        // given
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+
+        MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.getId()).thenReturn(1L);
+        when(menuGroup.getName()).thenReturn("향설 1관");
+        when(menuGroup.getSortOrder()).thenReturn(0);
+        when(menuGroup.getDailyMenu()).thenReturn(dailyMenu);
+        when(menuGroup.getMenus()).thenReturn(new java.util.ArrayList<>());
+
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(100);
+        when(stock.getCapacity()).thenReturn(100);
+        when(menuGroup.getStock()).thenReturn(stock);
+
+        when(menuGroupRepository.findByIdWithMenus(1L)).thenReturn(Optional.of(menuGroup));
+
+        com._1000meal.menu.dto.MenuUpdateRequest request =
+                new com._1000meal.menu.dto.MenuUpdateRequest(List.of("떡볶이", "순대", "튀김"));
+
+        // when
+        var result = service.updateMenusInGroup(1L, request);
+
+        // then
+        verify(menuGroup).replaceMenus(anyList());
+        assertNotNull(result);
+        assertEquals(1L, result.getId());
+    }
+
+    @Test
+    @DisplayName("updateMenusInGroup: 그룹 미존재 시 MENU_GROUP_NOT_FOUND")
+    void updateMenusInGroup_groupNotFound() {
+        // given
+        when(menuGroupRepository.findByIdWithMenus(999L)).thenReturn(Optional.empty());
+
+        com._1000meal.menu.dto.MenuUpdateRequest request =
+                new com._1000meal.menu.dto.MenuUpdateRequest(List.of("떡볶이"));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.updateMenusInGroup(999L, request));
+
+        assertEquals(MenuErrorCode.MENU_GROUP_NOT_FOUND, ex.getErrorCodeIfs());
+    }
+
+    @Test
+    @DisplayName("updateMenusInGroup: 정제 후 빈 메뉴 시 MENU_EMPTY")
+    void updateMenusInGroup_emptyAfterCleaning() {
+        // given
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.getDailyMenu()).thenReturn(dailyMenu);
+        when(menuGroupRepository.findByIdWithMenus(1L)).thenReturn(Optional.of(menuGroup));
+
+        // 빈 문자열과 공백만 있는 리스트
+        com._1000meal.menu.dto.MenuUpdateRequest request =
+                new com._1000meal.menu.dto.MenuUpdateRequest(List.of("  ", ""));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.updateMenusInGroup(1L, request));
+
+        assertEquals(MenuErrorCode.MENU_EMPTY, ex.getErrorCodeIfs());
+    }
+
+    // ========== 기본 그룹 삭제 방어 테스트 ==========
+
+    @Test
+    @DisplayName("deleteMenuGroup: 기본 그룹 삭제 시 CANNOT_DELETE_DEFAULT_GROUP")
+    void deleteMenuGroup_defaultGroupBlocked() {
+        // given
+        MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.isDefault()).thenReturn(true);
+        when(menuGroupRepository.findById(1L)).thenReturn(Optional.of(menuGroup));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.deleteMenuGroup(1L));
+
+        assertEquals(MenuErrorCode.CANNOT_DELETE_DEFAULT_GROUP, ex.getErrorCodeIfs());
+        verify(menuGroupRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("deleteMenuGroup: 일반 그룹은 정상 삭제")
+    void deleteMenuGroup_normalGroupDeleted() {
+        // given
+        MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.isDefault()).thenReturn(false);
+        when(menuGroupRepository.findById(2L)).thenReturn(Optional.of(menuGroup));
+
+        // when
+        service.deleteMenuGroup(2L);
+
+        // then
+        verify(menuGroupRepository).delete(menuGroup);
+    }
+
+    // ========== 그룹 생성 시 메뉴 없이 생성되는지 테스트 ==========
+
+    @Test
+    @DisplayName("createMenuGroup: 메뉴 없이 그룹만 생성")
+    void createMenuGroup_noMenus() {
+        // given
+        Long storeId = 1L;
+        LocalDate date = LocalDate.of(2026, 1, 23);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date))
+                .thenReturn(Optional.of(dailyMenu));
+
+        com._1000meal.menu.dto.MenuGroupCreateRequest request =
+                com._1000meal.menu.dto.MenuGroupCreateRequest.builder()
+                        .name("크앙분식")
+                        .sortOrder(1)
+                        .capacity(100)
+                        .build();
+
+        when(menuGroupRepository.save(any(MenuGroup.class))).thenAnswer(invocation -> {
+            MenuGroup saved = invocation.getArgument(0);
+            return saved;
+        });
+
+        // when
+        var result = service.createMenuGroup(storeId, date, request);
+
+        // then
+        assertNotNull(result);
+        assertEquals("크앙분식", result.getName());
+        // 메뉴가 생성되지 않았음을 확인 (비어있어야 함)
+        assertTrue(result.getMenus().isEmpty());
+    }
 }

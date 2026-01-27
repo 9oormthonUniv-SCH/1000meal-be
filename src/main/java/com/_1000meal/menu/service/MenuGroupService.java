@@ -119,7 +119,7 @@ public class MenuGroupService {
     }
 
     /**
-     * 메뉴 그룹 생성
+     * 메뉴 그룹 생성 (그룹만 생성, 메뉴는 별도 API)
      */
     @Transactional
     public MenuGroupDto createMenuGroup(Long storeId, LocalDate date, MenuGroupCreateRequest request) {
@@ -134,15 +134,6 @@ public class MenuGroupService {
 
         menuGroup.initializeStock(request.getCapacityOrDefault());
 
-        // 메뉴 추가
-        if (request.getMenus() != null && !request.getMenus().isEmpty()) {
-            for (String menuName : request.getMenus()) {
-                Menu menu = Menu.builder().name(menuName).build();
-                menu.setDailyMenu(dailyMenu);
-                menuGroup.addMenu(menu);
-            }
-        }
-
         dailyMenu.addMenuGroup(menuGroup);
         menuGroupRepository.save(menuGroup);
 
@@ -150,12 +141,49 @@ public class MenuGroupService {
     }
 
     /**
-     * 메뉴 그룹 삭제
+     * 그룹 내 메뉴 등록/교체 (전체 교체 방식)
+     */
+    @Transactional
+    public MenuGroupDto updateMenusInGroup(Long groupId, MenuUpdateRequest request) {
+        MenuGroup menuGroup = menuGroupRepository.findByIdWithMenus(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        DailyMenu dailyMenu = menuGroup.getDailyMenu();
+
+        List<String> cleaned = request.getMenus().stream()
+                .map(s -> s == null ? "" : s.trim())
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+
+        if (cleaned.isEmpty()) {
+            throw new CustomException(MenuErrorCode.MENU_EMPTY);
+        }
+
+        List<Menu> newMenus = cleaned.stream()
+                .map(name -> {
+                    Menu m = Menu.builder().name(name).build();
+                    m.setDailyMenu(dailyMenu);
+                    return m;
+                })
+                .toList();
+
+        menuGroup.replaceMenus(newMenus);
+
+        return MenuGroupDto.from(menuGroup);
+    }
+
+    /**
+     * 메뉴 그룹 삭제 (기본 그룹은 삭제 불가)
      */
     @Transactional
     public void deleteMenuGroup(Long groupId) {
         MenuGroup menuGroup = menuGroupRepository.findById(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        if (menuGroup.isDefault()) {
+            throw new CustomException(MenuErrorCode.CANNOT_DELETE_DEFAULT_GROUP);
+        }
 
         menuGroupRepository.delete(menuGroup);
     }

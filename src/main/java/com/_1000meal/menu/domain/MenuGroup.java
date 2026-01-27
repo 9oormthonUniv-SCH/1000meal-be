@@ -32,6 +32,9 @@ public class MenuGroup {
     @Column(nullable = false)
     private Integer sortOrder;
 
+    @Column(nullable = false)
+    private boolean isDefault;
+
     @OneToOne(mappedBy = "menuGroup", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private MenuGroupStock stock;
 
@@ -40,10 +43,11 @@ public class MenuGroup {
     private List<Menu> menus = new ArrayList<>();
 
     @Builder
-    public MenuGroup(DailyMenu dailyMenu, String name, Integer sortOrder) {
+    public MenuGroup(DailyMenu dailyMenu, String name, Integer sortOrder, boolean isDefault) {
         this.dailyMenu = dailyMenu;
         this.name = name;
         this.sortOrder = sortOrder != null ? sortOrder : 0;
+        this.isDefault = isDefault;
     }
 
     public void initializeStock(int capacity) {
@@ -53,6 +57,13 @@ public class MenuGroup {
     public void addMenu(Menu menu) {
         this.menus.add(menu);
         menu.setMenuGroup(this);
+    }
+
+    public void replaceMenus(List<Menu> newMenus) {
+        this.menus.clear();
+        for (Menu menu : newMenus) {
+            addMenu(menu);
+        }
     }
 
     public void updateName(String name) {

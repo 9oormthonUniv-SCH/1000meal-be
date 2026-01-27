@@ -33,7 +33,7 @@ public class StoreViewService {
         return base.stream().map(sr -> {
             Long storeId = sr.getId(); // DTO 실제 접근자에 맞게 수정
             Integer liveStock = dailyMenuRepository
-                    .findStockByStoreIdAndDate(storeId, today)
+                    .findTotalGroupStockByStoreIdAndDate(storeId, today)
                     .orElse(sr.getTodayMenu() != null ? sr.getTodayMenu().getStock() : null);
 
             // DTO가 불변이면 복사 생성/빌더 필요

@@ -84,11 +84,34 @@ public class MenuGroupController {
     }
 
     @Operation(
+            summary = "그룹 메뉴 등록/교체",
+            description = """
+                    메뉴 그룹의 메뉴를 등록하거나 기존 메뉴를 교체합니다.
+
+                    - 전체 교체 전략: 기존 메뉴는 모두 삭제되고 새 메뉴로 대체됩니다.
+                    - 메뉴명은 trim 처리되며, 빈 값/중복 값은 제거됩니다.
+                    """
+    )
+    @PostMapping("/groups/{groupId}/menus")
+    public ApiResponse<MenuGroupDto> updateMenusInGroup(
+            @Parameter(description = "그룹 ID", example = "1")
+            @PathVariable Long groupId,
+
+            @Valid @RequestBody MenuUpdateRequest request
+    ) {
+        return ApiResponse.success(
+                menuGroupService.updateMenusInGroup(groupId, request),
+                SuccessCode.OK
+        );
+    }
+
+    @Operation(
             summary = "메뉴 그룹 생성",
             description = """
                     특정 날짜에 새로운 메뉴 그룹을 생성합니다.
 
-                    - 그룹명, 정렬 순서, 최대 재고량, 메뉴 목록을 지정할 수 있습니다.
+                    - 그룹명, 정렬 순서, 최대 재고량을 지정할 수 있습니다.
+                    - 기본 그룹은 이 API로 생성하지 않습니다 (DB에 이미 존재).
                     """
     )
     @PostMapping("/{storeId}/groups")
