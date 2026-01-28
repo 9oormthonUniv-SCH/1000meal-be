@@ -11,9 +11,11 @@ services:
       - .env
 
     environment:
+
       # 🔒 JPA 잠금
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
-      SPRING_SQL_INIT_MODE: never
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+      SPRING_SQL_INIT_MODE: "never"
+      SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "false"
 
       # 🧬 Flyway
       SPRING_FLYWAY_ENABLED: "true"
@@ -35,6 +37,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
+
+
 
     restart: "no"
 
