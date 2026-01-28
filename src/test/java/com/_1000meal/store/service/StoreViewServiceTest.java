@@ -42,7 +42,7 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findStockByStoreIdAndDate(1L, fixedToday))
+        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
                 .thenReturn(Optional.of(12));
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -56,7 +56,7 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findStockByStoreIdAndDate(1L, fixedToday);
+        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
     }
 
     @Test
@@ -74,7 +74,7 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findStockByStoreIdAndDate(1L, fixedToday))
+        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
                 .thenReturn(Optional.empty());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -88,7 +88,7 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findStockByStoreIdAndDate(1L, fixedToday);
+        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
     }
 
     @Test
@@ -102,7 +102,7 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findStockByStoreIdAndDate(1L, fixedToday))
+        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
                 .thenReturn(Optional.empty());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -115,6 +115,6 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findStockByStoreIdAndDate(1L, fixedToday);
+        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
     }
 }

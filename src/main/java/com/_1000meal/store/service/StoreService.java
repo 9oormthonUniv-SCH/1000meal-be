@@ -41,14 +41,7 @@ public class StoreService {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today);
-
-        DailyMenu dm = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
-                .orElse(null);
-
-        int remain = (dm != null && dm.getStock() != null) ? dm.getStock() : 0;
-        boolean isOpen = (dm != null) && dm.isOpen();
-
-        return store.toDetailedResponse(weeklyMenu, remain, isOpen);
+        return store.toDetailedResponse(weeklyMenu);
     }
 
     @Transactional(readOnly = true)

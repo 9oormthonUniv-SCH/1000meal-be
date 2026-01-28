@@ -29,4 +29,14 @@ public interface DailyMenuRepository extends JpaRepository<DailyMenu, Long> {
     """)
     Optional<Integer> findStockByStoreIdAndDate(@Param("storeId") Long storeId,
                                                 @Param("date") LocalDate date);
+
+    @Query("""
+        SELECT COALESCE(SUM(mgs.stock), 0)
+        FROM MenuGroupStock mgs
+        JOIN mgs.menuGroup mg
+        JOIN mg.dailyMenu dm
+        WHERE dm.weeklyMenu.store.id = :storeId AND dm.date = :date
+    """)
+    Optional<Integer> findTotalGroupStockByStoreIdAndDate(@Param("storeId") Long storeId,
+                                                          @Param("date") LocalDate date);
 }

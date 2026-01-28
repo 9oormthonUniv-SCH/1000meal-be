@@ -1,9 +1,10 @@
 package com._1000meal.menu.service;
 
 import com._1000meal.global.error.code.MenuErrorCode;
+import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.domain.Menu;
+import com._1000meal.menu.domain.GroupDailyMenu;
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
 import com._1000meal.menu.dto.*;
@@ -12,9 +13,11 @@ import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
+import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -22,7 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,6 +39,8 @@ public class MenuGroupService {
     private final MenuGroupRepository menuGroupRepository;
     private final MenuGroupStockRepository stockRepository;
     private final DailyMenuRepository dailyMenuRepository;
+    private final GroupDailyMenuRepository groupDailyMenuRepository;
+    private final StoreRepository storeRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -39,16 +48,41 @@ public class MenuGroupService {
      */
     @Transactional(readOnly = true)
     public DailyMenuWithGroupsDto getMenuGroups(Long storeId, LocalDate date) {
-        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+        List<MenuGroup> groups = menuGroupRepository.findByStoreIdWithStock(storeId);
+        List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
 
-        List<MenuGroup> groups = menuGroupRepository.findByDailyMenuIdWithStockAndMenus(dailyMenu.getId());
+        Map<Long, GroupDailyMenu> dailyMenusByGroupId = groupIds.isEmpty()
+                ? Collections.emptyMap()
+                : groupDailyMenuRepository.findByMenuGroupIdInAndDate(groupIds, date).stream()
+                        .collect(Collectors.toMap(
+                                gdm -> gdm.getMenuGroup().getId(),
+                                gdm -> gdm
+                        ));
 
         List<MenuGroupDto> groupDtos = groups.stream()
-                .map(MenuGroupDto::from)
+                .map(group -> {
+                    GroupDailyMenu gdm = dailyMenusByGroupId.get(group.getId());
+                    List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
+                    return MenuGroupDto.from(group, menus);
+                })
                 .toList();
 
-        return DailyMenuWithGroupsDto.from(dailyMenu, groupDtos);
+        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElse(null);
+
+        int totalStock = groupDtos.stream()
+                .mapToInt(g -> g.getStock() != null ? g.getStock() : 0)
+                .sum();
+
+        return DailyMenuWithGroupsDto.builder()
+                .id(dailyMenu != null ? dailyMenu.getId() : null)
+                .date(date)
+                .dayOfWeek(date.getDayOfWeek())
+                .isOpen(dailyMenu != null ? dailyMenu.isOpen() : true)
+                .isHoliday(dailyMenu != null && dailyMenu.isHoliday())
+                .totalStock(totalStock)
+                .groups(groupDtos)
+                .build();
     }
 
     /**
@@ -58,13 +92,14 @@ public class MenuGroupService {
     @Transactional
     public MenuGroupStockResponse deductStock(Long groupId, DeductionUnit unit) {
         int value = unit.getValue();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         // 비관적 락으로 재고 조회
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
         int beforeStock = stock.getStock();
-        StockDeductResult result = stock.deduct(value);
+        StockDeductResult result = stock.deduct(value, today);
         int afterStock = stock.getStock();
 
         log.info("[STOCK][DEDUCT] groupId={}, before={}, after={}, unit={}",
@@ -75,7 +110,7 @@ public class MenuGroupService {
             MenuGroup group = menuGroupRepository.findByIdWithStore(groupId)
                     .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
-            Store store = group.getDailyMenu().getWeeklyMenu().getStore();
+            Store store = group.getStore();
 
             // 30 임계치 하향 돌파 알림 이벤트
             if (result.notifyLowStock30()) {
@@ -119,43 +154,73 @@ public class MenuGroupService {
     }
 
     /**
-     * 메뉴 그룹 생성
+     * 메뉴 그룹 생성 (그룹만 생성, 메뉴는 별도 API)
      */
     @Transactional
-    public MenuGroupDto createMenuGroup(Long storeId, LocalDate date, MenuGroupCreateRequest request) {
-        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.DAILY_MENU_NOT_FOUND));
+    public MenuGroupDto createMenuGroup(Long storeId, MenuGroupCreateRequest request) {
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            throw new CustomException(MenuErrorCode.INVALID_MENU_NAME);
+        }
+
+        Store store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
         MenuGroup menuGroup = MenuGroup.builder()
-                .dailyMenu(dailyMenu)
+                .store(store)
                 .name(request.getName())
                 .sortOrder(request.getSortOrderOrDefault())
+                .isDefault(false)
                 .build();
 
         menuGroup.initializeStock(request.getCapacityOrDefault());
-
-        // 메뉴 추가
-        if (request.getMenus() != null && !request.getMenus().isEmpty()) {
-            for (String menuName : request.getMenus()) {
-                Menu menu = Menu.builder().name(menuName).build();
-                menu.setDailyMenu(dailyMenu);
-                menuGroup.addMenu(menu);
-            }
-        }
-
-        dailyMenu.addMenuGroup(menuGroup);
         menuGroupRepository.save(menuGroup);
 
         return MenuGroupDto.from(menuGroup);
     }
 
     /**
-     * 메뉴 그룹 삭제
+     * 그룹 내 메뉴 등록/교체 (전체 교체 방식)
+     * (groupId, date) 조합으로 GroupDailyMenu를 upsert
+     */
+    @Transactional
+    public GroupDailyMenuResponse updateMenusInGroup(Long groupId, LocalDate date, MenuUpdateRequest request) {
+        MenuGroup menuGroup = menuGroupRepository.findById(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        List<String> cleaned = request.getMenus().stream()
+                .map(s -> s == null ? "" : s.trim())
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .toList();
+
+        if (cleaned.isEmpty()) {
+            throw new CustomException(MenuErrorCode.MENU_EMPTY);
+        }
+
+        GroupDailyMenu groupDailyMenu = groupDailyMenuRepository
+                .findByMenuGroupIdAndDate(groupId, date)
+                .orElseGet(() -> GroupDailyMenu.builder()
+                        .menuGroup(menuGroup)
+                        .date(date)
+                        .build());
+
+        groupDailyMenu.replaceMenus(cleaned);
+        groupDailyMenuRepository.save(groupDailyMenu);
+
+        return GroupDailyMenuResponse.from(groupDailyMenu);
+    }
+
+    /**
+     * 메뉴 그룹 삭제 (기본 그룹은 삭제 불가)
      */
     @Transactional
     public void deleteMenuGroup(Long groupId) {
         MenuGroup menuGroup = menuGroupRepository.findById(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        if (menuGroup.isDefault()) {
+            throw new CustomException(MenuErrorCode.CANNOT_DELETE_DEFAULT_GROUP);
+        }
 
         menuGroupRepository.delete(menuGroup);
     }

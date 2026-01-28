@@ -84,11 +84,38 @@ public class MenuGroupController {
     }
 
     @Operation(
+            summary = "그룹 메뉴 등록/교체",
+            description = """
+                    메뉴 그룹의 특정 날짜 메뉴를 등록하거나 기존 메뉴를 교체합니다.
+
+                    - (groupId, date) 조합으로 upsert 동작합니다.
+                    - 해당 조합이 없으면 새로 생성, 있으면 메뉴를 교체합니다.
+                    - 메뉴명은 trim 처리되며, 빈 값/중복 값은 제거됩니다.
+                    """
+    )
+    @PostMapping("/groups/{groupId}/menus")
+    public ApiResponse<GroupDailyMenuResponse> updateMenusInGroup(
+            @Parameter(description = "그룹 ID", example = "1")
+            @PathVariable Long groupId,
+
+            @Parameter(description = "날짜 (YYYY-MM-DD)", example = "2026-01-23")
+            @RequestParam LocalDate date,
+
+            @Valid @RequestBody MenuUpdateRequest request
+    ) {
+        return ApiResponse.success(
+                menuGroupService.updateMenusInGroup(groupId, date, request),
+                SuccessCode.OK
+        );
+    }
+
+    @Operation(
             summary = "메뉴 그룹 생성",
             description = """
-                    특정 날짜에 새로운 메뉴 그룹을 생성합니다.
+                    매장에 새로운 메뉴 그룹을 생성합니다.
 
-                    - 그룹명, 정렬 순서, 최대 재고량, 메뉴 목록을 지정할 수 있습니다.
+                    - 그룹명, 정렬 순서, 최대 재고량을 지정할 수 있습니다.
+                    - 기본 그룹은 이 API로 생성하지 않습니다 (DB에 이미 존재).
                     """
     )
     @PostMapping("/{storeId}/groups")
@@ -96,13 +123,10 @@ public class MenuGroupController {
             @Parameter(description = "매장 ID", example = "1")
             @PathVariable Long storeId,
 
-            @Parameter(description = "날짜 (YYYY-MM-DD)", example = "2026-01-23")
-            @RequestParam LocalDate date,
-
             @Valid @RequestBody MenuGroupCreateRequest request
     ) {
         return ApiResponse.success(
-                menuGroupService.createMenuGroup(storeId, date, request),
+                menuGroupService.createMenuGroup(storeId, request),
                 SuccessCode.CREATED
         );
     }

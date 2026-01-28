@@ -1,5 +1,6 @@
 package com._1000meal.menu.domain;
 
+import com._1000meal.store.domain.Store;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -23,7 +24,11 @@ public class MenuGroup {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "daily_menu_id", nullable = false)
+    @JoinColumn(name = "store_id", nullable = false)
+    private Store store;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "daily_menu_id")
     private DailyMenu dailyMenu;
 
     @Column(nullable = false, length = 100)
@@ -31,6 +36,9 @@ public class MenuGroup {
 
     @Column(nullable = false)
     private Integer sortOrder;
+
+    @Column(nullable = false)
+    private boolean isDefault;
 
     @OneToOne(mappedBy = "menuGroup", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private MenuGroupStock stock;
@@ -40,10 +48,12 @@ public class MenuGroup {
     private List<Menu> menus = new ArrayList<>();
 
     @Builder
-    public MenuGroup(DailyMenu dailyMenu, String name, Integer sortOrder) {
+    public MenuGroup(DailyMenu dailyMenu, Store store, String name, Integer sortOrder, boolean isDefault) {
+        this.store = store;
         this.dailyMenu = dailyMenu;
         this.name = name;
         this.sortOrder = sortOrder != null ? sortOrder : 0;
+        this.isDefault = isDefault;
     }
 
     public void initializeStock(int capacity) {
@@ -53,6 +63,13 @@ public class MenuGroup {
     public void addMenu(Menu menu) {
         this.menus.add(menu);
         menu.setMenuGroup(this);
+    }
+
+    public void replaceMenus(List<Menu> newMenus) {
+        this.menus.clear();
+        for (Menu menu : newMenus) {
+            addMenu(menu);
+        }
     }
 
     public void updateName(String name) {

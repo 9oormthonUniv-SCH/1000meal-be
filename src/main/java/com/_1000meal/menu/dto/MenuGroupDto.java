@@ -27,4 +27,15 @@ public class MenuGroupDto {
                 .menus(group.getMenus().stream().map(Menu::getName).toList())
                 .build();
     }
+
+    public static MenuGroupDto from(MenuGroup group, List<String> menus) {
+        return MenuGroupDto.builder()
+                .id(group.getId())
+                .name(group.getName())
+                .sortOrder(group.getSortOrder())
+                .stock(group.getStock() != null ? group.getStock().getStock() : 0)
+                .capacity(group.getStock() != null ? group.getStock().getCapacity() : 100)
+                .menus(menus != null ? menus : List.of())
+                .build();
+    }
 }

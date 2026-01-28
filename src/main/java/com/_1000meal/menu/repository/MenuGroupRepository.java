@@ -20,9 +20,13 @@ public interface MenuGroupRepository extends JpaRepository<MenuGroup, Long> {
     List<MenuGroup> findByDailyMenuIdWithStockAndMenus(@Param("dailyMenuId") Long dailyMenuId);
 
     @Query("SELECT mg FROM MenuGroup mg " +
-            "JOIN FETCH mg.dailyMenu dm " +
-            "JOIN FETCH dm.weeklyMenu wm " +
-            "JOIN FETCH wm.store " +
+            "LEFT JOIN FETCH mg.stock " +
+            "WHERE mg.store.id = :storeId " +
+            "ORDER BY mg.sortOrder ASC")
+    List<MenuGroup> findByStoreIdWithStock(@Param("storeId") Long storeId);
+
+    @Query("SELECT mg FROM MenuGroup mg " +
+            "JOIN FETCH mg.store " +
             "LEFT JOIN FETCH mg.stock " +
             "WHERE mg.id = :groupId")
     Optional<MenuGroup> findByIdWithStore(@Param("groupId") Long groupId);
@@ -38,4 +42,10 @@ public interface MenuGroupRepository extends JpaRepository<MenuGroup, Long> {
             "WHERE mg.dailyMenu.id IN :dailyMenuIds " +
             "ORDER BY mg.dailyMenu.id, mg.sortOrder ASC")
     List<MenuGroup> findByDailyMenuIdsWithStockAndMenus(@Param("dailyMenuIds") List<Long> dailyMenuIds);
+
+    @Query("SELECT mg FROM MenuGroup mg " +
+            "LEFT JOIN FETCH mg.menus " +
+            "LEFT JOIN FETCH mg.stock " +
+            "WHERE mg.id = :groupId")
+    Optional<MenuGroup> findByIdWithMenus(@Param("groupId") Long groupId);
 }

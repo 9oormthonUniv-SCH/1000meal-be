@@ -16,6 +16,7 @@ public class DailyMenuGroupResponse {
     private DayOfWeek dayOfWeek;
     private boolean isOpen;
     private boolean holiday;
+    private Integer totalStock;
     private List<MenuGroupResponse> groups;
 
     public static DailyMenuGroupResponse from(DailyMenu dailyMenu, List<MenuGroupResponse> groups) {
@@ -25,6 +26,7 @@ public class DailyMenuGroupResponse {
                 .dayOfWeek(dailyMenu.getDate() != null ? dailyMenu.getDate().getDayOfWeek() : dailyMenu.getDayOfWeek())
                 .isOpen(dailyMenu.isOpen())
                 .holiday(dailyMenu.isHoliday())
+                .totalStock(null)
                 .groups(groups)
                 .build();
     }
@@ -36,7 +38,27 @@ public class DailyMenuGroupResponse {
                 .dayOfWeek(date.getDayOfWeek())
                 .isOpen(false)
                 .holiday(false)
+                .totalStock(null)
                 .groups(List.of())
+                .build();
+    }
+
+    public static DailyMenuGroupResponse storeBased(
+            DailyMenu dailyMenu,
+            LocalDate date,
+            List<MenuGroupResponse> groups,
+            Integer totalStock,
+            boolean isOpen,
+            boolean holiday
+    ) {
+        return DailyMenuGroupResponse.builder()
+                .id(dailyMenu != null ? dailyMenu.getId() : null)
+                .date(date)
+                .dayOfWeek(date.getDayOfWeek())
+                .isOpen(isOpen)
+                .holiday(holiday)
+                .totalStock(totalStock)
+                .groups(groups)
                 .build();
     }
 }
