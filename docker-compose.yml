@@ -13,7 +13,7 @@ services:
     environment:
 
       # 🔒 JPA 잠금
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "create"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
       SPRING_SQL_INIT_MODE: "never"
       SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "false"
 
