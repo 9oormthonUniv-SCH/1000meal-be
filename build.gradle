@@ -74,6 +74,9 @@ dependencies {
     testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
     testImplementation 'org.mockito:mockito-inline:5.2.0' // ✅ static mocking
 
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
+
 
 
 
