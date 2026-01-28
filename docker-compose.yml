@@ -19,7 +19,7 @@ services:
 
       # 🧬 Flyway
       SPRING_FLYWAY_ENABLED: "true"
-      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "false"
       SPRING_FLYWAY_BASELINE_VERSION: "2"
       SPRING_FLYWAY_LOCATIONS: "classpath:db/migration"
 
