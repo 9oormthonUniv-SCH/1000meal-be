@@ -44,9 +44,8 @@ bin/
 
 *.env
 *.yml
-application-*.yml
 application.properties
-src/main/resources/
+
 
 # Firebase service account
 **/*firebase-adminsdk*.json
