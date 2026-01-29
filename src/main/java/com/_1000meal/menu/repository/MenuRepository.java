@@ -16,4 +16,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long> {
     @Query("delete from Menu m where m.dailyMenu.id = :dailyMenuId")
     int deleteByDailyMenuId(@Param("dailyMenuId") Long dailyMenuId);
 
-    List<Menu> findByDailyMenu_IdOrderByIdAsc(Long dailyMenuId);}
+    List<Menu> findByDailyMenu_IdOrderByIdAsc(Long dailyMenuId);
+
+    @Query("select m from Menu m where m.dailyMenu.id in :dailyMenuIds order by m.id asc")
+    List<Menu> findByDailyMenuIdInOrderByIdAsc(@Param("dailyMenuIds") List<Long> dailyMenuIds);
+}

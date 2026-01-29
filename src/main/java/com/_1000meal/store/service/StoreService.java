@@ -6,6 +6,7 @@ import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
@@ -40,7 +41,8 @@ public class StoreService {
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        WeeklyMenuResponse weeklyMenu = menuService.getWeeklyMenu(storeId,today);
+        WeeklyMenuWithGroupsResponse weeklyMenu =
+                menuService.getWeeklyMenuWithGroups(storeId, today);
         return store.toDetailedResponse(weeklyMenu);
     }
 

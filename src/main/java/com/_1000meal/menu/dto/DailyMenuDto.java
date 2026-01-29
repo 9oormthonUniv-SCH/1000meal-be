@@ -21,6 +21,9 @@ public class DailyMenuDto {
     private boolean isOpen;
     private boolean isHoliday;
     private Integer stock;
-    private List<String> menus;
+    @Builder.Default
+    private List<String> menus = List.of();
+    @Builder.Default
+    private List<MenuGroupResponseDto> menuGroups = List.of();
 
 }

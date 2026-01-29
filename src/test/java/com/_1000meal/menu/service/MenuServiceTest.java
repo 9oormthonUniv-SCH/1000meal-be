@@ -13,6 +13,7 @@ import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
+import com._1000meal.menu.repository.MenuRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -40,6 +41,7 @@ class MenuServiceTest {
     @Mock DailyMenuRepository dailyMenuRepository;
     @Mock GroupDailyMenuRepository groupDailyMenuRepository;
     @Mock MenuGroupRepository menuGroupRepository;
+    @Mock MenuRepository menuRepository;
 
     @InjectMocks MenuService service;
 
@@ -80,7 +82,7 @@ class MenuServiceTest {
         when(store.getId()).thenReturn(storeId);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
-        when(weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, wed)).thenReturn(Optional.empty());
+        when(weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, wed)).thenReturn(Optional.empty());
 
         WeeklyMenuResponse res = service.getWeeklyMenu(storeId, wed);
 

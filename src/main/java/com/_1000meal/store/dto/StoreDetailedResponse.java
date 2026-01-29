@@ -1,6 +1,7 @@
 package com._1000meal.store.dto;
 
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -24,6 +25,6 @@ public class StoreDetailedResponse {
     private double lat;
     private double lng;
 
-    private WeeklyMenuResponse weeklyMenuResponse;
+    private WeeklyMenuWithGroupsResponse weeklyMenuResponse;
 
 }

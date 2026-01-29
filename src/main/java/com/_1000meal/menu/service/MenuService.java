@@ -4,17 +4,21 @@ package com._1000meal.menu.service;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.GroupDailyMenu;
+import com._1000meal.menu.domain.Menu;
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.DailyMenuGroupResponse;
 import com._1000meal.menu.dto.MenuGroupResponse;
+import com._1000meal.menu.dto.MenuGroupResponseDto;
+import com._1000meal.menu.dto.MenuResponseDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
+import com._1000meal.menu.repository.MenuRepository;
 import com._1000meal.menu.repository.WeeklyMenuRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -38,6 +42,7 @@ public class MenuService {
     private final WeeklyMenuRepository weeklyMenuRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuGroupRepository menuGroupRepository;
+    private final MenuRepository menuRepository;
     private final GroupDailyMenuRepository groupDailyMenuRepository;
 
     @Transactional(readOnly = true)
@@ -45,17 +50,79 @@ public class MenuService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        return weeklyMenuRepository.findByStoreIdAndRangeWithMenus(storeId, date)
+        return weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, date)
                 .map(weeklyMenu -> {
-                    List<DailyMenuDto> dailyDtos = weeklyMenu.getDailyMenus().stream()
+                    List<DailyMenu> dailyMenus = weeklyMenu.getDailyMenus().stream()
                             .sorted(Comparator.comparing(DailyMenu::getDate))
+                            .toList();
+
+                    List<Long> dailyMenuIds = dailyMenus.stream()
+                            .map(DailyMenu::getId)
+                            .toList();
+
+                    Map<Long, List<MenuGroup>> groupsByDailyMenuId = dailyMenuIds.isEmpty()
+                            ? Map.of()
+                            : menuGroupRepository.findByDailyMenuIdsOrderBySortAndId(dailyMenuIds).stream()
+                            .collect(Collectors.groupingBy(
+                                    mg -> mg.getDailyMenu().getId(),
+                                    LinkedHashMap::new,
+                                    Collectors.toList()
+                            ));
+
+                    List<Menu> menus = dailyMenuIds.isEmpty()
+                            ? List.of()
+                            : menuRepository.findByDailyMenuIdInOrderByIdAsc(dailyMenuIds);
+
+                    Map<Long, List<Menu>> menusByGroupId = menus.stream()
+                            .filter(menu -> menu.getMenuGroup() != null)
+                            .collect(Collectors.groupingBy(
+                                    menu -> menu.getMenuGroup().getId(),
+                                    LinkedHashMap::new,
+                                    Collectors.toList()
+                            ));
+
+                    Map<Long, List<Menu>> menusByDailyMenuIdNoGroup = menus.stream()
+                            .filter(menu -> menu.getMenuGroup() == null)
+                            .collect(Collectors.groupingBy(
+                                    menu -> menu.getDailyMenu().getId(),
+                                    LinkedHashMap::new,
+                                    Collectors.toList()
+                            ));
+
+                    List<DailyMenuDto> dailyDtos = dailyMenus.stream()
                             .map(dm -> {
-                                DailyMenuDto dto = dm.toDto();
-                                List<String> sorted = dto.getMenus().stream()
-                                        .sorted()
+                                List<MenuGroup> groups = groupsByDailyMenuId.getOrDefault(dm.getId(), List.of());
+                                List<MenuGroupResponseDto> groupDtos = groups.stream()
+                                        .map(group -> {
+                                            List<MenuResponseDto> menuDtos = menusByGroupId
+                                                    .getOrDefault(group.getId(), List.of())
+                                                    .stream()
+                                                    .map(MenuResponseDto::from)
+                                                    .toList();
+                                            return MenuGroupResponseDto.from(group, menuDtos);
+                                        })
                                         .toList();
-                                dto.setMenus(sorted);
-                                return dto;
+
+                                List<String> legacyMenus = menusByDailyMenuIdNoGroup
+                                        .getOrDefault(dm.getId(), List.of())
+                                        .stream()
+                                        .map(Menu::getName)
+                                        .toList();
+
+                                DayOfWeek dow = (dm.getDate() != null)
+                                        ? dm.getDate().getDayOfWeek()
+                                        : dm.getDayOfWeek();
+
+                                return DailyMenuDto.builder()
+                                        .id(dm.getId())
+                                        .date(dm.getDate())
+                                        .dayOfWeek(dow)
+                                        .isOpen(dm.isOpen())
+                                        .isHoliday(dm.isHoliday())
+                                        .stock(dm.getStock())
+                                        .menus(legacyMenus)
+                                        .menuGroups(groupDtos)
+                                        .build();
                             })
                             .toList();
 
@@ -121,6 +188,7 @@ public class MenuService {
                     .dayOfWeek(d.getDayOfWeek())
                     .stock(0)
                     .menus(List.of())
+                    .menuGroups(List.of())
                     .isOpen(true)
                     .build());
         }
