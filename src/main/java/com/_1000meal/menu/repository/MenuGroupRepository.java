@@ -48,4 +48,9 @@ public interface MenuGroupRepository extends JpaRepository<MenuGroup, Long> {
             "LEFT JOIN FETCH mg.stock " +
             "WHERE mg.id = :groupId")
     Optional<MenuGroup> findByIdWithMenus(@Param("groupId") Long groupId);
+
+    @Query("SELECT mg FROM MenuGroup mg " +
+            "WHERE mg.dailyMenu.id IN :dailyMenuIds " +
+            "ORDER BY mg.dailyMenu.id ASC, mg.sortOrder ASC, mg.id ASC")
+    List<MenuGroup> findByDailyMenuIdsOrderBySortAndId(@Param("dailyMenuIds") List<Long> dailyMenuIds);
 }

@@ -12,19 +12,21 @@ spring:
 
   sql:
     init:
-      mode: always
+      mode: never
       data-locations: classpath:data.sql
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
         show_sql: true
-    defer-datasource-initialization: true
+    defer-datasource-initialization: false
     # database-platform: org.hibernate.dialect.MySQL8Dialect  # 중복이라 dev에서는 제거 권장
+  flyway:
+    enabled: false
 
   jackson:
     time-zone: Asia/Seoul

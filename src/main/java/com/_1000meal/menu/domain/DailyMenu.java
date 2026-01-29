@@ -79,6 +79,7 @@ public class DailyMenu {
                 .isOpen(this.isOpen())
                 .isHoliday(this.isHoliday)   // ✅ DTO로 전달
                 .menus(menuNames)
+                .menuGroups(List.of())
                 .stock(this.getStock())
                 .build();
     }
@@ -113,4 +114,3 @@ public class DailyMenu {
         this.menuGroups.add(menuGroup);
     }
 }
-

@@ -3,6 +3,7 @@ package com._1000meal.store.domain;
 import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
 import jakarta.persistence.*;
@@ -66,8 +67,8 @@ public class Store {
         this.lng = lng;
     }
 
-    public StoreDetailedResponse toDetailedResponse(WeeklyMenuResponse weeklyMenu) {
 
+    public StoreDetailedResponse toDetailedResponse(WeeklyMenuWithGroupsResponse weeklyMenu) {
         return StoreDetailedResponse.builder()
                 .id(this.getId())
                 .imageUrl(this.getImageUrl())
