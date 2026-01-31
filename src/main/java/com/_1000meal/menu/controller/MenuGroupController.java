@@ -5,6 +5,7 @@ import com._1000meal.global.response.ApiResponse;
 import com._1000meal.menu.dto.*;
 import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.service.MenuGroupService;
+import com._1000meal.menu.service.MenuService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +22,7 @@ import java.time.LocalDate;
 public class MenuGroupController {
 
     private final MenuGroupService menuGroupService;
+    private final MenuService menuService;
 
     @Operation(
             summary = "일간 메뉴 그룹 조회",
@@ -40,6 +42,28 @@ public class MenuGroupController {
             @RequestParam LocalDate date
     ) {
         return ApiResponse.ok(menuGroupService.getMenuGroups(storeId, date));
+    }
+
+    @Operation(
+            summary = "주간 메뉴 조회",
+            description = """
+                    기준 날짜가 포함된 주간(월~일) 메뉴를 조회합니다.
+
+                    - 주간 메뉴가 없으면 빈 스켈레톤 구조를 반환합니다.
+                    - 월~금(영업일) 기준으로 반환됩니다.
+                    """
+    )
+
+    @GetMapping("/weekly/{storeId}/groups")
+    public ApiResponse<WeeklyMenuWithGroupsResponse> getWeeklyMenuWithGroups(
+            @Parameter(description = "매장 ID", example = "1")
+            @PathVariable Long storeId,
+
+            @Parameter(description = "기준 날짜 (YYYY-MM-DD)", example = "2026-01-06")
+            @RequestParam LocalDate date
+    ) {
+        WeeklyMenuWithGroupsResponse response = menuService.getWeeklyMenuWithGroups(storeId, date);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
 
     @Operation(

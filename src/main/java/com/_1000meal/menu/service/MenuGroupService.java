@@ -29,6 +29,9 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -48,7 +51,13 @@ public class MenuGroupService {
      */
     @Transactional(readOnly = true)
     public DailyMenuWithGroupsDto getMenuGroups(Long storeId, LocalDate date) {
-        List<MenuGroup> groups = menuGroupRepository.findByStoreIdWithStock(storeId);
+        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElse(null);
+
+        List<MenuGroup> groups = (dailyMenu != null)
+                ? menuGroupRepository.findByDailyMenuIdWithStockAndMenus(dailyMenu.getId())
+                : menuGroupRepository.findByStoreIdWithStock(storeId);
+
         List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
 
         Map<Long, GroupDailyMenu> dailyMenusByGroupId = groupIds.isEmpty()
@@ -67,9 +76,6 @@ public class MenuGroupService {
                 })
                 .toList();
 
-        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
-                .orElse(null);
-
         int totalStock = groupDtos.stream()
                 .mapToInt(g -> g.getStock() != null ? g.getStock() : 0)
                 .sum();
@@ -83,6 +89,107 @@ public class MenuGroupService {
                 .totalStock(totalStock)
                 .groups(groupDtos)
                 .build();
+    }
+
+    /**
+     * 여러 매장의 특정 날짜 메뉴 정보를 한 번에 조회 (store 목록용)
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, DailyMenuDto> getDailyMenuDtosForStores(List<Long> storeIds, LocalDate date) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<DailyMenu> dailyMenus = dailyMenuRepository.findByStoreIdInAndDate(storeIds, date);
+        Map<Long, DailyMenu> dailyMenuByStoreId = dailyMenus.stream()
+                .collect(Collectors.toMap(
+                        dm -> dm.getWeeklyMenu().getStore().getId(),
+                        dm -> dm
+                ));
+
+        List<Long> storesWithDaily = dailyMenuByStoreId.keySet().stream().toList();
+        List<Long> storesWithoutDaily = storeIds.stream()
+                .filter(id -> !dailyMenuByStoreId.containsKey(id))
+                .toList();
+
+        List<Long> dailyMenuIds = dailyMenus.stream()
+                .map(DailyMenu::getId)
+                .toList();
+
+        Map<Long, List<MenuGroup>> groupsByDailyMenuId = dailyMenuIds.isEmpty()
+                ? Map.of()
+                : menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(dailyMenuIds).stream()
+                        .collect(Collectors.groupingBy(
+                                mg -> mg.getDailyMenu().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        Map<Long, List<MenuGroup>> groupsByStoreId = storesWithoutDaily.isEmpty()
+                ? Map.of()
+                : menuGroupRepository.findByStoreIdInWithStock(storesWithoutDaily).stream()
+                        .collect(Collectors.groupingBy(
+                                mg -> mg.getStore().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        List<Long> groupIds = new ArrayList<>();
+        groupsByDailyMenuId.values().forEach(list -> list.forEach(mg -> groupIds.add(mg.getId())));
+        groupsByStoreId.values().forEach(list -> list.forEach(mg -> groupIds.add(mg.getId())));
+
+        Map<Long, List<String>> menusByGroupId = groupIds.isEmpty()
+                ? Map.of()
+                : groupDailyMenuRepository.findByMenuGroupIdInAndDate(groupIds, date).stream()
+                        .collect(Collectors.toMap(
+                                gdm -> gdm.getMenuGroup().getId(),
+                                GroupDailyMenu::getMenuNames,
+                                (a, b) -> a
+                        ));
+
+        Map<Long, DailyMenuDto> result = new HashMap<>();
+        for (Long storeId : storeIds) {
+            DailyMenu dm = dailyMenuByStoreId.get(storeId);
+            List<MenuGroup> groups = (dm != null)
+                    ? groupsByDailyMenuId.getOrDefault(dm.getId(), List.of())
+                    : groupsByStoreId.getOrDefault(storeId, List.of());
+
+            List<MenuGroupResponseDto> groupDtos = groups.stream()
+                    .map(group -> {
+                        List<MenuResponseDto> menuDtos = menusByGroupId
+                                .getOrDefault(group.getId(), List.of())
+                                .stream()
+                                .map(name -> MenuResponseDto.builder().id(null).name(name).build())
+                                .toList();
+                        return MenuGroupResponseDto.from(group, menuDtos);
+                    })
+                    .toList();
+
+            List<String> flatMenus = groups.stream()
+                    .flatMap(group -> menusByGroupId.getOrDefault(group.getId(), List.of()).stream())
+                    .toList();
+
+            int totalStock = groups.stream()
+                    .mapToInt(g -> g.getStock() != null ? g.getStock().getStock() : 0)
+                    .sum();
+
+            boolean isOpen = dm != null ? dm.isOpen() : true;
+            boolean isHoliday = dm != null && dm.isHoliday();
+            Long dailyMenuId = dm != null ? dm.getId() : null;
+
+            result.put(storeId, DailyMenuDto.builder()
+                    .id(dailyMenuId)
+                    .date(date)
+                    .dayOfWeek(date.getDayOfWeek())
+                    .isOpen(isOpen)
+                    .isHoliday(isHoliday)
+                    .stock(totalStock)
+                    .menus(flatMenus)
+                    .menuGroups(groupDtos)
+                    .build());
+        }
+
+        return result;
     }
 
     /**

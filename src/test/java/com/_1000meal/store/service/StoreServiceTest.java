@@ -5,8 +5,9 @@ import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
 import com._1000meal.menu.dto.DailyMenuDto;
-import com._1000meal.menu.dto.WeeklyMenuResponse;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
@@ -22,6 +23,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -33,6 +35,7 @@ class StoreServiceTest {
     @Mock private StoreRepository storeRepository;
     @Mock private DailyMenuRepository dailyMenuRepository;
     @Mock private MenuService menuService;
+    @Mock private MenuGroupService menuGroupService;
     @Mock private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks private StoreService storeService;
@@ -65,10 +68,10 @@ class StoreServiceTest {
                 .isOpen(true)
                 .remain(12)
                 .build();
-        WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
+        WeeklyMenuWithGroupsResponse weekly = mock(WeeklyMenuWithGroupsResponse.class);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
-        when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
+        when(menuService.getWeeklyMenuWithGroups(eq(storeId), eq(fixedToday))).thenReturn(weekly);
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -80,7 +83,7 @@ class StoreServiceTest {
         }
 
         verify(storeRepository).findById(storeId);
-        verify(menuService).getWeeklyMenu(storeId, fixedToday);
+        verify(menuService).getWeeklyMenuWithGroups(storeId, fixedToday);
         verifyNoInteractions(dailyMenuRepository);
     }
 
@@ -98,10 +101,10 @@ class StoreServiceTest {
                 .isOpen(true)
                 .remain(50)
                 .build();
-        WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
+        WeeklyMenuWithGroupsResponse weekly = mock(WeeklyMenuWithGroupsResponse.class);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
-        when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
+        when(menuService.getWeeklyMenuWithGroups(eq(storeId), eq(fixedToday))).thenReturn(weekly);
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -126,23 +129,27 @@ class StoreServiceTest {
         Store store1 = mock(Store.class);
         Store store2 = mock(Store.class);
 
-        when(storeRepository.findById(1L)).thenReturn(Optional.of(store1));
-        when(storeRepository.findById(2L)).thenReturn(Optional.of(store2));
+        when(storeRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(store1, store2));
+        when(store1.getId()).thenReturn(1L);
+        when(store2.getId()).thenReturn(2L);
 
-        // 1번 매장: today dailyMenu 존재 + holiday=false
-        DailyMenu dm1 = mock(DailyMenu.class);
-        DailyMenuDto dm1Dto = mock(DailyMenuDto.class);
-        when(dm1.toDto()).thenReturn(dm1Dto);
-        when(dm1.isHoliday()).thenReturn(false);
-        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(1L, fixedToday)).thenReturn(Optional.of(dm1));
+        DailyMenuDto dm1Dto = DailyMenuDto.builder()
+                .date(fixedToday)
+                .dayOfWeek(fixedToday.getDayOfWeek())
+                .isOpen(true)
+                .isHoliday(false)
+                .stock(10)
+                .build();
+        DailyMenuDto dm2Dto = DailyMenuDto.builder()
+                .date(fixedToday)
+                .dayOfWeek(fixedToday.getDayOfWeek())
+                .isOpen(true)
+                .isHoliday(false)
+                .stock(0)
+                .build();
 
-        StoreResponse resp1 = mock(StoreResponse.class);
-        when(store1.toStoreResponse(dm1Dto, false)).thenReturn(resp1);
-
-        // 2번 매장: today dailyMenu 없음 => holiday=true, dto=null
-        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(2L, fixedToday)).thenReturn(Optional.empty());
-        StoreResponse resp2 = mock(StoreResponse.class);
-        when(store2.toStoreResponse(null, true)).thenReturn(resp2);
+        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L, 2L), fixedToday))
+                .thenReturn(Map.of(1L, dm1Dto, 2L, dm2Dto));
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -150,15 +157,15 @@ class StoreServiceTest {
             List<StoreResponse> result = storeService.getAllStores();
 
             assertEquals(2, result.size());
-            assertSame(resp1, result.get(0));
-            assertSame(resp2, result.get(1));
+            assertSame(dm1Dto, result.get(0).getTodayMenu());
+            assertSame(dm2Dto, result.get(1).getTodayMenu());
+            assertTrue(result.get(0).isOpen());
+            assertFalse(result.get(0).isHoliday());
         }
 
         verify(storeRepository).findAllStoreIds();
-        verify(storeRepository).findById(1L);
-        verify(storeRepository).findById(2L);
-        verify(store1).toStoreResponse(dm1Dto, false);
-        verify(store2).toStoreResponse(null, true);
+        verify(storeRepository).findAllById(List.of(1L, 2L));
+        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L, 2L), fixedToday);
     }
 
     @Test
@@ -219,10 +226,10 @@ class StoreServiceTest {
                 .isOpen(false)
                 .remain(10)
                 .build();
-        WeeklyMenuResponse weekly = mock(WeeklyMenuResponse.class);
+        WeeklyMenuWithGroupsResponse weekly = mock(WeeklyMenuWithGroupsResponse.class);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
-        when(menuService.getWeeklyMenu(eq(storeId), eq(fixedToday))).thenReturn(weekly);
+        when(menuService.getWeeklyMenuWithGroups(eq(storeId), eq(fixedToday))).thenReturn(weekly);
         when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, fixedToday)).thenReturn(Optional.empty());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {

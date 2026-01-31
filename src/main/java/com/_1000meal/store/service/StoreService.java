@@ -8,6 +8,7 @@ import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
@@ -31,6 +32,7 @@ public class StoreService {
     private final StoreRepository storeRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final MenuService menuService;
+    private final MenuGroupService menuGroupService;
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional(readOnly = true)
@@ -52,20 +54,36 @@ public class StoreService {
         List<Long> storeIds = storeRepository.findAllStoreIds();
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
+        var todayMenus = menuGroupService.getDailyMenuDtosForStores(storeIds, today);
+        var storesById = storeRepository.findAllById(storeIds).stream()
+                .collect(Collectors.toMap(Store::getId, s -> s));
+
         return storeIds.stream()
                 .map(id -> {
-                    Store store = storeRepository.findById(id)
-                            .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
+                    Store store = storesById.get(id);
+                    if (store == null) {
+                        throw new CustomException(StoreErrorCode.STORE_NOT_FOUND);
+                    }
 
-                    DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(id, today)
-                            .orElse(null);
+                    DailyMenuDto todayMenuDto = todayMenus.get(id);
+                    boolean isOpen = todayMenuDto != null ? todayMenuDto.isOpen() : store.isOpen();
+                    boolean isHoliday = todayMenuDto != null && todayMenuDto.isHoliday();
 
-                    DailyMenuDto todayMenuDto = (dailyMenu != null) ? dailyMenu.toDto() : null;
-
-                    // holiday 판별 로직
-                    boolean holiday = (dailyMenu == null) || dailyMenu.isHoliday();
-
-                    return store.toStoreResponse(todayMenuDto, holiday);
+                    return StoreResponse.builder()
+                            .id(store.getId())
+                            .imageUrl(store.getImageUrl())
+                            .name(store.getName())
+                            .address(store.getAddress())
+                            .phone(store.getPhone())
+                            .description(store.getDescription())
+                            .hours(store.getHours())
+                            .isOpen(isOpen)
+                            .isHoliday(isHoliday)
+                            .remain(store.getRemain())
+                            .lat(store.getLat())
+                            .lng(store.getLng())
+                            .todayMenu(todayMenuDto)
+                            .build();
                 })
                 .collect(Collectors.toList());
     }

@@ -219,8 +219,31 @@ public class MenuService {
                 : weeklyMenu.getDailyMenus().stream()
                         .collect(Collectors.toMap(DailyMenu::getDate, dm -> dm));
 
-        List<MenuGroup> storeGroups = menuGroupRepository.findByStoreIdWithStock(storeId);
-        List<Long> groupIds = storeGroups.stream().map(MenuGroup::getId).toList();
+        List<MenuGroup> storeGroups = List.of();
+        Map<Long, List<MenuGroup>> groupsByDailyMenuId = Map.of();
+        List<Long> groupIds;
+
+        if (weeklyMenu == null) {
+            storeGroups = menuGroupRepository.findByStoreIdWithStock(storeId);
+            groupIds = storeGroups.stream().map(MenuGroup::getId).toList();
+        } else {
+            List<Long> dailyMenuIds = dailyMenuByDate.values().stream()
+                    .map(DailyMenu::getId)
+                    .toList();
+
+            List<MenuGroup> dailyMenuGroups = dailyMenuIds.isEmpty()
+                    ? List.of()
+                    : menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(dailyMenuIds);
+
+            groupsByDailyMenuId = dailyMenuGroups.stream()
+                    .collect(Collectors.groupingBy(
+                            mg -> mg.getDailyMenu().getId(),
+                            LinkedHashMap::new,
+                            Collectors.toList()
+                    ));
+
+            groupIds = dailyMenuGroups.stream().map(MenuGroup::getId).toList();
+        }
 
         Map<LocalDate, Map<Long, GroupDailyMenu>> dailyMenusByDateAndGroup = groupIds.isEmpty()
                 ? Map.of()
@@ -239,13 +262,27 @@ public class MenuService {
             DailyMenu dm = dailyMenuByDate.get(d);
             Map<Long, GroupDailyMenu> dailyMenuMap = dailyMenusByDateAndGroup.getOrDefault(d, Map.of());
 
-            List<MenuGroupResponse> groupResponses = storeGroups.stream()
-                    .map(group -> {
-                        GroupDailyMenu gdm = dailyMenuMap.get(group.getId());
-                        List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
-                        return MenuGroupResponse.from(group, menus);
-                    })
-                    .toList();
+            List<MenuGroupResponse> groupResponses;
+            if (weeklyMenu == null) {
+                groupResponses = storeGroups.stream()
+                        .map(group -> {
+                            GroupDailyMenu gdm = dailyMenuMap.get(group.getId());
+                            List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
+                            return MenuGroupResponse.from(group, menus);
+                        })
+                        .toList();
+            } else if (dm != null) {
+                List<MenuGroup> dayGroups = groupsByDailyMenuId.getOrDefault(dm.getId(), List.of());
+                groupResponses = dayGroups.stream()
+                        .map(group -> {
+                            GroupDailyMenu gdm = dailyMenuMap.get(group.getId());
+                            List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
+                            return MenuGroupResponse.from(group, menus);
+                        })
+                        .toList();
+            } else {
+                groupResponses = List.of();
+            }
 
             int totalStock = groupResponses.stream()
                     .mapToInt(gr -> gr.getStock() != null ? gr.getStock() : 0)

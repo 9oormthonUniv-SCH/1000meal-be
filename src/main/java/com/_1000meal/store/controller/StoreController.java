@@ -45,14 +45,24 @@ public class StoreController {
 
     @Operation(
             summary = "매장 전체 목록 조회",
-            description = "모든 매장의 기본 정보를 조회합니다."
+            description = """
+                    모든 매장의 기본 정보를 조회합니다.
+
+                    - view=live (기본값): 실시간 조회
+                    - view=cached: 캐시된 목록 + 실시간 재고 덮어쓰기
+                    """
     )
     @ApiResponses({
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "매장 목록 조회 성공")
     })
     @GetMapping
-    public ApiResponse<List<StoreResponse>> getAllStores() {
-        List<StoreResponse> response = storeService.getAllStores();
+    public ApiResponse<List<StoreResponse>> getAllStores(
+            @RequestParam(name = "view", required = false, defaultValue = "live")
+            String view
+    ) {
+        List<StoreResponse> response = "cached".equalsIgnoreCase(view)
+                ? storeViewService.getAllStoresView()
+                : storeService.getAllStores();
         return ApiResponse.success(response, SuccessCode.OK);
     }
 
@@ -89,19 +99,20 @@ public class StoreController {
         return ApiResponse.ok(response);
     }
 
-    @Operation(
-            summary = "매장 목록 조회 (캐시 + 실시간 재고 반영)",
-            description = """
-                    매장 목록의 기본 정보는 캐시를 사용하고,
-                    오늘의 재고(stock)만 실시간 DB 값으로 덮어씁니다.
-                    """
-    )
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "매장 목록 조회 성공")
-    })
-    @GetMapping("/list")
-    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores() {
-        List<StoreResponse> list = storeViewService.getAllStoresView();
-        return ResponseEntity.ok(ApiResponse.success(list, SuccessCode.OK));
-    }
+//    @Operation(
+//            summary = "매장 목록 조회 (캐시 + 실시간 재고 반영)",
+//            description = """
+//                    매장 목록의 기본 정보는 캐시를 사용하고,
+//                    오늘의 재고(stock)만 실시간 DB 값으로 덮어씁니다.
+//                    """
+//    )
+//    @ApiResponses({
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "매장 목록 조회 성공")
+//    })
+//    @Deprecated(forRemoval = false)
+//    @GetMapping("/list")
+//    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores() {
+//        List<StoreResponse> list = storeViewService.getAllStoresView();
+//        return ResponseEntity.ok(ApiResponse.success(list, SuccessCode.OK));
+//    }
 }

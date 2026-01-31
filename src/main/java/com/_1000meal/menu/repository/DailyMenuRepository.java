@@ -31,6 +31,17 @@ public interface DailyMenuRepository extends JpaRepository<DailyMenu, Long> {
                                                 @Param("date") LocalDate date);
 
     @Query("""
+        select dm
+        from DailyMenu dm
+        join fetch dm.weeklyMenu wm
+        join fetch wm.store s
+        where s.id in :storeIds
+          and dm.date = :date
+    """)
+    List<DailyMenu> findByStoreIdInAndDate(@Param("storeIds") List<Long> storeIds,
+                                           @Param("date") LocalDate date);
+
+    @Query("""
         SELECT COALESCE(SUM(mgs.stock), 0)
         FROM MenuGroupStock mgs
         JOIN mgs.menuGroup mg
