@@ -131,7 +131,7 @@ class MenuServiceTest {
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStock()).thenReturn(stock);
 
-        when(menuGroupRepository.findByStoreIdWithStock(storeId))
+        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
                 .thenReturn(List.of(group));
         when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L), weekStart, weekEnd))
                 .thenReturn(List.of());
@@ -259,7 +259,7 @@ class MenuServiceTest {
         when(group2.getStock()).thenReturn(stock2);
         when(group2.getSortOrder()).thenReturn(1);
 
-        when(menuGroupRepository.findByStoreIdWithStock(storeId))
+        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
                 .thenReturn(List.of(group1, group2));
 
         when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L, 2L), weekStart, weekEnd))
@@ -321,7 +321,7 @@ class MenuServiceTest {
         when(group2.getStock()).thenReturn(stock2);
         when(group2.getSortOrder()).thenReturn(1);
 
-        when(menuGroupRepository.findByStoreIdWithStock(storeId))
+        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
                 .thenReturn(List.of(group1, group2));
 
         GroupDailyMenu gdm1 = mock(GroupDailyMenu.class);

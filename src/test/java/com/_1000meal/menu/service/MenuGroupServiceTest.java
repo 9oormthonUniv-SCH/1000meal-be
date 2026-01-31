@@ -222,6 +222,40 @@ class MenuGroupServiceTest {
     }
 
     @Test
+    @DisplayName("메뉴 그룹 조회: dailyMenu 존재 시 해당 일자의 그룹만 사용")
+    void getMenuGroups_usesDailyMenuGroups_whenDailyMenuExists() {
+        Long storeId = 1L;
+        LocalDate date = LocalDate.of(2026, 1, 23);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenu.getId()).thenReturn(10L);
+        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date))
+                .thenReturn(Optional.of(dailyMenu));
+
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(40);
+        when(stock.getCapacity()).thenReturn(100);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getId()).thenReturn(1L);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getSortOrder()).thenReturn(0);
+        when(group.getStock()).thenReturn(stock);
+
+        when(menuGroupRepository.findByDailyMenuIdWithStockAndMenus(10L))
+                .thenReturn(List.of(group));
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date))
+                .thenReturn(List.of());
+
+        DailyMenuWithGroupsDto result = service.getMenuGroups(storeId, date);
+
+        assertEquals(1, result.getGroups().size());
+        assertEquals("기본 메뉴", result.getGroups().get(0).getName());
+        assertEquals(40, result.getTotalStock());
+        verify(menuGroupRepository, never()).findByStoreIdWithStock(storeId);
+    }
+
+    @Test
     @DisplayName("그룹A 차감 시 그룹B stock은 변하지 않음")
     void deductStock_independentGroups() {
         // given: 그룹A 설정

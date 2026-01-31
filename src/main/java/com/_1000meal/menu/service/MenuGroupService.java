@@ -48,7 +48,13 @@ public class MenuGroupService {
      */
     @Transactional(readOnly = true)
     public DailyMenuWithGroupsDto getMenuGroups(Long storeId, LocalDate date) {
-        List<MenuGroup> groups = menuGroupRepository.findByStoreIdWithStock(storeId);
+        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
+                .orElse(null);
+
+        List<MenuGroup> groups = (dailyMenu != null)
+                ? menuGroupRepository.findByDailyMenuIdWithStockAndMenus(dailyMenu.getId())
+                : menuGroupRepository.findByStoreIdWithStock(storeId);
+
         List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
 
         Map<Long, GroupDailyMenu> dailyMenusByGroupId = groupIds.isEmpty()
@@ -66,9 +72,6 @@ public class MenuGroupService {
                     return MenuGroupDto.from(group, menus);
                 })
                 .toList();
-
-        DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
-                .orElse(null);
 
         int totalStock = groupDtos.stream()
                 .mapToInt(g -> g.getStock() != null ? g.getStock() : 0)
