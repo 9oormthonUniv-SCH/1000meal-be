@@ -60,10 +60,24 @@ public class StoreService {
                     DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(id, today)
                             .orElse(null);
 
-                    DailyMenuDto todayMenuDto = (dailyMenu != null) ? dailyMenu.toDto() : null;
-
-                    // holiday 판별 로직
-                    boolean holiday = (dailyMenu == null) || dailyMenu.isHoliday();
+                    DailyMenuDto todayMenuDto;
+                    boolean holiday;
+                    if (dailyMenu != null) {
+                        todayMenuDto = dailyMenu.toDto();
+                        holiday = dailyMenu.isHoliday();
+                    } else {
+                        todayMenuDto = DailyMenuDto.builder()
+                                .id(null)
+                                .date(today)
+                                .dayOfWeek(today.getDayOfWeek())
+                                .isOpen(store.isOpen())
+                                .isHoliday(false)
+                                .stock(0)
+                                .menus(List.of())
+                                .menuGroups(List.of())
+                                .build();
+                        holiday = false;
+                    }
 
                     return store.toStoreResponse(todayMenuDto, holiday);
                 })
