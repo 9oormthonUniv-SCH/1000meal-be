@@ -1,7 +1,7 @@
 package com._1000meal.store.service;
 
 import com._1000meal.menu.dto.DailyMenuDto;
-import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.store.dto.StoreResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,7 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -21,29 +21,28 @@ import static org.mockito.Mockito.*;
 class StoreViewServiceTest {
 
     @Mock private StoreService storeService;
-    @Mock private DailyMenuRepository dailyMenuRepository;
+    @Mock private MenuGroupService menuGroupService;
 
     @InjectMocks private StoreViewService storeViewService;
 
     private static final ZoneId KST = ZoneId.of("Asia/Seoul");
 
     @Test
-    @DisplayName("getAllStoresView: liveStock 있으면 todayMenu.stock을 liveStock으로 덮어쓴다")
-    void getAllStoresView_overwriteStock_whenLiveStockPresent() {
+    @DisplayName("getAllStoresView: todayMenu를 일간 메뉴 조회 결과로 교체한다")
+    void getAllStoresView_replacesTodayMenuFromService() {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
-        DailyMenuDto baseMenu = DailyMenuDto.builder()
-                .stock(5)
-                .build();
-
-        StoreResponse sr1 = StoreResponse.builder()
-                .id(1L)
-                .todayMenu(baseMenu)
-                .build();
+        DailyMenuDto baseMenu = DailyMenuDto.builder().stock(5).build();
+        StoreResponse sr1 = StoreResponse.builder().id(1L).todayMenu(baseMenu).build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
-                .thenReturn(Optional.of(12));
+        DailyMenuDto todayMenu = DailyMenuDto.builder()
+                .stock(12)
+                .isOpen(true)
+                .isHoliday(false)
+                .build();
+        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+                .thenReturn(Map.of(1L, todayMenu));
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -51,17 +50,18 @@ class StoreViewServiceTest {
             List<StoreResponse> result = storeViewService.getAllStoresView();
 
             assertEquals(1, result.size());
-            assertNotNull(result.get(0).getTodayMenu());
-            assertEquals(12, result.get(0).getTodayMenu().getStock());
+            assertSame(todayMenu, result.get(0).getTodayMenu());
+            assertTrue(result.get(0).isOpen());
+            assertFalse(result.get(0).isHoliday());
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
+        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
     }
 
     @Test
-    @DisplayName("getAllStoresView: liveStock 없으면 base(todayMenu.stock)를 유지한다")
-    void getAllStoresView_keepBaseStock_whenLiveStockAbsent() {
+    @DisplayName("getAllStoresView: todayMenu 없으면 기존 값을 유지한다")
+    void getAllStoresView_keepBase_whenNoTodayMenu() {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
         DailyMenuDto baseMenu = DailyMenuDto.builder()
@@ -74,8 +74,8 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
-                .thenReturn(Optional.empty());
+        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+                .thenReturn(Map.of());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -84,15 +84,15 @@ class StoreViewServiceTest {
 
             assertEquals(1, result.size());
             assertNotNull(result.get(0).getTodayMenu());
-            assertEquals(7, result.get(0).getTodayMenu().getStock()); // ✅ 유지
+            assertEquals(7, result.get(0).getTodayMenu().getStock());
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
+        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
     }
 
     @Test
-    @DisplayName("getAllStoresView: todayMenu가 null이면 null 유지 + liveStock 조회 fallback도 null")
+    @DisplayName("getAllStoresView: todayMenu가 null이고 신규 값이 없으면 null 유지")
     void getAllStoresView_todayMenuNull_staysNull() {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
@@ -102,8 +102,8 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(1L, fixedToday))
-                .thenReturn(Optional.empty());
+        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+                .thenReturn(Map.of());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
             mocked.when(() -> LocalDate.now(KST)).thenReturn(fixedToday);
@@ -115,6 +115,6 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(dailyMenuRepository).findTotalGroupStockByStoreIdAndDate(1L, fixedToday);
+        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
     }
 }

@@ -29,6 +29,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -253,6 +254,60 @@ class MenuGroupServiceTest {
         assertEquals("기본 메뉴", result.getGroups().get(0).getName());
         assertEquals(40, result.getTotalStock());
         verify(menuGroupRepository, never()).findByStoreIdWithStock(storeId);
+    }
+
+    @Test
+    @DisplayName("store 목록용: 여러 매장의 dailyMenuDto를 배치로 조회")
+    void getDailyMenuDtosForStores_batch() {
+        Long storeId = 1L;
+        LocalDate date = LocalDate.of(2026, 1, 23);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
+
+        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        when(weeklyMenu.getStore()).thenReturn(store);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenu.getId()).thenReturn(10L);
+        when(dailyMenu.getWeeklyMenu()).thenReturn(weeklyMenu);
+        when(dailyMenu.isOpen()).thenReturn(true);
+        when(dailyMenu.isHoliday()).thenReturn(false);
+
+        when(dailyMenuRepository.findByStoreIdInAndDate(List.of(storeId), date))
+                .thenReturn(List.of(dailyMenu));
+
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(40);
+        when(stock.getCapacity()).thenReturn(100);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getId()).thenReturn(1L);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getSortOrder()).thenReturn(0);
+        when(group.isDefault()).thenReturn(true);
+        when(group.getStock()).thenReturn(stock);
+        when(group.getDailyMenu()).thenReturn(dailyMenu);
+
+        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
+                .thenReturn(List.of(group));
+
+        GroupDailyMenu gdm = mock(GroupDailyMenu.class);
+        when(gdm.getMenuGroup()).thenReturn(group);
+        when(gdm.getMenuNames()).thenReturn(List.of("김밥"));
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date))
+                .thenReturn(List.of(gdm));
+
+        Map<Long, DailyMenuDto> result = service.getDailyMenuDtosForStores(List.of(storeId), date);
+
+        DailyMenuDto dto = result.get(storeId);
+        assertNotNull(dto);
+        assertEquals(date, dto.getDate());
+        assertTrue(dto.isOpen());
+        assertFalse(dto.isHoliday());
+        assertEquals(40, dto.getStock());
+        assertEquals(List.of("김밥"), dto.getMenus());
+        assertEquals(1, dto.getMenuGroups().size());
     }
 
     @Test

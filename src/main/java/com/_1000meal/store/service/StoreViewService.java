@@ -1,6 +1,6 @@
 package com._1000meal.store.service;
 
-import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.store.dto.StoreResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -16,7 +16,7 @@ import java.util.List;
 public class StoreViewService {
 
     private final StoreService storeService;              // 원본 서비스 읽기 사용
-    private final DailyMenuRepository dailyMenuRepository;
+    private final MenuGroupService menuGroupService;
 
     /** 1) 전체 목록 캐시(틀만 캐시) */
     @Cacheable(cacheNames = "stores:list", key = "'v1'", unless = "#result == null || #result.isEmpty()")
@@ -29,22 +29,18 @@ public class StoreViewService {
     public List<StoreResponse> getAllStoresView() {
         var base = getAllStoresCached();
         var today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        var storeIds = base.stream().map(StoreResponse::getId).toList();
+        var todayMenus = menuGroupService.getDailyMenuDtosForStores(storeIds, today);
 
         return base.stream().map(sr -> {
-            Long storeId = sr.getId(); // DTO 실제 접근자에 맞게 수정
-            Integer liveStock = dailyMenuRepository
-                    .findTotalGroupStockByStoreIdAndDate(storeId, today)
-                    .orElse(sr.getTodayMenu() != null ? sr.getTodayMenu().getStock() : null);
-
-            // DTO가 불변이면 복사 생성/빌더 필요
-            var tm = sr.getTodayMenu();
-            var tmUpdated = (tm == null) ? null
-                    : tm.toBuilder()
-                    .stock(liveStock)  // 필드명 맞추기
-                    .build();
+            var todayMenu = todayMenus.get(sr.getId());
+            boolean isOpen = todayMenu != null ? todayMenu.isOpen() : sr.isOpen();
+            boolean isHoliday = todayMenu != null && todayMenu.isHoliday();
 
             return sr.toBuilder()
-                    .todayMenu(tmUpdated) // 필드명 맞추기
+                    .isOpen(isOpen)
+                    .isHoliday(isHoliday)
+                    .todayMenu(todayMenu)
                     .build();
         }).toList();
     }

@@ -99,20 +99,20 @@ public class StoreController {
         return ApiResponse.ok(response);
     }
 
-    @Operation(
-            summary = "매장 목록 조회 (캐시 + 실시간 재고 반영)",
-            description = """
-                    매장 목록의 기본 정보는 캐시를 사용하고,
-                    오늘의 재고(stock)만 실시간 DB 값으로 덮어씁니다.
-                    """
-    )
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "매장 목록 조회 성공")
-    })
-    @Deprecated(forRemoval = false)
-    @GetMapping("/list")
-    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores() {
-        List<StoreResponse> list = storeViewService.getAllStoresView();
-        return ResponseEntity.ok(ApiResponse.success(list, SuccessCode.OK));
-    }
+//    @Operation(
+//            summary = "매장 목록 조회 (캐시 + 실시간 재고 반영)",
+//            description = """
+//                    매장 목록의 기본 정보는 캐시를 사용하고,
+//                    오늘의 재고(stock)만 실시간 DB 값으로 덮어씁니다.
+//                    """
+//    )
+//    @ApiResponses({
+//            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "매장 목록 조회 성공")
+//    })
+//    @Deprecated(forRemoval = false)
+//    @GetMapping("/list")
+//    public ResponseEntity<ApiResponse<List<StoreResponse>>> listStores() {
+//        List<StoreResponse> list = storeViewService.getAllStoresView();
+//        return ResponseEntity.ok(ApiResponse.success(list, SuccessCode.OK));
+//    }
 }

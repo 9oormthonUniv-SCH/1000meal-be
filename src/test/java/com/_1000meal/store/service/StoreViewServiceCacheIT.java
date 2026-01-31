@@ -1,6 +1,6 @@
 package com._1000meal.store.service;
 
-import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.store.dto.StoreResponse;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,13 +26,13 @@ class StoreViewServiceCacheIT {
         @Bean CacheManager cacheManager() {
             return new ConcurrentMapCacheManager("stores:list");
         }
-        @Bean StoreViewService storeViewService(StoreService storeService, DailyMenuRepository dailyMenuRepository) {
-            return new StoreViewService(storeService, dailyMenuRepository);
+        @Bean StoreViewService storeViewService(StoreService storeService, MenuGroupService menuGroupService) {
+            return new StoreViewService(storeService, menuGroupService);
         }
     }
 
     @MockBean private StoreService storeService;
-    @MockBean private DailyMenuRepository dailyMenuRepository;
+    @MockBean private MenuGroupService menuGroupService;
 
     @Autowired
     private StoreViewService storeViewService;
