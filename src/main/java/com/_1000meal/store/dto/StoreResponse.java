@@ -1,6 +1,5 @@
 package com._1000meal.store.dto;
 
-import com._1000meal.menu.dto.DailyMenuDto;
 import lombok.*;
 
 
@@ -23,5 +22,5 @@ public class StoreResponse {
     private int remain;
     private double lat;
     private double lng;
-    private DailyMenuDto todayMenu;
+    private StoreTodayMenuDto todayMenu;
 }

@@ -19,6 +19,8 @@ import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
+import com._1000meal.store.dto.StoreTodayMenuDto;
+import com._1000meal.store.dto.StoreTodayMenuGroupDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -109,7 +111,6 @@ public class MenuGroupService {
                         dm -> dm
                 ));
 
-        List<Long> storesWithDaily = dailyMenuByStoreId.keySet().stream().toList();
         List<Long> storesWithoutDaily = storeIds.stream()
                 .filter(id -> !dailyMenuByStoreId.containsKey(id))
                 .toList();
@@ -195,6 +196,96 @@ public class MenuGroupService {
     }
 
     /**
+     * /stores 전용: 그룹 기준으로 오늘 메뉴를 배치 조회
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, StoreTodayMenuDto> getTodayMenuForStores(List<Long> storeIds, LocalDate date) {
+        if (storeIds == null || storeIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<DailyMenu> dailyMenus = dailyMenuRepository.findByStoreIdInAndDate(storeIds, date);
+        Map<Long, DailyMenu> dailyMenuByStoreId = dailyMenus.stream()
+                .collect(Collectors.toMap(
+                        dm -> dm.getWeeklyMenu().getStore().getId(),
+                        dm -> dm
+                ));
+
+        List<Long> storesWithoutDaily = storeIds.stream()
+                .filter(id -> !dailyMenuByStoreId.containsKey(id))
+                .toList();
+
+        List<Long> dailyMenuIds = dailyMenus.stream()
+                .map(DailyMenu::getId)
+                .toList();
+
+        Map<Long, List<MenuGroup>> groupsByDailyMenuId = dailyMenuIds.isEmpty()
+                ? Map.of()
+                : menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(dailyMenuIds).stream()
+                        .collect(Collectors.groupingBy(
+                                mg -> mg.getDailyMenu().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        Map<Long, List<MenuGroup>> groupsByStoreId = storesWithoutDaily.isEmpty()
+                ? Map.of()
+                : menuGroupRepository.findByStoreIdInWithStock(storesWithoutDaily).stream()
+                        .collect(Collectors.groupingBy(
+                                mg -> mg.getStore().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        List<Long> groupIds = new ArrayList<>();
+        groupsByDailyMenuId.values().forEach(list -> list.forEach(mg -> groupIds.add(mg.getId())));
+        groupsByStoreId.values().forEach(list -> list.forEach(mg -> groupIds.add(mg.getId())));
+
+        Map<Long, List<String>> menusByGroupId = groupIds.isEmpty()
+                ? Map.of()
+                : groupDailyMenuRepository.findByMenuGroupIdInAndDate(groupIds, date).stream()
+                        .collect(Collectors.toMap(
+                                gdm -> gdm.getMenuGroup().getId(),
+                                GroupDailyMenu::getMenuNames,
+                                (a, b) -> a
+                        ));
+
+        Map<Long, StoreTodayMenuDto> result = new HashMap<>();
+        for (Long storeId : storeIds) {
+            DailyMenu dm = dailyMenuByStoreId.get(storeId);
+            List<MenuGroup> groups = (dm != null)
+                    ? groupsByDailyMenuId.getOrDefault(dm.getId(), List.of())
+                    : groupsByStoreId.getOrDefault(storeId, List.of());
+
+            List<StoreTodayMenuGroupDto> groupDtos = groups.stream()
+                    .map(group -> {
+                        List<MenuResponseDto> menuDtos = menusByGroupId
+                                .getOrDefault(group.getId(), List.of())
+                                .stream()
+                                .map(name -> MenuResponseDto.builder().id(null).name(name).build())
+                                .toList();
+                        return StoreTodayMenuGroupDto.from(group, menuDtos);
+                    })
+                    .toList();
+
+            boolean isOpen = dm != null ? dm.isOpen() : true;
+            boolean isHoliday = dm != null && dm.isHoliday();
+            Long dailyMenuId = dm != null ? dm.getId() : null;
+
+            result.put(storeId, StoreTodayMenuDto.builder()
+                    .id(dailyMenuId)
+                    .date(date)
+                    .dayOfWeek(date.getDayOfWeek())
+                    .isOpen(isOpen)
+                    .isHoliday(isHoliday)
+                    .menuGroups(groupDtos)
+                    .build());
+        }
+
+        return result;
+    }
+
+    /**
      * 그룹 재고 차감
      * 비관적 락으로 동시성 보장
      */
@@ -202,6 +293,8 @@ public class MenuGroupService {
     public MenuGroupStockResponse deductStock(Long groupId, DeductionUnit unit) {
         int value = unit.getValue();
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        MenuGroup group = getAuthorizedGroup(groupId);
 
         // 비관적 락으로 재고 조회
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
@@ -215,10 +308,6 @@ public class MenuGroupService {
                 groupId, beforeStock, afterStock, unit.name());
 
         if (result.shouldNotify()) {
-            // 그룹 정보와 매장 정보 조회
-            MenuGroup group = menuGroupRepository.findByIdWithStore(groupId)
-                    .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
-
             Store store = group.getStore();
 
             // 30 임계치 하향 돌파 알림 이벤트
@@ -252,6 +341,63 @@ public class MenuGroupService {
      */
     @Transactional
     public MenuGroupStockResponse updateStock(Long groupId, int newStock) {
+        getAuthorizedGroup(groupId);
+        MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        stock.updateStock(newStock);
+
+        log.info("[STOCK][UPDATE] groupId={}, newStock={}", groupId, newStock);
+
+        return new MenuGroupStockResponse(groupId, stock.getStock());
+    }
+
+    @Transactional
+    public MenuGroupStockResponse deductStockForStore(Long storeId, Long groupId, DeductionUnit unit) {
+        MenuGroup group = getAuthorizedGroupForStore(storeId, groupId);
+        int value = unit.getValue();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+
+        MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        int beforeStock = stock.getStock();
+        StockDeductResult result = stock.deduct(value, today);
+        int afterStock = stock.getStock();
+
+        log.info("[STOCK][DEDUCT] groupId={}, before={}, after={}, unit={}",
+                groupId, beforeStock, afterStock, unit.name());
+
+        if (result.shouldNotify()) {
+            Store store = group.getStore();
+
+            if (result.notifyLowStock30()) {
+                eventPublisher.publishEvent(new LowStock30Event(
+                        store.getId(),
+                        store.getName(),
+                        groupId,
+                        group.getName(),
+                        afterStock
+                ));
+            }
+
+            if (result.notifyLowStock10()) {
+                eventPublisher.publishEvent(new LowStockEvent(
+                        store.getId(),
+                        store.getName(),
+                        groupId,
+                        group.getName(),
+                        afterStock
+                ));
+            }
+        }
+
+        return new MenuGroupStockResponse(groupId, afterStock);
+    }
+
+    @Transactional
+    public MenuGroupStockResponse updateStockForStore(Long storeId, Long groupId, int newStock) {
+        getAuthorizedGroupForStore(storeId, groupId);
         MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
@@ -293,15 +439,7 @@ public class MenuGroupService {
      */
     @Transactional
     public GroupDailyMenuResponse updateMenusInGroup(Long groupId, LocalDate date, MenuUpdateRequest request) {
-        Long accountStoreId = currentAccountProvider.getCurrentStoreId();
-        MenuGroup menuGroup = menuGroupRepository.findById(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
-
-        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
-        if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
-            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
-        }
-
+        MenuGroup menuGroup = getAuthorizedGroup(groupId);
         return upsertGroupDailyMenu(menuGroup, date, request);
     }
 
@@ -312,9 +450,7 @@ public class MenuGroupService {
             LocalDate date,
             MenuUpdateRequest request
     ) {
-        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, storeId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
-
+        MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
         return upsertGroupDailyMenu(menuGroup, date, request);
     }
 
@@ -352,6 +488,31 @@ public class MenuGroupService {
         groupDailyMenuRepository.save(groupDailyMenu);
 
         return GroupDailyMenuResponse.from(groupDailyMenu);
+    }
+
+    private MenuGroup getAuthorizedGroup(Long groupId) {
+        Long accountStoreId = currentAccountProvider.getCurrentStoreId();
+        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
+        if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
+            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
+        }
+
+        return menuGroup;
+    }
+
+    private MenuGroup getAuthorizedGroupForStore(Long storeId, Long groupId) {
+        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
+        if (groupStoreId == null || !groupStoreId.equals(storeId)) {
+            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
+        }
+
+        return menuGroup;
     }
 
     /**

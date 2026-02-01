@@ -1,11 +1,8 @@
 package com._1000meal.store.service;
 
 import com._1000meal.global.error.code.StoreErrorCode;
-import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.dto.DailyMenuDto;
-import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.service.MenuGroupService;
@@ -13,6 +10,7 @@ import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
+import com._1000meal.store.dto.StoreTodayMenuDto;
 import com._1000meal.store.event.StoreOpenedEvent;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -54,7 +52,7 @@ public class StoreService {
         List<Long> storeIds = storeRepository.findAllStoreIds();
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
-        var todayMenus = menuGroupService.getDailyMenuDtosForStores(storeIds, today);
+        var todayMenus = menuGroupService.getTodayMenuForStores(storeIds, today);
         var storesById = storeRepository.findAllById(storeIds).stream()
                 .collect(Collectors.toMap(Store::getId, s -> s));
 
@@ -65,7 +63,7 @@ public class StoreService {
                         throw new CustomException(StoreErrorCode.STORE_NOT_FOUND);
                     }
 
-                    DailyMenuDto todayMenuDto = todayMenus.get(id);
+                    StoreTodayMenuDto todayMenuDto = todayMenus.get(id);
                     boolean isOpen = todayMenuDto != null ? todayMenuDto.isOpen() : store.isOpen();
                     boolean isHoliday = todayMenuDto != null && todayMenuDto.isHoliday();
 

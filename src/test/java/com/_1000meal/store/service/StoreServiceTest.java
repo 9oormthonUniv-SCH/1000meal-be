@@ -4,7 +4,6 @@ package com._1000meal.store.service;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.service.MenuGroupService;
@@ -12,6 +11,7 @@ import com._1000meal.menu.service.MenuService;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
+import com._1000meal.store.dto.StoreTodayMenuDto;
 import com._1000meal.store.repository.StoreRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -133,22 +133,20 @@ class StoreServiceTest {
         when(store1.getId()).thenReturn(1L);
         when(store2.getId()).thenReturn(2L);
 
-        DailyMenuDto dm1Dto = DailyMenuDto.builder()
+        StoreTodayMenuDto dm1Dto = StoreTodayMenuDto.builder()
                 .date(fixedToday)
                 .dayOfWeek(fixedToday.getDayOfWeek())
                 .isOpen(true)
                 .isHoliday(false)
-                .stock(10)
                 .build();
-        DailyMenuDto dm2Dto = DailyMenuDto.builder()
+        StoreTodayMenuDto dm2Dto = StoreTodayMenuDto.builder()
                 .date(fixedToday)
                 .dayOfWeek(fixedToday.getDayOfWeek())
                 .isOpen(true)
                 .isHoliday(false)
-                .stock(0)
                 .build();
 
-        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L, 2L), fixedToday))
+        when(menuGroupService.getTodayMenuForStores(List.of(1L, 2L), fixedToday))
                 .thenReturn(Map.of(1L, dm1Dto, 2L, dm2Dto));
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -165,7 +163,7 @@ class StoreServiceTest {
 
         verify(storeRepository).findAllStoreIds();
         verify(storeRepository).findAllById(List.of(1L, 2L));
-        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L, 2L), fixedToday);
+        verify(menuGroupService).getTodayMenuForStores(List.of(1L, 2L), fixedToday);
     }
 
     @Test

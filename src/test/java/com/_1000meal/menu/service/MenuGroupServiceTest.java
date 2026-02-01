@@ -9,6 +9,7 @@ import com._1000meal.menu.dto.GroupDailyMenuResponse;
 import com._1000meal.menu.dto.MenuGroupAdminResponse;
 import com._1000meal.menu.dto.MenuGroupStockResponse;
 import com._1000meal.menu.dto.MenuUpdateRequest;
+import com._1000meal.store.dto.StoreTodayMenuDto;
 import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
@@ -69,6 +70,7 @@ class MenuGroupServiceTest {
     @DisplayName("재고 차감 성공 - 알림 조건 미충족 (31 초과에서 31 초과)")
     void deductStock_noNotification() {
         // given
+        mockAuthorizedGroup(1L, 1L);
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(50);
         when(stock.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
@@ -87,19 +89,19 @@ class MenuGroupServiceTest {
     @DisplayName("재고 차감 성공 - 10 임계치 알림 조건 충족 (11 → 10 이하)")
     void deductStock_withNotification10() {
         // given
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(1L, 100L, group, store);
+
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, true));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        // Store 모의 설정
-        Store store = mock(Store.class);
         when(store.getId()).thenReturn(100L);
         when(store.getName()).thenReturn("향설 1관");
 
-        MenuGroup group = mock(MenuGroup.class);
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
-        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
         // 차감 후 재고값 설정
         when(stock.getStock()).thenReturn(8);
@@ -123,6 +125,7 @@ class MenuGroupServiceTest {
     @DisplayName("재고 부족 시 예외 발생")
     void deductStock_insufficient() {
         // given
+        mockAuthorizedGroup(1L, 1L);
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.deduct(eq(10), any(LocalDate.class))).thenThrow(new CustomException(MenuErrorCode.INSUFFICIENT_STOCK));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
@@ -138,6 +141,8 @@ class MenuGroupServiceTest {
     @DisplayName("존재하지 않는 그룹 차감 시 예외 발생")
     void deductStock_groupNotFound() {
         // given
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
+        when(menuGroupRepository.findByIdWithStore(999L)).thenReturn(Optional.empty());
         when(stockRepository.findByMenuGroupIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // when & then
@@ -151,6 +156,7 @@ class MenuGroupServiceTest {
     @DisplayName("중복 알림 방지 - 이미 알림 발송된 경우")
     void deductStock_duplicateNotificationPrevented() {
         // given: 이미 알림 발송된 상태에서 10 이하로 차감
+        mockAuthorizedGroup(1L, 1L);
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(5);
         when(stock.deduct(eq(1), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
@@ -167,6 +173,7 @@ class MenuGroupServiceTest {
     @DisplayName("재고 직접 수정 성공")
     void updateStock_success() {
         // given
+        mockAuthorizedGroup(1L, 1L);
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.getStock()).thenReturn(80);
         when(stockRepository.findByMenuGroupId(1L)).thenReturn(Optional.of(stock));
@@ -178,6 +185,44 @@ class MenuGroupServiceTest {
         verify(stock).updateStock(80);
         assertEquals(1L, response.getGroupId());
         assertEquals(80, response.getStock());
+    }
+
+    @Test
+    @DisplayName("재고 차감 실패 - 다른 매장 그룹 접근 시 STORE_ACCESS_DENIED")
+    void deductStock_forbiddenDifferentStore() {
+        // given
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(2L);
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.deductStock(1L, DeductionUnit.SINGLE));
+
+        assertEquals(StoreErrorCode.STORE_ACCESS_DENIED, ex.getErrorCodeIfs());
+        verifyNoInteractions(stockRepository);
+    }
+
+    @Test
+    @DisplayName("재고 수정 실패 - 다른 매장 그룹 접근 시 STORE_ACCESS_DENIED")
+    void updateStock_forbiddenDifferentStore() {
+        // given
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(2L);
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.updateStock(1L, 80));
+
+        assertEquals(StoreErrorCode.STORE_ACCESS_DENIED, ex.getErrorCodeIfs());
+        verifyNoInteractions(stockRepository);
     }
 
     @Test
@@ -317,9 +362,69 @@ class MenuGroupServiceTest {
     }
 
     @Test
+    @DisplayName("getTodayMenuForStores: 그룹별 stock/capacity/menus 매핑")
+    void getTodayMenuForStores_groupDetails() {
+        Long storeId = 1L;
+        LocalDate date = LocalDate.of(2026, 2, 1);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
+
+        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        when(weeklyMenu.getStore()).thenReturn(store);
+
+        DailyMenu dailyMenu = mock(DailyMenu.class);
+        when(dailyMenu.getId()).thenReturn(10L);
+        when(dailyMenu.getWeeklyMenu()).thenReturn(weeklyMenu);
+        when(dailyMenu.isOpen()).thenReturn(true);
+        when(dailyMenu.isHoliday()).thenReturn(false);
+
+        when(dailyMenuRepository.findByStoreIdInAndDate(List.of(storeId), date))
+                .thenReturn(List.of(dailyMenu));
+
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(40);
+        when(stock.getCapacity()).thenReturn(100);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getId()).thenReturn(1L);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getSortOrder()).thenReturn(0);
+        when(group.isDefault()).thenReturn(true);
+        when(group.getStock()).thenReturn(stock);
+        when(group.getDailyMenu()).thenReturn(dailyMenu);
+
+        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
+                .thenReturn(List.of(group));
+
+        GroupDailyMenu gdm = mock(GroupDailyMenu.class);
+        when(gdm.getMenuGroup()).thenReturn(group);
+        when(gdm.getMenuNames()).thenReturn(List.of("김밥"));
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date))
+                .thenReturn(List.of(gdm));
+
+        Map<Long, StoreTodayMenuDto> result = service.getTodayMenuForStores(List.of(storeId), date);
+
+        StoreTodayMenuDto dto = result.get(storeId);
+        assertNotNull(dto);
+        assertEquals(date, dto.getDate());
+        assertTrue(dto.isOpen());
+        assertFalse(dto.isHoliday());
+        assertEquals(1, dto.getMenuGroups().size());
+        var groupDto = dto.getMenuGroups().get(0);
+        assertEquals(1L, groupDto.getId());
+        assertEquals("기본 메뉴", groupDto.getName());
+        assertEquals(100, groupDto.getCapacity());
+        assertEquals(40, groupDto.getStock());
+        assertEquals(1, groupDto.getMenus().size());
+        assertEquals("김밥", groupDto.getMenus().get(0).getName());
+    }
+
+    @Test
     @DisplayName("그룹A 차감 시 그룹B stock은 변하지 않음")
     void deductStock_independentGroups() {
         // given: 그룹A 설정
+        mockAuthorizedGroup(1L, 1L);
         MenuGroupStock stockA = mock(MenuGroupStock.class);
         when(stockA.getStock()).thenReturn(85);
         when(stockA.deduct(eq(5), any(LocalDate.class))).thenReturn(new StockDeductResult(false, false));
@@ -339,17 +444,18 @@ class MenuGroupServiceTest {
     @DisplayName("30 임계치 하향 돌파 - LowStock30Event 1회 발행")
     void deductStock_lowStock30Notification() {
         // given: before=31, after=30 → 30 임계치 돌파
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(1L, 100L, group, store);
+
         MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 31);
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        Store store = mock(Store.class);
         when(store.getId()).thenReturn(100L);
         when(store.getName()).thenReturn("향설 1관");
 
-        MenuGroup group = mock(MenuGroup.class);
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
-        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
         // when
         LocalDate fixedToday = LocalDate.of(2026, 1, 23);
@@ -374,17 +480,18 @@ class MenuGroupServiceTest {
     @DisplayName("30 임계치 중복 방지 - 이미 30 알림 발송 후 추가 차감 시 이벤트 없음")
     void deductStock_lowStock30_noDuplicate() {
         // given: 같은 날 31→30 알림 발송 후 추가 차감
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(1L, 100L, group, store);
+
         MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 31);
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        Store store = mock(Store.class);
         when(store.getId()).thenReturn(100L);
         when(store.getName()).thenReturn("향설 1관");
 
-        MenuGroup group = mock(MenuGroup.class);
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
-        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
         LocalDate fixedToday = LocalDate.of(2026, 1, 23);
         try (MockedStatic<LocalDate> mocked = mockStatic(LocalDate.class)) {
@@ -401,17 +508,18 @@ class MenuGroupServiceTest {
     @Test
     @DisplayName("30 임계치 - 전날 알림이면 오늘 다시 발송")
     void deductStock_lowStock30_notifiedYesterday_triggersToday() throws Exception {
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(1L, 100L, group, store);
+
         MenuGroupStock stock = MenuGroupStock.of(mock(MenuGroup.class), 30);
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        Store store = mock(Store.class);
         when(store.getId()).thenReturn(100L);
         when(store.getName()).thenReturn("향설 1관");
 
-        MenuGroup group = mock(MenuGroup.class);
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
-        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
         LocalDate fixedToday = LocalDate.of(2026, 1, 23);
         setField(stock, "lastNotifiedDate", fixedToday.minusDays(1));
@@ -429,18 +537,19 @@ class MenuGroupServiceTest {
     @DisplayName("31 → 5 대량 차감 시 30 + 10 두 이벤트 모두 발행")
     void deductStock_bothThresholdsCrossed() {
         // given: 31에서 5로 대량 차감 → 30 및 10 동시 돌파
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(1L, 100L, group, store);
+
         MenuGroupStock stock = mock(MenuGroupStock.class);
         when(stock.deduct(eq(10), any(LocalDate.class))).thenReturn(new StockDeductResult(true, true));
         when(stockRepository.findByMenuGroupIdForUpdate(1L)).thenReturn(Optional.of(stock));
 
-        Store store = mock(Store.class);
         when(store.getId()).thenReturn(100L);
         when(store.getName()).thenReturn("향설 1관");
 
-        MenuGroup group = mock(MenuGroup.class);
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
-        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(group));
 
         when(stock.getStock()).thenReturn(5);
 
@@ -471,6 +580,20 @@ class MenuGroupServiceTest {
         field.set(target, value);
     }
 
+    private MenuGroup mockAuthorizedGroup(Long groupId, Long storeId) {
+        Store store = mock(Store.class);
+        MenuGroup group = mock(MenuGroup.class);
+        mockAuthorizedGroup(groupId, storeId, group, store);
+        return group;
+    }
+
+    private void mockAuthorizedGroup(Long groupId, Long storeId, MenuGroup group, Store store) {
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
+        when(store.getId()).thenReturn(storeId);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdWithStore(groupId)).thenReturn(Optional.of(group));
+    }
+
     // ========== 메뉴 등록/교체 테스트 (GroupDailyMenu 기반) ==========
 
     @Test
@@ -490,7 +613,7 @@ class MenuGroupServiceTest {
         when(menuGroup.getId()).thenReturn(groupId);
         when(menuGroup.getName()).thenReturn("향설 1관");
         when(menuGroup.getStore()).thenReturn(store);
-        when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
+        when(menuGroupRepository.findByIdWithStore(groupId)).thenReturn(Optional.of(menuGroup));
 
         // (groupId, date)에 대한 기존 데이터 없음
         when(groupDailyMenuRepository.findByMenuGroupIdAndDate(groupId, date))
@@ -530,7 +653,7 @@ class MenuGroupServiceTest {
         when(menuGroup.getId()).thenReturn(groupId);
         when(menuGroup.getName()).thenReturn("향설 1관");
         when(menuGroup.getStore()).thenReturn(store);
-        when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
+        when(menuGroupRepository.findByIdWithStore(groupId)).thenReturn(Optional.of(menuGroup));
 
         // 기존 GroupDailyMenu 존재
         GroupDailyMenu existing = mock(GroupDailyMenu.class);
@@ -560,7 +683,7 @@ class MenuGroupServiceTest {
         // given
         LocalDate date = LocalDate.of(2026, 1, 23);
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
-        when(menuGroupRepository.findById(999L)).thenReturn(Optional.empty());
+        when(menuGroupRepository.findByIdWithStore(999L)).thenReturn(Optional.empty());
 
         MenuUpdateRequest request = new MenuUpdateRequest(List.of("떡볶이"));
 
@@ -585,7 +708,7 @@ class MenuGroupServiceTest {
 
         MenuGroup menuGroup = mock(MenuGroup.class);
         when(menuGroup.getStore()).thenReturn(store);
-        when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
+        when(menuGroupRepository.findByIdWithStore(groupId)).thenReturn(Optional.of(menuGroup));
 
         MenuUpdateRequest request = new MenuUpdateRequest(List.of("떡볶이"));
 
@@ -610,7 +733,7 @@ class MenuGroupServiceTest {
 
         MenuGroup menuGroup = mock(MenuGroup.class);
         when(menuGroup.getStore()).thenReturn(store);
-        when(menuGroupRepository.findById(1L)).thenReturn(Optional.of(menuGroup));
+        when(menuGroupRepository.findByIdWithStore(1L)).thenReturn(Optional.of(menuGroup));
 
         // 빈 문자열과 공백만 있는 리스트
         MenuUpdateRequest request = new MenuUpdateRequest(List.of("  ", ""));

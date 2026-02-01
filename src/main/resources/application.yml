@@ -12,9 +12,9 @@ spring:
 
   sql:
     init:
-      mode: never
       data-locations: classpath:data.sql
 
+      mode: never
   jpa:
     hibernate:
       ddl-auto: validate
