@@ -59,4 +59,8 @@ public interface MenuGroupRepository extends JpaRepository<MenuGroup, Long> {
             "WHERE mg.dailyMenu.id IN :dailyMenuIds " +
             "ORDER BY mg.dailyMenu.id ASC, mg.sortOrder ASC, mg.id ASC")
     List<MenuGroup> findByDailyMenuIdsOrderBySortAndId(@Param("dailyMenuIds") List<Long> dailyMenuIds);
+
+    Optional<MenuGroup> findByIdAndStoreId(Long groupId, Long storeId);
+
+    List<MenuGroup> findByStoreIdOrderBySortOrderAscIdAsc(Long storeId);
 }

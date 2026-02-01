@@ -115,8 +115,10 @@ public class MenuGroupController {
                     - (groupId, date) 조합으로 upsert 동작합니다.
                     - 해당 조합이 없으면 새로 생성, 있으면 메뉴를 교체합니다.
                     - 메뉴명은 trim 처리되며, 빈 값/중복 값은 제거됩니다.
-                    """
+                    """,
+            deprecated = true
     )
+    @Deprecated
     @PostMapping("/groups/{groupId}/menus")
     public ApiResponse<GroupDailyMenuResponse> updateMenusInGroup(
             @Parameter(description = "그룹 ID", example = "1")

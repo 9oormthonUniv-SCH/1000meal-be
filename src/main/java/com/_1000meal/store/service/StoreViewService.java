@@ -2,6 +2,7 @@ package com._1000meal.store.service;
 
 import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.store.dto.StoreResponse;
+import com._1000meal.store.dto.StoreTodayMenuDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -30,17 +31,18 @@ public class StoreViewService {
         var base = getAllStoresCached();
         var today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         var storeIds = base.stream().map(StoreResponse::getId).toList();
-        var todayMenus = menuGroupService.getDailyMenuDtosForStores(storeIds, today);
+        var todayMenus = menuGroupService.getTodayMenuForStores(storeIds, today);
 
         return base.stream().map(sr -> {
-            var todayMenu = todayMenus.get(sr.getId());
+            StoreTodayMenuDto todayMenu = todayMenus.get(sr.getId());
+            StoreTodayMenuDto mergedTodayMenu = todayMenu != null ? todayMenu : sr.getTodayMenu();
             boolean isOpen = todayMenu != null ? todayMenu.isOpen() : sr.isOpen();
             boolean isHoliday = todayMenu != null && todayMenu.isHoliday();
 
             return sr.toBuilder()
                     .isOpen(isOpen)
                     .isHoliday(isHoliday)
-                    .todayMenu(todayMenu)
+                    .todayMenu(mergedTodayMenu)
                     .build();
         }).toList();
     }

@@ -1,8 +1,8 @@
 package com._1000meal.store.service;
 
-import com._1000meal.menu.dto.DailyMenuDto;
 import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.store.dto.StoreResponse;
+import com._1000meal.store.dto.StoreTodayMenuDto;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,16 +32,15 @@ class StoreViewServiceTest {
     void getAllStoresView_replacesTodayMenuFromService() {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
-        DailyMenuDto baseMenu = DailyMenuDto.builder().stock(5).build();
+        StoreTodayMenuDto baseMenu = StoreTodayMenuDto.builder().build();
         StoreResponse sr1 = StoreResponse.builder().id(1L).todayMenu(baseMenu).build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        DailyMenuDto todayMenu = DailyMenuDto.builder()
-                .stock(12)
+        StoreTodayMenuDto todayMenu = StoreTodayMenuDto.builder()
                 .isOpen(true)
                 .isHoliday(false)
                 .build();
-        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+        when(menuGroupService.getTodayMenuForStores(List.of(1L), fixedToday))
                 .thenReturn(Map.of(1L, todayMenu));
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -56,7 +55,7 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
+        verify(menuGroupService).getTodayMenuForStores(List.of(1L), fixedToday);
     }
 
     @Test
@@ -64,9 +63,7 @@ class StoreViewServiceTest {
     void getAllStoresView_keepBase_whenNoTodayMenu() {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
-        DailyMenuDto baseMenu = DailyMenuDto.builder()
-                .stock(7)
-                .build();
+        StoreTodayMenuDto baseMenu = StoreTodayMenuDto.builder().build();
 
         StoreResponse sr1 = StoreResponse.builder()
                 .id(1L)
@@ -74,7 +71,7 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+        when(menuGroupService.getTodayMenuForStores(List.of(1L), fixedToday))
                 .thenReturn(Map.of());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -83,12 +80,11 @@ class StoreViewServiceTest {
             List<StoreResponse> result = storeViewService.getAllStoresView();
 
             assertEquals(1, result.size());
-            assertNotNull(result.get(0).getTodayMenu());
-            assertEquals(7, result.get(0).getTodayMenu().getStock());
+            assertSame(baseMenu, result.get(0).getTodayMenu());
         }
 
         verify(storeService).getAllStores();
-        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
+        verify(menuGroupService).getTodayMenuForStores(List.of(1L), fixedToday);
     }
 
     @Test
@@ -102,7 +98,7 @@ class StoreViewServiceTest {
                 .build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
-        when(menuGroupService.getDailyMenuDtosForStores(List.of(1L), fixedToday))
+        when(menuGroupService.getTodayMenuForStores(List.of(1L), fixedToday))
                 .thenReturn(Map.of());
 
         try (MockedStatic<LocalDate> mocked = Mockito.mockStatic(LocalDate.class)) {
@@ -115,6 +111,6 @@ class StoreViewServiceTest {
         }
 
         verify(storeService).getAllStores();
-        verify(menuGroupService).getDailyMenuDtosForStores(List.of(1L), fixedToday);
+        verify(menuGroupService).getTodayMenuForStores(List.of(1L), fixedToday);
     }
 }
