@@ -1,5 +1,6 @@
 package com._1000meal.menu.service;
 
+import com._1000meal.auth.service.CurrentAccountProvider;
 import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
@@ -45,6 +46,7 @@ public class MenuGroupService {
     private final GroupDailyMenuRepository groupDailyMenuRepository;
     private final StoreRepository storeRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final CurrentAccountProvider currentAccountProvider;
 
     /**
      * 특정 매장/날짜의 메뉴 그룹 목록 조회
@@ -291,9 +293,43 @@ public class MenuGroupService {
      */
     @Transactional
     public GroupDailyMenuResponse updateMenusInGroup(Long groupId, LocalDate date, MenuUpdateRequest request) {
+        Long accountStoreId = currentAccountProvider.getCurrentStoreId();
         MenuGroup menuGroup = menuGroupRepository.findById(groupId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
+        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
+        if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
+            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
+        }
+
+        return upsertGroupDailyMenu(menuGroup, date, request);
+    }
+
+    @Transactional
+    public GroupDailyMenuResponse updateMenusInGroupForStore(
+            Long storeId,
+            Long groupId,
+            LocalDate date,
+            MenuUpdateRequest request
+    ) {
+        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, storeId)
+                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+
+        return upsertGroupDailyMenu(menuGroup, date, request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MenuGroupAdminResponse> getMenuGroupsForAdmin(Long storeId) {
+        return menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId).stream()
+                .map(MenuGroupAdminResponse::from)
+                .toList();
+    }
+
+    private GroupDailyMenuResponse upsertGroupDailyMenu(
+            MenuGroup menuGroup,
+            LocalDate date,
+            MenuUpdateRequest request
+    ) {
         List<String> cleaned = request.getMenus().stream()
                 .map(s -> s == null ? "" : s.trim())
                 .filter(s -> !s.isEmpty())
@@ -304,6 +340,7 @@ public class MenuGroupService {
             throw new CustomException(MenuErrorCode.MENU_EMPTY);
         }
 
+        Long groupId = menuGroup.getId();
         GroupDailyMenu groupDailyMenu = groupDailyMenuRepository
                 .findByMenuGroupIdAndDate(groupId, date)
                 .orElseGet(() -> GroupDailyMenu.builder()

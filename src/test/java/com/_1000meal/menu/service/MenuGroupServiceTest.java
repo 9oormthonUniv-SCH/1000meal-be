@@ -1,10 +1,12 @@
 package com._1000meal.menu.service;
 
 import com._1000meal.global.error.code.MenuErrorCode;
+import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.*;
 import com._1000meal.menu.dto.DailyMenuWithGroupsDto;
 import com._1000meal.menu.dto.GroupDailyMenuResponse;
+import com._1000meal.menu.dto.MenuGroupAdminResponse;
 import com._1000meal.menu.dto.MenuGroupStockResponse;
 import com._1000meal.menu.dto.MenuUpdateRequest;
 import com._1000meal.menu.enums.DeductionUnit;
@@ -16,6 +18,7 @@ import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
+import com._1000meal.auth.service.CurrentAccountProvider;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +58,9 @@ class MenuGroupServiceTest {
 
     @Mock
     ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    CurrentAccountProvider currentAccountProvider;
 
     @InjectMocks
     MenuGroupService service;
@@ -472,11 +478,18 @@ class MenuGroupServiceTest {
     void updateMenusInGroup_success_creates() {
         // given
         Long groupId = 1L;
+        Long storeId = 1L;
         LocalDate date = LocalDate.of(2026, 1, 23);
+
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
 
         MenuGroup menuGroup = mock(MenuGroup.class);
         when(menuGroup.getId()).thenReturn(groupId);
         when(menuGroup.getName()).thenReturn("향설 1관");
+        when(menuGroup.getStore()).thenReturn(store);
         when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
 
         // (groupId, date)에 대한 기존 데이터 없음
@@ -505,11 +518,18 @@ class MenuGroupServiceTest {
     void updateMenusInGroup_success_replaces() {
         // given
         Long groupId = 1L;
+        Long storeId = 1L;
         LocalDate date = LocalDate.of(2026, 1, 23);
+
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
 
         MenuGroup menuGroup = mock(MenuGroup.class);
         when(menuGroup.getId()).thenReturn(groupId);
         when(menuGroup.getName()).thenReturn("향설 1관");
+        when(menuGroup.getStore()).thenReturn(store);
         when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
 
         // 기존 GroupDailyMenu 존재
@@ -539,6 +559,7 @@ class MenuGroupServiceTest {
     void updateMenusInGroup_groupNotFound() {
         // given
         LocalDate date = LocalDate.of(2026, 1, 23);
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
         when(menuGroupRepository.findById(999L)).thenReturn(Optional.empty());
 
         MenuUpdateRequest request = new MenuUpdateRequest(List.of("떡볶이"));
@@ -551,12 +572,44 @@ class MenuGroupServiceTest {
     }
 
     @Test
+    @DisplayName("updateMenusInGroup: 다른 매장 그룹이면 STORE_ACCESS_DENIED")
+    void updateMenusInGroup_storeMismatchForbidden() {
+        // given
+        Long groupId = 1L;
+        LocalDate date = LocalDate.of(2026, 1, 23);
+
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(1L);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(4L);
+
+        MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.getStore()).thenReturn(store);
+        when(menuGroupRepository.findById(groupId)).thenReturn(Optional.of(menuGroup));
+
+        MenuUpdateRequest request = new MenuUpdateRequest(List.of("떡볶이"));
+
+        // when & then
+        CustomException ex = assertThrows(CustomException.class,
+                () -> service.updateMenusInGroup(groupId, date, request));
+
+        assertEquals(StoreErrorCode.STORE_ACCESS_DENIED, ex.getErrorCodeIfs());
+    }
+
+    @Test
     @DisplayName("updateMenusInGroup: 정제 후 빈 메뉴 시 MENU_EMPTY")
     void updateMenusInGroup_emptyAfterCleaning() {
         // given
         LocalDate date = LocalDate.of(2026, 1, 23);
+        Long storeId = 1L;
+
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
 
         MenuGroup menuGroup = mock(MenuGroup.class);
+        when(menuGroup.getStore()).thenReturn(store);
         when(menuGroupRepository.findById(1L)).thenReturn(Optional.of(menuGroup));
 
         // 빈 문자열과 공백만 있는 리스트
@@ -567,6 +620,46 @@ class MenuGroupServiceTest {
                 () -> service.updateMenusInGroup(1L, date, request));
 
         assertEquals(MenuErrorCode.MENU_EMPTY, ex.getErrorCodeIfs());
+    }
+
+    @Test
+    @DisplayName("getMenuGroupsForAdmin: 매장 기준 그룹 목록 응답")
+    void getMenuGroupsForAdmin_returns() {
+        // given
+        Long storeId = 1L;
+
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
+
+        MenuGroup group1 = mock(MenuGroup.class);
+        when(group1.getId()).thenReturn(10L);
+        when(group1.getStore()).thenReturn(store);
+        when(group1.getName()).thenReturn("기본 메뉴");
+        when(group1.getSortOrder()).thenReturn(0);
+        when(group1.isDefault()).thenReturn(true);
+
+        MenuGroup group2 = mock(MenuGroup.class);
+        when(group2.getId()).thenReturn(11L);
+        when(group2.getStore()).thenReturn(store);
+        when(group2.getName()).thenReturn("사이드");
+        when(group2.getSortOrder()).thenReturn(1);
+        when(group2.isDefault()).thenReturn(false);
+
+        when(menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId))
+                .thenReturn(List.of(group1, group2));
+
+        // when
+        List<MenuGroupAdminResponse> result = service.getMenuGroupsForAdmin(storeId);
+
+        // then
+        assertEquals(2, result.size());
+        assertEquals(10L, result.get(0).getGroupId());
+        assertEquals(storeId, result.get(0).getStoreId());
+        assertEquals("기본 메뉴", result.get(0).getName());
+        assertTrue(result.get(0).isDefault());
+        assertEquals(11L, result.get(1).getGroupId());
+        assertEquals("사이드", result.get(1).getName());
+        assertFalse(result.get(1).isDefault());
     }
 
     // ========== 기본 그룹 삭제 방어 테스트 ==========
