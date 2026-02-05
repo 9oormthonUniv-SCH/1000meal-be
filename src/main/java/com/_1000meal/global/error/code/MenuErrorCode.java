@@ -17,6 +17,7 @@ public enum MenuErrorCode implements ErrorCodeIfs {
     MENU_GROUP_NOT_FOUND("MENU_GROUP_404", 404, "해당 메뉴 그룹을 찾을 수 없습니다."),
     CANNOT_DELETE_DEFAULT_GROUP("MENU_GROUP_400", 400, "기본 메뉴 그룹은 삭제할 수 없습니다."),
     DEFAULT_MENU_NOT_FOUND("DEFAULT_MENU_404", 404, "기본 메뉴 규칙을 찾을 수 없습니다."),
+    DEFAULT_MENU_INVALID_MENU("DEFAULT_MENU_INVALID_MENU_400", 400, "그룹에 등록되지 않은 메뉴는 고정메뉴로 설정할 수 없습니다."),
     ;
 
     private final String code;

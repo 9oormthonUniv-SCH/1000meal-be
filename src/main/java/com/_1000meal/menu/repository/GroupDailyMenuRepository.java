@@ -29,4 +29,8 @@ public interface GroupDailyMenuRepository extends JpaRepository<GroupDailyMenu, 
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate
     );
+
+    @Query("SELECT DISTINCT name FROM GroupDailyMenu gdm JOIN gdm.menuNames name " +
+            "WHERE gdm.menuGroup.id = :groupId")
+    List<String> findDistinctMenuNamesByGroupId(@Param("groupId") Long groupId);
 }

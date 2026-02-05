@@ -93,6 +93,11 @@ public class DefaultGroupMenu {
         this.endDate = endDate;
     }
 
+    public void deactivate(LocalDate endDate) {
+        this.endDate = endDate;
+        this.active = false;
+    }
+
     public boolean isPinnedOn(LocalDate date) {
         if (date == null) {
             return false;

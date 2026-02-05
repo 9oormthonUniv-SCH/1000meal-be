@@ -43,6 +43,7 @@ public class DefaultGroupMenuService {
         }
 
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
+        validateMenuNameInGroup(groupId, trimmed);
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
         LocalDate effectiveStart = startDate != null ? startDate : today;
@@ -86,13 +87,15 @@ public class DefaultGroupMenuService {
             throw new CustomException(MenuErrorCode.INVALID_MENU_NAME);
         }
 
-        getAuthorizedGroupForStore(storeId, groupId);
+        MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
 
         DefaultGroupMenu rule = defaultGroupMenuRepository.findOpenRule(groupId, trimmed)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.DEFAULT_MENU_NOT_FOUND));
 
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
-        rule.close(today);
+        rule.deactivate(today);
+
+        materializeForDateReplace(menuGroup, today);
 
         return DefaultMenuResponse.from(rule, today);
     }
@@ -190,6 +193,50 @@ public class DefaultGroupMenuService {
                 .itemCount(menus.size())
                 .menus(menus)
                 .build();
+    }
+
+    private DefaultMenuMaterializeResult materializeForDateReplace(MenuGroup group, LocalDate date) {
+        List<DefaultGroupMenu> activeDefaults = defaultGroupMenuRepository
+                .findActiveByMenuGroupIdAndDate(group.getId(), date);
+
+        Map<String, Boolean> merged = new LinkedHashMap<>();
+        for (DefaultGroupMenu dgm : activeDefaults) {
+            merged.putIfAbsent(dgm.getMenuName(), Boolean.TRUE);
+        }
+
+        List<String> menus = merged.keySet().stream().toList();
+
+        GroupDailyMenu daily = groupDailyMenuRepository.findByMenuGroupIdAndDate(group.getId(), date)
+                .orElseGet(() -> GroupDailyMenu.builder()
+                        .menuGroup(group)
+                        .date(date)
+                        .build());
+
+        boolean replaced = daily.getId() != null;
+        daily.replaceMenus(menus);
+        groupDailyMenuRepository.save(daily);
+
+        log.debug("[DEFAULT_MENU][MATERIALIZE] accountId={}, storeId={}, groupId={}, date={}, replaced={}, itemCount={}",
+                currentAccountProvider.getCurrentAccountId(),
+                group.getStore().getId(),
+                group.getId(),
+                date,
+                replaced,
+                menus.size());
+
+        return DefaultMenuMaterializeResult.builder()
+                .date(date)
+                .replaced(replaced)
+                .itemCount(menus.size())
+                .menus(menus)
+                .build();
+    }
+
+    private void validateMenuNameInGroup(Long groupId, String menuName) {
+        List<String> names = groupDailyMenuRepository.findDistinctMenuNamesByGroupId(groupId);
+        if (names == null || names.isEmpty() || !names.contains(menuName)) {
+            throw new CustomException(MenuErrorCode.DEFAULT_MENU_INVALID_MENU);
+        }
     }
 
     private MenuGroup getAuthorizedGroupForStore(Long storeId, Long groupId) {
