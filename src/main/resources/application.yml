@@ -29,7 +29,7 @@ spring:
     enabled: true
     baseline-on-migrate: false
     baseline-version: 3
-    schemas: 1000meal_test_local
+    #schemas: 1000meal_test_local
     baseline-description: "baseline from test db snapshot"
 
   jackson:
