@@ -3,11 +3,12 @@ package com._1000meal.menu.service;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.domain.GroupDailyMenu;
 import com._1000meal.menu.domain.MenuGroup;
-import com._1000meal.menu.domain.MenuGroupStock;
 import com._1000meal.menu.domain.WeeklyMenu;
 import com._1000meal.menu.dto.DailyMenuGroupResponse;
+import com._1000meal.menu.dto.DailyMenuWithGroupsDto;
+import com._1000meal.menu.dto.MenuGroupDto;
+import com._1000meal.menu.dto.MenuItemDto;
 import com._1000meal.menu.dto.WeeklyMenuResponse;
 import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.repository.DailyMenuRepository;
@@ -42,6 +43,7 @@ class MenuServiceTest {
     @Mock GroupDailyMenuRepository groupDailyMenuRepository;
     @Mock MenuGroupRepository menuGroupRepository;
     @Mock MenuRepository menuRepository;
+    @Mock MenuGroupService menuGroupService;
 
     @InjectMocks MenuService service;
 
@@ -120,21 +122,19 @@ class MenuServiceTest {
         when(store.getId()).thenReturn(storeId);
 
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
-        when(weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, wed)).thenReturn(Optional.empty());
-
-        MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.getStock()).thenReturn(80);
-        when(stock.getCapacity()).thenReturn(100);
-
-        MenuGroup group = mock(MenuGroup.class);
-        when(group.getId()).thenReturn(1L);
-        when(group.getName()).thenReturn("기본 메뉴");
-        when(group.getStock()).thenReturn(stock);
-
-        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
-                .thenReturn(List.of(group));
-        when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L), weekStart, weekEnd))
-                .thenReturn(List.of());
+        when(menuGroupService.getMenuGroups(eq(storeId), any(LocalDate.class)))
+                .thenAnswer(inv -> {
+                    LocalDate d = inv.getArgument(1);
+                    return DailyMenuWithGroupsDto.builder()
+                            .id(null)
+                            .date(d)
+                            .dayOfWeek(d.getDayOfWeek())
+                            .isOpen(true)
+                            .isHoliday(false)
+                            .totalStock(0)
+                            .groups(List.of())
+                            .build();
+                });
 
         WeeklyMenuWithGroupsResponse res = service.getWeeklyMenuWithGroups(storeId, wed);
 
@@ -150,8 +150,7 @@ class MenuServiceTest {
         assertEquals(DayOfWeek.MONDAY, firstDay.getDayOfWeek());
         assertTrue(firstDay.isOpen());
         assertFalse(firstDay.isHoliday());
-        assertEquals(1, firstDay.getGroups().size());
-        assertEquals(80, firstDay.getTotalStock());
+        assertEquals(0, firstDay.getGroups().size());
     }
 
     @Test
@@ -162,41 +161,29 @@ class MenuServiceTest {
         when(store.getId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
 
-        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        MenuGroupDto groupDto = MenuGroupDto.builder()
+                .id(1L)
+                .name("향설 1관")
+                .sortOrder(0)
+                .stock(90)
+                .capacity(100)
+                .menus(List.of("떡볶이"))
+                .menuItems(List.of(new MenuItemDto("떡볶이", true)))
+                .build();
 
-        DailyMenu dm = mock(DailyMenu.class);
-        when(dm.getId()).thenReturn(10L);
-        when(dm.getDate()).thenReturn(wed);
-        when(dm.isOpen()).thenReturn(true);
-        when(dm.isHoliday()).thenReturn(false);
-
-        Set<DailyMenu> dailyMenus = new LinkedHashSet<>();
-        dailyMenus.add(dm);
-        when(weeklyMenu.getDailyMenus()).thenReturn(dailyMenus);
-
-        when(weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, wed))
-                .thenReturn(Optional.of(weeklyMenu));
-
-        MenuGroupStock stock = mock(MenuGroupStock.class);
-        when(stock.getStock()).thenReturn(90);
-        when(stock.getCapacity()).thenReturn(100);
-
-        MenuGroup group = mock(MenuGroup.class);
-        when(group.getId()).thenReturn(1L);
-        when(group.getName()).thenReturn("향설 1관");
-        when(group.getStock()).thenReturn(stock);
-        when(group.getSortOrder()).thenReturn(0);
-
-        when(menuGroupRepository.findByStoreIdWithStock(storeId))
-                .thenReturn(List.of(group));
-
-        GroupDailyMenu groupDailyMenu = mock(GroupDailyMenu.class);
-        when(groupDailyMenu.getDate()).thenReturn(wed);
-        when(groupDailyMenu.getMenuGroup()).thenReturn(group);
-        when(groupDailyMenu.getMenuNames()).thenReturn(List.of("떡볶이"));
-
-        when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L), weekStart, weekEnd))
-                .thenReturn(List.of(groupDailyMenu));
+        when(menuGroupService.getMenuGroups(eq(storeId), any(LocalDate.class)))
+                .thenAnswer(inv -> {
+                    LocalDate d = inv.getArgument(1);
+                    return DailyMenuWithGroupsDto.builder()
+                            .id(null)
+                            .date(d)
+                            .dayOfWeek(d.getDayOfWeek())
+                            .isOpen(true)
+                            .isHoliday(false)
+                            .totalStock(90)
+                            .groups(List.of(groupDto))
+                            .build();
+                });
 
         WeeklyMenuWithGroupsResponse res = service.getWeeklyMenuWithGroups(storeId, wed);
 
@@ -214,140 +201,82 @@ class MenuServiceTest {
         assertEquals(90, wedResponse.getGroups().get(0).getStock());
         assertEquals(100, wedResponse.getGroups().get(0).getCapacity());
         assertEquals(List.of("떡볶이"), wedResponse.getGroups().get(0).getMenus());
+        assertTrue(wedResponse.getGroups().get(0).getMenuItems().get(0).isPinned());
     }
 
     @Test
-    @DisplayName("getWeeklyMenuWithGroups: 그룹 2개 이상인 경우 모두 반환")
-    void getWeeklyMenuWithGroups_multipleGroups() {
+    @DisplayName("getWeeklyMenuWithGroups: 주간은 일간 조회 로직을 재사용")
+    void getWeeklyMenuWithGroups_reusesDailyLogic() {
         Long storeId = 1L;
         Store store = mock(Store.class);
-        when(store.getId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
 
-        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
-
-        DailyMenu dm = mock(DailyMenu.class);
-        when(dm.getId()).thenReturn(10L);
-        when(dm.getDate()).thenReturn(wed);
-        when(dm.isOpen()).thenReturn(true);
-        when(dm.isHoliday()).thenReturn(false);
-
-        Set<DailyMenu> dailyMenus = new LinkedHashSet<>();
-        dailyMenus.add(dm);
-        when(weeklyMenu.getDailyMenus()).thenReturn(dailyMenus);
-
-        when(weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, wed))
-                .thenReturn(Optional.of(weeklyMenu));
-
-        MenuGroupStock stock1 = mock(MenuGroupStock.class);
-        when(stock1.getStock()).thenReturn(90);
-        when(stock1.getCapacity()).thenReturn(100);
-
-        MenuGroup group1 = mock(MenuGroup.class);
-        when(group1.getId()).thenReturn(1L);
-        when(group1.getName()).thenReturn("향설 1관");
-        when(group1.getStock()).thenReturn(stock1);
-        when(group1.getSortOrder()).thenReturn(0);
-
-        MenuGroupStock stock2 = mock(MenuGroupStock.class);
-        when(stock2.getStock()).thenReturn(50);
-        when(stock2.getCapacity()).thenReturn(50);
-
-        MenuGroup group2 = mock(MenuGroup.class);
-        when(group2.getId()).thenReturn(2L);
-        when(group2.getName()).thenReturn("국밥 세트");
-        when(group2.getStock()).thenReturn(stock2);
-        when(group2.getSortOrder()).thenReturn(1);
-
-        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
-                .thenReturn(List.of(group1, group2));
-
-        when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L, 2L), weekStart, weekEnd))
-                .thenReturn(List.of());
+        when(menuGroupService.getMenuGroups(eq(storeId), any(LocalDate.class)))
+                .thenAnswer(inv -> {
+                    LocalDate d = inv.getArgument(1);
+                    return DailyMenuWithGroupsDto.builder()
+                            .id(null)
+                            .date(d)
+                            .dayOfWeek(d.getDayOfWeek())
+                            .isOpen(true)
+                            .isHoliday(false)
+                            .totalStock(0)
+                            .groups(List.of())
+                            .build();
+                });
 
         WeeklyMenuWithGroupsResponse res = service.getWeeklyMenuWithGroups(storeId, wed);
-
-        DailyMenuGroupResponse wedResponse = res.getDailyMenus().stream()
-                .filter(d -> d.getDate().equals(wed))
-                .findFirst()
-                .orElseThrow();
-
-        assertEquals(2, wedResponse.getGroups().size());
-        assertEquals("향설 1관", wedResponse.getGroups().get(0).getName());
-        assertEquals("국밥 세트", wedResponse.getGroups().get(1).getName());
-        assertEquals(140, wedResponse.getTotalStock());
+        verify(menuGroupService, times(5)).getMenuGroups(eq(storeId), any(LocalDate.class));
+        assertEquals(5, res.getDailyMenus().size());
     }
 
     @Test
-    @DisplayName("getWeeklyMenuWithGroups: GroupDailyMenu 기반으로 주간 메뉴가 채워짐")
-    void getWeeklyMenuWithGroups_groupDailyMenusApplied() {
+    @DisplayName("getWeeklyMenuWithGroups: 요청 date 기준 pinned 반영")
+    void getWeeklyMenuWithGroups_pinnedByRequestDate() {
         Long storeId = 1L;
         Store store = mock(Store.class);
-        when(store.getId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
 
-        WeeklyMenu weeklyMenu = mock(WeeklyMenu.class);
+        LocalDate today = wed;
+        LocalDate tomorrow = wed.plusDays(1);
 
-        DailyMenu dm = mock(DailyMenu.class);
-        when(dm.getId()).thenReturn(10L);
-        when(dm.getDate()).thenReturn(wed);
-        when(dm.isOpen()).thenReturn(true);
-        when(dm.isHoliday()).thenReturn(false);
+        when(menuGroupService.getMenuGroups(eq(storeId), any(LocalDate.class)))
+                .thenAnswer(inv -> {
+                    LocalDate d = inv.getArgument(1);
+                    boolean pinned = d.equals(tomorrow);
+                    MenuGroupDto groupDto = MenuGroupDto.builder()
+                            .id(1L)
+                            .name("기본 메뉴")
+                            .sortOrder(0)
+                            .stock(10)
+                            .capacity(10)
+                            .menus(List.of("소보로빵"))
+                            .menuItems(List.of(new MenuItemDto("소보로빵", pinned)))
+                            .build();
+                    return DailyMenuWithGroupsDto.builder()
+                            .id(null)
+                            .date(d)
+                            .dayOfWeek(d.getDayOfWeek())
+                            .isOpen(true)
+                            .isHoliday(false)
+                            .totalStock(10)
+                            .groups(List.of(groupDto))
+                            .build();
+                });
 
-        Set<DailyMenu> dailyMenus = new LinkedHashSet<>();
-        dailyMenus.add(dm);
-        when(weeklyMenu.getDailyMenus()).thenReturn(dailyMenus);
+        WeeklyMenuWithGroupsResponse res = service.getWeeklyMenuWithGroups(storeId, today);
 
-        when(weeklyMenuRepository.findByStoreIdAndRangeWithDailyMenus(storeId, wed))
-                .thenReturn(Optional.of(weeklyMenu));
-
-        MenuGroupStock stock1 = mock(MenuGroupStock.class);
-        when(stock1.getStock()).thenReturn(30);
-        when(stock1.getCapacity()).thenReturn(50);
-
-        MenuGroup group1 = mock(MenuGroup.class);
-        when(group1.getId()).thenReturn(1L);
-        when(group1.getName()).thenReturn("그룹1");
-        when(group1.getStock()).thenReturn(stock1);
-        when(group1.getSortOrder()).thenReturn(0);
-
-        MenuGroupStock stock2 = mock(MenuGroupStock.class);
-        when(stock2.getStock()).thenReturn(20);
-        when(stock2.getCapacity()).thenReturn(20);
-
-        MenuGroup group2 = mock(MenuGroup.class);
-        when(group2.getId()).thenReturn(2L);
-        when(group2.getName()).thenReturn("그룹2");
-        when(group2.getStock()).thenReturn(stock2);
-        when(group2.getSortOrder()).thenReturn(1);
-
-        when(menuGroupRepository.findByDailyMenuIdsWithStockAndMenus(List.of(10L)))
-                .thenReturn(List.of(group1, group2));
-
-        GroupDailyMenu gdm1 = mock(GroupDailyMenu.class);
-        when(gdm1.getDate()).thenReturn(wed);
-        when(gdm1.getMenuGroup()).thenReturn(group1);
-        when(gdm1.getMenuNames()).thenReturn(List.of("떡볶이", "순대"));
-
-        GroupDailyMenu gdm2 = mock(GroupDailyMenu.class);
-        when(gdm2.getDate()).thenReturn(wed);
-        when(gdm2.getMenuGroup()).thenReturn(group2);
-        when(gdm2.getMenuNames()).thenReturn(List.of("김밥"));
-
-        when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(List.of(1L, 2L), weekStart, weekEnd))
-                .thenReturn(List.of(gdm1, gdm2));
-
-        WeeklyMenuWithGroupsResponse res = service.getWeeklyMenuWithGroups(storeId, wed);
-
-        DailyMenuGroupResponse wedResponse = res.getDailyMenus().stream()
-                .filter(d -> d.getDate().equals(wed))
+        DailyMenuGroupResponse todayRes = res.getDailyMenus().stream()
+                .filter(d -> d.getDate().equals(today))
+                .findFirst()
+                .orElseThrow();
+        DailyMenuGroupResponse tomorrowRes = res.getDailyMenus().stream()
+                .filter(d -> d.getDate().equals(tomorrow))
                 .findFirst()
                 .orElseThrow();
 
-        assertEquals(2, wedResponse.getGroups().size());
-        assertEquals(List.of("떡볶이", "순대"), wedResponse.getGroups().get(0).getMenus());
-        assertEquals(List.of("김밥"), wedResponse.getGroups().get(1).getMenus());
-        assertEquals(50, wedResponse.getTotalStock());
+        assertFalse(todayRes.getGroups().get(0).getMenuItems().get(0).isPinned());
+        assertTrue(tomorrowRes.getGroups().get(0).getMenuItems().get(0).isPinned());
     }
 
     @Test
