@@ -90,7 +90,6 @@ public class MenuGroupService {
         List<MenuGroupDto> groupDtos = groups.stream()
                 .map(group -> {
                     GroupDailyMenu gdm = dailyMenusByGroupId.get(group.getId());
-                    boolean createdFromDefault = false;
 
                     if (gdm == null && isOpen && !isHoliday) {
                         List<DefaultGroupMenu> defaults = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
@@ -106,7 +105,6 @@ public class MenuGroupService {
                             gdm.replaceMenus(names);
                             groupDailyMenuRepository.save(gdm);
                             dailyMenusByGroupId.put(group.getId(), gdm);
-                            createdFromDefault = true;
                             log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, created=true, itemCount={}",
                                     group.getId(), date, names.size());
                         } else {
@@ -127,17 +125,18 @@ public class MenuGroupService {
                     }
 
                     List<String> menus = gdm.getMenuNames();
-                    if (createdFromDefault) {
-                        List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
-                        List<MenuItemDto> mergedItems = mergeMenusWithPinned(List.of(), defaultMenus, date);
-                        List<String> mergedNames = mergedItems.stream()
-                                .map(MenuItemDto::getName)
-                                .toList();
-                        return MenuGroupDto.from(group, mergedNames, mergedItems);
-                    }
+                    List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                    Map<String, Boolean> pinnedByName = defaultMenus.stream()
+                            .filter(dgm -> dgm.isPinnedOn(date))
+                            .collect(Collectors.toMap(
+                                    DefaultGroupMenu::getMenuName,
+                                    dgm -> true,
+                                    (a, b) -> a,
+                                    LinkedHashMap::new
+                            ));
 
                     List<MenuItemDto> menuItems = menus.stream()
-                            .map(name -> new MenuItemDto(name, false))
+                            .map(name -> new MenuItemDto(name, pinnedByName.containsKey(name)))
                             .toList();
                     return MenuGroupDto.from(group, menus, menuItems);
                 })
@@ -599,36 +598,4 @@ public class MenuGroupService {
         menuGroupRepository.delete(menuGroup);
     }
 
-    private List<MenuItemDto> mergeMenusWithPinned(
-            List<String> dailyMenus,
-            List<DefaultGroupMenu> defaultMenus,
-            LocalDate date
-    ) {
-        if (dailyMenus == null) {
-            dailyMenus = List.of();
-        }
-        if (defaultMenus == null) {
-            defaultMenus = List.of();
-        }
-
-        Map<String, MenuItemDto> merged = new LinkedHashMap<>();
-
-        for (DefaultGroupMenu rule : defaultMenus) {
-            if (rule.isPinnedOn(date)) {
-                merged.putIfAbsent(rule.getMenuName(), new MenuItemDto(rule.getMenuName(), true));
-            }
-        }
-
-        for (DefaultGroupMenu rule : defaultMenus) {
-            if (rule.isCarryoverOn(date)) {
-                merged.putIfAbsent(rule.getMenuName(), new MenuItemDto(rule.getMenuName(), false));
-            }
-        }
-
-        for (String name : dailyMenus) {
-            merged.putIfAbsent(name, new MenuItemDto(name, false));
-        }
-
-        return new ArrayList<>(merged.values());
-    }
 }

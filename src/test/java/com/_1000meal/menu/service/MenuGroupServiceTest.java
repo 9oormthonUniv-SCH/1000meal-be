@@ -409,7 +409,7 @@ class MenuGroupServiceTest {
     }
 
     @Test
-    @DisplayName("lazy materialize: daily가 없으면 기본메뉴로 daily 생성")
+    @DisplayName("lazy materialize: daily가 없으면 기본메뉴로 daily 생성 + pinned=true")
     void getMenuGroups_lazyMaterializeWhenMissing() {
         Long storeId = 1L;
         LocalDate date = LocalDate.of(2026, 2, 5);
@@ -428,7 +428,7 @@ class MenuGroupServiceTest {
         when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date)).thenReturn(List.of());
         when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)).thenReturn(Optional.empty());
 
-        DefaultGroupMenu rule = DefaultGroupMenu.builder()
+        DefaultGroupMenu rule1 = DefaultGroupMenu.builder()
                 .menuGroup(group)
                 .store(mock(Store.class))
                 .menuName("국수")
@@ -436,15 +436,25 @@ class MenuGroupServiceTest {
                 .startDate(date.minusDays(1))
                 .endDate(null)
                 .build();
+        DefaultGroupMenu rule2 = DefaultGroupMenu.builder()
+                .menuGroup(group)
+                .store(mock(Store.class))
+                .menuName("김밥")
+                .active(true)
+                .startDate(date.minusDays(1))
+                .endDate(null)
+                .build();
 
         when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), date))
-                .thenReturn(List.of(rule));
+                .thenReturn(List.of(rule1, rule2));
 
         DailyMenuWithGroupsDto result = service.getMenuGroups(storeId, date);
         List<MenuItemDto> items = result.getGroups().get(0).getMenuItems();
-        assertEquals(1, items.size());
+        assertEquals(2, items.size());
         assertEquals("국수", items.get(0).getName());
         assertTrue(items.get(0).isPinned());
+        assertEquals("김밥", items.get(1).getName());
+        assertTrue(items.get(1).isPinned());
         verify(groupDailyMenuRepository).save(any());
     }
 
