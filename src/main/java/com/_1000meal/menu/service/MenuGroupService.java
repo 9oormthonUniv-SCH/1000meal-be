@@ -521,6 +521,9 @@ public class MenuGroupService {
 
         Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
         if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
+            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
+            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
+                    currentAccountProvider.getCurrentAccountId(), accountStoreId, groupStoreId);
             throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
         }
 
@@ -533,6 +536,9 @@ public class MenuGroupService {
 
         Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
         if (groupStoreId == null || !groupStoreId.equals(storeId)) {
+            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
+            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
+                    currentAccountProvider.getCurrentAccountId(), storeId, groupStoreId);
             throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
         }
 
