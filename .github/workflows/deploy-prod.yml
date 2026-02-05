@@ -1,0 +1,96 @@
+name: Deploy to PROD (main)
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOY_DIR: /home/${{ secrets.EC2_USER }}/1000meal
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Grant execute permission for Gradle
+        run: chmod +x ./gradlew
+
+      - name: Build Spring Boot JAR
+        run: ./gradlew clean build -x test
+
+      - name: Create .env file (PROD)
+        run: |
+          printf '%s' "${{ secrets.ENV_FILE_CONTENT }}" > .env
+          ls -l .env
+
+      - name: SSH sanity check & prepare target dir (PROD)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            whoami && hostname
+            mkdir -p "${{ env.DEPLOY_DIR }}"
+            chmod 755 "${{ env.DEPLOY_DIR }}"
+            ls -ld "${{ env.DEPLOY_DIR }}"
+
+      - name: Disk check & cleanup on EC2 (PROD)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            df -h /
+            USAGE=$(df -h / | awk 'NR==2 {gsub("%",""); print $5}')
+            echo "Root usage: ${USAGE}%"
+            if [ "$USAGE" -ge 85 ]; then
+              sudo docker system prune -af --volumes || true
+              sudo find /var/lib/docker/containers -type f -name "*.log" -size +50M -print -delete || true
+              sudo journalctl --vacuum-time=7d || true
+              sudo apt-get clean || true
+              df -h /
+            fi
+
+      - name: Upload artifacts via SCP (PROD)
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: |
+            build/libs/*.jar,
+            docker-compose.yml,
+            .env
+          target: ${{ env.DEPLOY_DIR }}/
+          overwrite: true
+          debug: true
+          timeout: 120s
+          command_timeout: 10m
+
+      - name: SSH compose up (PROD)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            set -e
+            cd "${{ env.DEPLOY_DIR }}"
+            echo "[check] files in deploy dir"
+            ls -al
+            docker compose down || true
+            docker compose --env-file .env up -d --build
+            docker compose ps

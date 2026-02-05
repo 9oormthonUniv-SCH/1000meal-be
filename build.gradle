@@ -19,29 +19,68 @@ repositories {
 }
 
 dependencies {
-    // Spring Web - REST API 개발용
+    // Web / REST
     implementation 'org.springframework.boot:spring-boot-starter-web'
 
-    // Spring Data JPA - ORM 기반 DB 연동
+    // JPA
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-    // MySQL Driver - MySQL 데이터베이스 연동
+    // MySQL Driver
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // Spring Security - 인증 및 인가 보안 처리
+    // Security (OAuth2 포함)
     implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 
-    // Lombok - 코드 간결화를 위한 애너테이션 (Getter, Builder 등)
+    // Validation
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // Mail
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // Swagger (Springdoc)
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+    // JWT (JJWT)
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+
+    // Cache
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+
+    // Actuator / Metrics
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // AWS (현재 사용 중이면 유지)
+    implementation 'org.springframework.cloud:spring-cloud-starter-aws:2.2.6.RELEASE'
+
+    // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
 
-    // Spring Validation - @Valid 등의 유효성 검사
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // Test 의존성 (JUnit, Mockito 등)
+    //FCM
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
+
+    // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'com.h2database:h2'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
+    testImplementation 'org.mockito:mockito-inline:5.2.0' // ✅ static mocking
+
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
+
+
+
+
 }
 
 test {

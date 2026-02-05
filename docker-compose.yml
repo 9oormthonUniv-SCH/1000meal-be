@@ -1,0 +1,55 @@
+
+
+services:
+  app:
+    build: .
+    container_name: app-1000meal
+    ports:
+      - "8080:8080"
+
+    env_file:
+      - .env
+
+    environment:
+
+      # 🔒 JPA 잠금
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+      SPRING_SQL_INIT_MODE: "never"
+      SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "false"
+
+      # 🧬 Flyway
+      SPRING_FLYWAY_ENABLED: "false"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "false"
+      SPRING_FLYWAY_BASELINE_VERSION: "2"
+      SPRING_FLYWAY_LOCATIONS: "classpath:db/migration"
+
+      # 🔍 Flyway 로그
+      LOGGING_LEVEL_org_flywaydb: DEBUG
+
+      # 📦 Datasource (Flyway/JPA 공통)
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # 기타
+      ACCESS_KEY: ${ACCESS_KEY}
+      SECRET_KEY: ${SECRET_KEY}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
+
+
+
+    restart: "no"
+
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ap-northeast-2
+        awslogs-group: /1000meal/test/app
+        awslogs-create-group: "true"
+
+
+
+volumes:
+  mysql-1000meal-data:

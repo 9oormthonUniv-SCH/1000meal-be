@@ -40,3 +40,13 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+
+*.env
+*.yml
+application.properties
+
+
+# Firebase service account
+**/*firebase-adminsdk*.json
+**/serviceAccountKey*.json
