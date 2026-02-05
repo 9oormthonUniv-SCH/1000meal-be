@@ -343,12 +343,13 @@ class MenuGroupServiceTest {
                 .menuGroup(group)
                 .store(mock(Store.class))
                 .menuName("소보로빵")
+                .active(true)
                 .startDate(tomorrow)
                 .endDate(null)
                 .build();
 
         when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), today))
-                .thenReturn(List.of(rule));
+                .thenReturn(List.of());
         when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), tomorrow))
                 .thenReturn(List.of(rule));
 
@@ -389,6 +390,7 @@ class MenuGroupServiceTest {
                 .menuGroup(group)
                 .store(mock(Store.class))
                 .menuName("소보로빵")
+                .active(true)
                 .startDate(today.minusDays(3))
                 .endDate(today)
                 .build();
@@ -396,7 +398,7 @@ class MenuGroupServiceTest {
         when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), today))
                 .thenReturn(List.of(rule));
         when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), tomorrow))
-                .thenReturn(List.of(rule));
+                .thenReturn(List.of());
 
         DailyMenuWithGroupsDto todayResult = service.getMenuGroups(storeId, today);
         assertEquals(List.of("소보로빵"), todayResult.getGroups().get(0).getMenus());
@@ -407,8 +409,8 @@ class MenuGroupServiceTest {
     }
 
     @Test
-    @DisplayName("중복 제거: 기본(핀) 메뉴와 당일 입력 메뉴가 겹치면 1개만 표시")
-    void getMenuGroups_deduplicatePinnedAndDaily() {
+    @DisplayName("lazy materialize: daily가 없으면 기본메뉴로 daily 생성")
+    void getMenuGroups_lazyMaterializeWhenMissing() {
         Long storeId = 1L;
         LocalDate date = LocalDate.of(2026, 2, 5);
 
@@ -422,18 +424,15 @@ class MenuGroupServiceTest {
         when(group.getSortOrder()).thenReturn(0);
         when(group.getStock()).thenReturn(stock);
 
-        GroupDailyMenu gdm = mock(GroupDailyMenu.class);
-        when(gdm.getMenuGroup()).thenReturn(group);
-        when(gdm.getMenuNames()).thenReturn(List.of("국수", "김밥"));
-
         when(menuGroupRepository.findByStoreIdWithStock(storeId)).thenReturn(List.of(group));
-        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date)).thenReturn(List.of(gdm));
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date)).thenReturn(List.of());
         when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)).thenReturn(Optional.empty());
 
         DefaultGroupMenu rule = DefaultGroupMenu.builder()
                 .menuGroup(group)
                 .store(mock(Store.class))
                 .menuName("국수")
+                .active(true)
                 .startDate(date.minusDays(1))
                 .endDate(null)
                 .build();
@@ -443,10 +442,10 @@ class MenuGroupServiceTest {
 
         DailyMenuWithGroupsDto result = service.getMenuGroups(storeId, date);
         List<MenuItemDto> items = result.getGroups().get(0).getMenuItems();
-        assertEquals(2, items.size());
+        assertEquals(1, items.size());
         assertEquals("국수", items.get(0).getName());
         assertTrue(items.get(0).isPinned());
-        assertEquals("김밥", items.get(1).getName());
+        verify(groupDailyMenuRepository).save(any());
     }
 
     @Test
@@ -483,6 +482,7 @@ class MenuGroupServiceTest {
                 .menuGroup(group)
                 .store(mock(Store.class))
                 .menuName("소보로빵")
+                .active(true)
                 .startDate(date.minusDays(1))
                 .endDate(null)
                 .build();
@@ -492,6 +492,50 @@ class MenuGroupServiceTest {
         DailyMenuWithGroupsDto result = service.getMenuGroups(storeId, date);
         assertTrue(result.getGroups().get(0).getMenus().isEmpty());
         assertTrue(result.getGroups().get(0).getMenuItems().isEmpty());
+    }
+
+    @Test
+    @DisplayName("A안: daily가 이미 있으면 기본메뉴로 덮어쓰기 금지")
+    void getMenuGroups_dailyExists_noDefaultOverwrite() {
+        Long storeId = 1L;
+        LocalDate date = LocalDate.of(2026, 2, 5);
+
+        MenuGroupStock stock = mock(MenuGroupStock.class);
+        when(stock.getStock()).thenReturn(20);
+        when(stock.getCapacity()).thenReturn(50);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getId()).thenReturn(1L);
+        when(group.getName()).thenReturn("기본 메뉴");
+        when(group.getSortOrder()).thenReturn(0);
+        when(group.getStock()).thenReturn(stock);
+
+        GroupDailyMenu gdm = mock(GroupDailyMenu.class);
+        when(gdm.getMenuGroup()).thenReturn(group);
+        when(gdm.getMenuNames()).thenReturn(List.of("수동메뉴"));
+
+        when(menuGroupRepository.findByStoreIdWithStock(storeId)).thenReturn(List.of(group));
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDate(List.of(1L), date)).thenReturn(List.of(gdm));
+        when(dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)).thenReturn(Optional.empty());
+
+        DefaultGroupMenu rule = DefaultGroupMenu.builder()
+                .menuGroup(group)
+                .store(mock(Store.class))
+                .menuName("기본메뉴")
+                .active(true)
+                .startDate(date.minusDays(1))
+                .endDate(null)
+                .build();
+
+        when(defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(List.of(1L), date))
+                .thenReturn(List.of(rule));
+
+        DailyMenuWithGroupsDto result = service.getMenuGroups(storeId, date);
+        List<MenuItemDto> items = result.getGroups().get(0).getMenuItems();
+        assertEquals(1, items.size());
+        assertEquals("수동메뉴", items.get(0).getName());
+        assertFalse(items.get(0).isPinned());
+        verify(groupDailyMenuRepository, never()).save(any());
     }
 
     @Test

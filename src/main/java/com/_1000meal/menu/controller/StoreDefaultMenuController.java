@@ -4,6 +4,8 @@ import com._1000meal.auth.service.CurrentAccountProvider;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.response.ApiResponse;
+import com._1000meal.menu.dto.DefaultMenuActivateRequest;
+import com._1000meal.menu.dto.DefaultMenuActivateResponse;
 import com._1000meal.menu.dto.DefaultMenuRequest;
 import com._1000meal.menu.dto.DefaultMenuResponse;
 import com._1000meal.menu.service.DefaultGroupMenuService;
@@ -50,7 +52,13 @@ public class StoreDefaultMenuController {
             throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
         }
 
-        return ApiResponse.ok(defaultGroupMenuService.pinDefaultMenu(storeId, groupId, request.getMenuName()));
+        return ApiResponse.ok(defaultGroupMenuService.pinDefaultMenu(
+                storeId,
+                groupId,
+                request.getMenuName(),
+                request.getStartDate(),
+                request.getEndDate()
+        ));
     }
 
     @Operation(
@@ -104,5 +112,36 @@ public class StoreDefaultMenuController {
         }
 
         return ApiResponse.ok(defaultGroupMenuService.getDefaultMenus(storeId, groupId));
+    }
+
+    @Operation(
+            summary = "기본(핀) 메뉴 활성화 및 일간 메뉴 전개",
+            description = """
+                    기본(핀) 메뉴를 활성화하고, 오늘 날짜의 일간 메뉴로 전개합니다.
+
+                    - storeId는 로그인 계정의 storeId와 반드시 일치해야 합니다.
+                    - 그룹의 storeId도 path storeId와 일치해야 합니다.
+                    - 기본 동작은 '오늘 하루' 전개입니다.
+                    """
+    )
+    @PatchMapping("/{storeId}/menu-groups/{groupId}/default-menus/{defaultMenuId}/activate")
+    public ApiResponse<DefaultMenuActivateResponse> activateDefaultMenu(
+            @Parameter(description = "매장 ID", example = "1")
+            @PathVariable Long storeId,
+
+            @Parameter(description = "그룹 ID", example = "1")
+            @PathVariable Long groupId,
+
+            @Parameter(description = "기본 메뉴 ID", example = "1")
+            @PathVariable Long defaultMenuId,
+
+            @RequestBody(required = false) DefaultMenuActivateRequest request
+    ) {
+        Long accountStoreId = currentAccountProvider.getCurrentStoreId();
+        if (!storeId.equals(accountStoreId)) {
+            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
+        }
+
+        return ApiResponse.ok(defaultGroupMenuService.activateDefaultMenu(storeId, groupId, defaultMenuId, request));
     }
 }

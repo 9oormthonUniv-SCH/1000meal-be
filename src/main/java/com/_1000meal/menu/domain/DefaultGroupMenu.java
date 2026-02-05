@@ -41,6 +41,9 @@ public class DefaultGroupMenu {
     @Column(name = "menu_name", nullable = false, length = 80)
     private String menuName;
 
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
@@ -61,6 +64,7 @@ public class DefaultGroupMenu {
             Store store,
             MenuGroup menuGroup,
             String menuName,
+            boolean active,
             LocalDate startDate,
             LocalDate endDate,
             Long createdByAccountId
@@ -68,6 +72,7 @@ public class DefaultGroupMenu {
         this.store = store;
         this.menuGroup = menuGroup;
         this.menuName = menuName;
+        this.active = active;
         this.startDate = startDate;
         this.endDate = endDate;
         this.createdByAccountId = createdByAccountId;
@@ -92,6 +97,9 @@ public class DefaultGroupMenu {
         if (date == null) {
             return false;
         }
+        if (!active) {
+            return false;
+        }
         if (date.isBefore(startDate)) {
             return false;
         }
@@ -102,6 +110,21 @@ public class DefaultGroupMenu {
         if (date == null || endDate == null) {
             return false;
         }
+        if (!active) {
+            return false;
+        }
         return !date.isBefore(startDate) && endDate.isEqual(date);
+    }
+
+    public void setActiveRule(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null) {
+            this.startDate = startDate;
+        }
+        this.endDate = endDate;
+        this.active = true;
+    }
+
+    public void activate(LocalDate startDate, LocalDate endDate) {
+        setActiveRule(startDate, endDate);
     }
 }

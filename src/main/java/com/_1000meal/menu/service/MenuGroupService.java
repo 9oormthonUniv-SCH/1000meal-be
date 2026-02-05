@@ -56,7 +56,7 @@ public class MenuGroupService {
     /**
      * 특정 매장/날짜의 메뉴 그룹 목록 조회
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public DailyMenuWithGroupsDto getMenuGroups(Long storeId, LocalDate date) {
         DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
                 .orElse(null);
@@ -90,17 +90,56 @@ public class MenuGroupService {
         List<MenuGroupDto> groupDtos = groups.stream()
                 .map(group -> {
                     GroupDailyMenu gdm = dailyMenusByGroupId.get(group.getId());
-                    List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
+                    boolean createdFromDefault = false;
+
+                    if (gdm == null && isOpen && !isHoliday) {
+                        List<DefaultGroupMenu> defaults = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                        if (!defaults.isEmpty()) {
+                            List<String> names = defaults.stream()
+                                    .map(DefaultGroupMenu::getMenuName)
+                                    .distinct()
+                                    .toList();
+                            gdm = GroupDailyMenu.builder()
+                                    .menuGroup(group)
+                                    .date(date)
+                                    .build();
+                            gdm.replaceMenus(names);
+                            groupDailyMenuRepository.save(gdm);
+                            dailyMenusByGroupId.put(group.getId(), gdm);
+                            createdFromDefault = true;
+                            log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, created=true, itemCount={}",
+                                    group.getId(), date, names.size());
+                        } else {
+                            log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, skipped=no_default",
+                                    group.getId(), date);
+                        }
+                    } else if (gdm != null) {
+                        log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, skipped=already_exists",
+                                group.getId(), date);
+                    }
+
                     if (!isOpen || isHoliday) {
                         return MenuGroupDto.from(group, List.of(), List.of());
                     }
 
-                    List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
-                    List<MenuItemDto> mergedItems = mergeMenusWithPinned(menus, defaultMenus, date);
-                    List<String> mergedNames = mergedItems.stream()
-                            .map(MenuItemDto::getName)
+                    if (gdm == null) {
+                        return MenuGroupDto.from(group, List.of(), List.of());
+                    }
+
+                    List<String> menus = gdm.getMenuNames();
+                    if (createdFromDefault) {
+                        List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                        List<MenuItemDto> mergedItems = mergeMenusWithPinned(List.of(), defaultMenus, date);
+                        List<String> mergedNames = mergedItems.stream()
+                                .map(MenuItemDto::getName)
+                                .toList();
+                        return MenuGroupDto.from(group, mergedNames, mergedItems);
+                    }
+
+                    List<MenuItemDto> menuItems = menus.stream()
+                            .map(name -> new MenuItemDto(name, false))
                             .toList();
-                    return MenuGroupDto.from(group, mergedNames, mergedItems);
+                    return MenuGroupDto.from(group, menus, menuItems);
                 })
                 .toList();
 

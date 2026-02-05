@@ -16,12 +16,7 @@ public class DefaultMenuResponse {
     private boolean active;
 
     public static DefaultMenuResponse from(DefaultGroupMenu rule, LocalDate today) {
-        boolean active = false;
-        if (today != null && rule.getStartDate() != null) {
-            boolean started = !today.isBefore(rule.getStartDate());
-            boolean notEnded = rule.getEndDate() == null || !rule.getEndDate().isBefore(today);
-            active = started && notEnded;
-        }
+        boolean active = rule.isActive();
 
         return DefaultMenuResponse.builder()
                 .id(rule.getId())

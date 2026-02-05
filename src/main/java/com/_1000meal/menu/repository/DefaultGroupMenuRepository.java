@@ -19,11 +19,23 @@ public interface DefaultGroupMenuRepository extends JpaRepository<DefaultGroupMe
 
     @Query("SELECT dgm FROM DefaultGroupMenu dgm " +
             "WHERE dgm.menuGroup.id IN :groupIds " +
+            "AND dgm.active = true " +
             "AND dgm.startDate <= :date " +
             "AND (dgm.endDate IS NULL OR dgm.endDate >= :date) " +
             "ORDER BY dgm.menuGroup.id ASC, dgm.startDate ASC, dgm.id ASC")
     List<DefaultGroupMenu> findApplicableByMenuGroupIdsAndDate(
             @Param("groupIds") List<Long> groupIds,
+            @Param("date") LocalDate date
+    );
+
+    @Query("SELECT dgm FROM DefaultGroupMenu dgm " +
+            "WHERE dgm.menuGroup.id = :groupId " +
+            "AND dgm.active = true " +
+            "AND dgm.startDate <= :date " +
+            "AND (dgm.endDate IS NULL OR dgm.endDate >= :date) " +
+            "ORDER BY dgm.startDate ASC, dgm.id ASC")
+    List<DefaultGroupMenu> findActiveByMenuGroupIdAndDate(
+            @Param("groupId") Long groupId,
             @Param("date") LocalDate date
     );
 
