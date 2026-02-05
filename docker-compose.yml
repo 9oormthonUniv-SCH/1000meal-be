@@ -45,8 +45,8 @@ services:
     logging:
       driver: awslogs
       options:
-        awslogs-region: ap-northeast-2
-        awslogs-group: /1000meal/test/app
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${CW_LOG_GROUP}
         awslogs-create-group: "true"
 
 
