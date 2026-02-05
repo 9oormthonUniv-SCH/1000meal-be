@@ -5,6 +5,7 @@ import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
+import com._1000meal.menu.domain.DefaultGroupMenu;
 import com._1000meal.menu.domain.GroupDailyMenu;
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
@@ -13,6 +14,7 @@ import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
+import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
@@ -46,6 +48,7 @@ public class MenuGroupService {
     private final MenuGroupStockRepository stockRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final GroupDailyMenuRepository groupDailyMenuRepository;
+    private final DefaultGroupMenuRepository defaultGroupMenuRepository;
     private final StoreRepository storeRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentAccountProvider currentAccountProvider;
@@ -62,6 +65,9 @@ public class MenuGroupService {
                 ? menuGroupRepository.findByDailyMenuIdWithStockAndMenus(dailyMenu.getId())
                 : menuGroupRepository.findByStoreIdWithStock(storeId);
 
+        boolean isOpen = dailyMenu != null ? dailyMenu.isOpen() : true;
+        boolean isHoliday = dailyMenu != null && dailyMenu.isHoliday();
+
         List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
 
         Map<Long, GroupDailyMenu> dailyMenusByGroupId = groupIds.isEmpty()
@@ -72,11 +78,29 @@ public class MenuGroupService {
                                 gdm -> gdm
                         ));
 
+        Map<Long, List<DefaultGroupMenu>> defaultMenusByGroupId = (isOpen && !isHoliday && !groupIds.isEmpty())
+                ? defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(groupIds, date).stream()
+                        .collect(Collectors.groupingBy(
+                                rule -> rule.getMenuGroup().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ))
+                : Collections.emptyMap();
+
         List<MenuGroupDto> groupDtos = groups.stream()
                 .map(group -> {
                     GroupDailyMenu gdm = dailyMenusByGroupId.get(group.getId());
                     List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
-                    return MenuGroupDto.from(group, menus);
+                    if (!isOpen || isHoliday) {
+                        return MenuGroupDto.from(group, List.of(), List.of());
+                    }
+
+                    List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                    List<MenuItemDto> mergedItems = mergeMenusWithPinned(menus, defaultMenus, date);
+                    List<String> mergedNames = mergedItems.stream()
+                            .map(MenuItemDto::getName)
+                            .toList();
+                    return MenuGroupDto.from(group, mergedNames, mergedItems);
                 })
                 .toList();
 
@@ -88,8 +112,8 @@ public class MenuGroupService {
                 .id(dailyMenu != null ? dailyMenu.getId() : null)
                 .date(date)
                 .dayOfWeek(date.getDayOfWeek())
-                .isOpen(dailyMenu != null ? dailyMenu.isOpen() : true)
-                .isHoliday(dailyMenu != null && dailyMenu.isHoliday())
+                .isOpen(isOpen)
+                .isHoliday(isHoliday)
                 .totalStock(totalStock)
                 .groups(groupDtos)
                 .build();
@@ -528,5 +552,38 @@ public class MenuGroupService {
         }
 
         menuGroupRepository.delete(menuGroup);
+    }
+
+    private List<MenuItemDto> mergeMenusWithPinned(
+            List<String> dailyMenus,
+            List<DefaultGroupMenu> defaultMenus,
+            LocalDate date
+    ) {
+        if (dailyMenus == null) {
+            dailyMenus = List.of();
+        }
+        if (defaultMenus == null) {
+            defaultMenus = List.of();
+        }
+
+        Map<String, MenuItemDto> merged = new LinkedHashMap<>();
+
+        for (DefaultGroupMenu rule : defaultMenus) {
+            if (rule.isPinnedOn(date)) {
+                merged.putIfAbsent(rule.getMenuName(), new MenuItemDto(rule.getMenuName(), true));
+            }
+        }
+
+        for (DefaultGroupMenu rule : defaultMenus) {
+            if (rule.isCarryoverOn(date)) {
+                merged.putIfAbsent(rule.getMenuName(), new MenuItemDto(rule.getMenuName(), false));
+            }
+        }
+
+        for (String name : dailyMenus) {
+            merged.putIfAbsent(name, new MenuItemDto(name, false));
+        }
+
+        return new ArrayList<>(merged.values());
     }
 }
