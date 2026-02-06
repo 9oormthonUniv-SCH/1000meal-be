@@ -13,7 +13,7 @@ services:
     environment:
 
       # 🔒 JPA 잠금
-      SPRING_DATASOURCE_URL: jdbc:mysql://soonbob-db.cneoikiukcul.ap-northeast-2.rds.amazonaws.com:3306/1000meal_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
+      SPRING_DATASOURCE_URL: jdbc:mysql://soonbob-db.cneoikiukcul.ap-northeast-2.rds.amazonaws.com:3306/mysql_1000meal?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: 242f4NLz
 
