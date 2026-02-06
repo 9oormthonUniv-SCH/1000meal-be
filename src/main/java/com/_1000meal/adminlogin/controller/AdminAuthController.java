@@ -5,14 +5,14 @@ import com._1000meal.adminlogin.dto.AdminLoginResponse;
 import com._1000meal.adminlogin.dto.AdminResponse;
 import com._1000meal.adminlogin.dto.AdminSignupRequest;
 import com._1000meal.adminlogin.dto.PasswordChangeRequest;
-import com._1000meal.adminlogin.entity.AdminEntity;
+import com._1000meal.adminlogin.service.AdminAccountAuthService;
 import com._1000meal.adminlogin.service.AdminService;
 
 import com._1000meal.auth.model.AuthPrincipal;
+import com._1000meal.global.error.code.ErrorCode;
+import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
-import com._1000meal.global.security.JwtProvider;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -29,7 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminAuthController {
 
     private final AdminService adminService;
-    private final JwtProvider jwtProvider;
+    private final AdminAccountAuthService adminAccountAuthService;
 
     @Operation(
             summary = "관리자 로그인",
@@ -44,30 +44,10 @@ public class AdminAuthController {
     public ApiResponse<AdminLoginResponse> login(
             @RequestBody AdminLoginRequest request
     ) {
-        AdminEntity admin = adminService.authenticate(
+        return ApiResponse.ok(adminAccountAuthService.login(
                 request.getUsername(),
                 request.getPassword()
-        );
-
-        AuthPrincipal principal = new AuthPrincipal(
-                admin.getId(),
-                admin.getUsername(),
-                admin.getName(),
-                null,
-                "ADMIN"
-        );
-
-        String token = jwtProvider.createToken(principal);
-
-        AdminLoginResponse response = new AdminLoginResponse(
-                token,
-                admin.getId(),
-                admin.getUsername(),
-                admin.getName(),
-                admin.getPhoneNumber()
-        );
-
-        return ApiResponse.ok(response);
+        ));
     }
 
     @Operation(
@@ -100,17 +80,11 @@ public class AdminAuthController {
             @Parameter(hidden = true)
             Authentication authentication
     ) {
-        String username = authentication.getName();
-        AdminEntity admin = adminService.getAdminByUsername(username);
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
 
-        AdminResponse response = new AdminResponse(
-                admin.getId(),
-                admin.getUsername(),
-                admin.getName(),
-                admin.getPhoneNumber()
-        );
-
-        return ApiResponse.ok(response);
+        return ApiResponse.ok(adminAccountAuthService.getMyInfo(principal.id()));
     }
 
     @Operation(
@@ -128,8 +102,15 @@ public class AdminAuthController {
             @Parameter(hidden = true)
             Authentication authentication
     ) {
-        String username = authentication.getName();
-        adminService.changePassword(username, request);
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
+
+        adminAccountAuthService.changePassword(
+                principal.id(),
+                request.getOldPassword(),
+                request.getNewPassword()
+        );
         return ApiResponse.success("비밀번호가 성공적으로 변경되었습니다.", SuccessCode.UPDATED);
     }
 }

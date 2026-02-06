@@ -12,9 +12,9 @@ spring:
 
   sql:
     init:
-      data-locations: classpath:data.sql
-
+#      data-locations: classpath:data.sql
       mode: never
+
   jpa:
     hibernate:
       ddl-auto: validate
@@ -26,7 +26,11 @@ spring:
     defer-datasource-initialization: false
     # database-platform: org.hibernate.dialect.MySQL8Dialect  # 중복이라 dev에서는 제거 권장
   flyway:
-    enabled: false
+    enabled: true
+    baseline-on-migrate: false
+    baseline-version: 3
+    #schemas: 1000meal_test_local
+    baseline-description: "baseline from test db snapshot"
 
   jackson:
     time-zone: Asia/Seoul

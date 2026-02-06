@@ -5,6 +5,7 @@ import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.menu.domain.DailyMenu;
+import com._1000meal.menu.domain.DefaultGroupMenu;
 import com._1000meal.menu.domain.GroupDailyMenu;
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
@@ -13,6 +14,7 @@ import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
+import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupRepository;
@@ -46,6 +48,7 @@ public class MenuGroupService {
     private final MenuGroupStockRepository stockRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final GroupDailyMenuRepository groupDailyMenuRepository;
+    private final DefaultGroupMenuRepository defaultGroupMenuRepository;
     private final StoreRepository storeRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentAccountProvider currentAccountProvider;
@@ -53,7 +56,7 @@ public class MenuGroupService {
     /**
      * 특정 매장/날짜의 메뉴 그룹 목록 조회
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public DailyMenuWithGroupsDto getMenuGroups(Long storeId, LocalDate date) {
         DailyMenu dailyMenu = dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, date)
                 .orElse(null);
@@ -61,6 +64,9 @@ public class MenuGroupService {
         List<MenuGroup> groups = (dailyMenu != null)
                 ? menuGroupRepository.findByDailyMenuIdWithStockAndMenus(dailyMenu.getId())
                 : menuGroupRepository.findByStoreIdWithStock(storeId);
+
+        boolean isOpen = dailyMenu != null ? dailyMenu.isOpen() : true;
+        boolean isHoliday = dailyMenu != null && dailyMenu.isHoliday();
 
         List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
 
@@ -72,11 +78,67 @@ public class MenuGroupService {
                                 gdm -> gdm
                         ));
 
+        Map<Long, List<DefaultGroupMenu>> defaultMenusByGroupId = (isOpen && !isHoliday && !groupIds.isEmpty())
+                ? defaultGroupMenuRepository.findApplicableByMenuGroupIdsAndDate(groupIds, date).stream()
+                        .collect(Collectors.groupingBy(
+                                rule -> rule.getMenuGroup().getId(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ))
+                : Collections.emptyMap();
+
         List<MenuGroupDto> groupDtos = groups.stream()
                 .map(group -> {
                     GroupDailyMenu gdm = dailyMenusByGroupId.get(group.getId());
-                    List<String> menus = gdm != null ? gdm.getMenuNames() : List.of();
-                    return MenuGroupDto.from(group, menus);
+
+                    if (gdm == null && isOpen && !isHoliday) {
+                        List<DefaultGroupMenu> defaults = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                        if (!defaults.isEmpty()) {
+                            List<String> names = defaults.stream()
+                                    .map(DefaultGroupMenu::getMenuName)
+                                    .distinct()
+                                    .toList();
+                            gdm = GroupDailyMenu.builder()
+                                    .menuGroup(group)
+                                    .date(date)
+                                    .build();
+                            gdm.replaceMenus(names);
+                            groupDailyMenuRepository.save(gdm);
+                            dailyMenusByGroupId.put(group.getId(), gdm);
+                            log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, created=true, itemCount={}",
+                                    group.getId(), date, names.size());
+                        } else {
+                            log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, skipped=no_default",
+                                    group.getId(), date);
+                        }
+                    } else if (gdm != null) {
+                        log.debug("[DEFAULT_MENU][LAZY_MATERIALIZE] groupId={}, date={}, skipped=already_exists",
+                                group.getId(), date);
+                    }
+
+                    if (!isOpen || isHoliday) {
+                        return MenuGroupDto.from(group, List.of(), List.of());
+                    }
+
+                    if (gdm == null) {
+                        return MenuGroupDto.from(group, List.of(), List.of());
+                    }
+
+                    List<String> menus = gdm.getMenuNames();
+                    List<DefaultGroupMenu> defaultMenus = defaultMenusByGroupId.getOrDefault(group.getId(), List.of());
+                    Map<String, Boolean> pinnedByName = defaultMenus.stream()
+                            .filter(dgm -> dgm.isPinnedOn(date))
+                            .collect(Collectors.toMap(
+                                    DefaultGroupMenu::getMenuName,
+                                    dgm -> true,
+                                    (a, b) -> a,
+                                    LinkedHashMap::new
+                            ));
+
+                    List<MenuItemDto> menuItems = menus.stream()
+                            .map(name -> new MenuItemDto(name, pinnedByName.containsKey(name)))
+                            .toList();
+                    return MenuGroupDto.from(group, menus, menuItems);
                 })
                 .toList();
 
@@ -88,8 +150,8 @@ public class MenuGroupService {
                 .id(dailyMenu != null ? dailyMenu.getId() : null)
                 .date(date)
                 .dayOfWeek(date.getDayOfWeek())
-                .isOpen(dailyMenu != null ? dailyMenu.isOpen() : true)
-                .isHoliday(dailyMenu != null && dailyMenu.isHoliday())
+                .isOpen(isOpen)
+                .isHoliday(isHoliday)
                 .totalStock(totalStock)
                 .groups(groupDtos)
                 .build();
@@ -497,6 +559,9 @@ public class MenuGroupService {
 
         Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
         if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
+            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
+            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
+                    currentAccountProvider.getCurrentAccountId(), accountStoreId, groupStoreId);
             throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
         }
 
@@ -509,6 +574,9 @@ public class MenuGroupService {
 
         Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
         if (groupStoreId == null || !groupStoreId.equals(storeId)) {
+            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
+            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
+                    currentAccountProvider.getCurrentAccountId(), storeId, groupStoreId);
             throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
         }
 
@@ -529,4 +597,5 @@ public class MenuGroupService {
 
         menuGroupRepository.delete(menuGroup);
     }
+
 }
