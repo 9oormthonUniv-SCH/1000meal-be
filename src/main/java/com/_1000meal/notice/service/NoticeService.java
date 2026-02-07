@@ -77,22 +77,6 @@ public class NoticeService {
         return noticeImageService.register(noticeId, request);
     }
 
-    @Transactional(readOnly = true)
-    public List<NoticeImagePresignResponse> presignImages(
-            Long noticeId,
-            NoticeImagePresignRequest request
-    ) {
-        return noticeImageService.presign(noticeId, request);
-    }
-
-    @Transactional
-    public List<NoticeImageResponse> registerImages(
-            Long noticeId,
-            NoticeImageRegisterRequest request
-    ) {
-        return noticeImageService.register(noticeId, request);
-    }
-
     @Transactional
     public NoticeResponse update(Long id, NoticeUpdateRequest req) {
         Notice n = noticeRepository.findById(id)
