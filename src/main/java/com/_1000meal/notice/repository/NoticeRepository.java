@@ -10,5 +10,5 @@ import java.util.List;
 
 public interface NoticeRepository extends JpaRepository<Notice, Long> {
 
-    List<Notice> findAllByDeletedAtIsNull(Sort sort);
+    List<Notice> findAllByDeletedAtIsNullAndIsPublishedTrue(Sort sort);
 }
