@@ -58,7 +58,7 @@ class NoticeServiceTest {
         doReturn(LocalDateTime.of(2026, 1, 1, 9, 0)).when(normal).getCreatedAt();
         doReturn(LocalDateTime.of(2026, 1, 1, 9, 0)).when(normal).getUpdatedAt();
 
-        when(noticeRepository.findAllByDeletedAtIsNull(any(Sort.class)))
+        when(noticeRepository.findAllByDeletedAtIsNullAndIsPublishedTrue(any(Sort.class)))
                 .thenReturn(List.of(pinned, normal));
 
         // when
@@ -69,7 +69,7 @@ class NoticeServiceTest {
         assertEquals(2, result.size());
 
         ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
-        verify(noticeRepository).findAllByDeletedAtIsNull(sortCaptor.capture());
+        verify(noticeRepository).findAllByDeletedAtIsNullAndIsPublishedTrue(sortCaptor.capture());
 
         List<Sort.Order> orders = sortCaptor.getValue().toList();
         assertEquals(2, orders.size());
