@@ -20,21 +20,22 @@ public class NoticeImage {
     @JoinColumn(name = "notice_id", nullable = false)
     private Notice notice;
 
-    @Column(nullable = false, length = 600)
+    @Column(name = "s3_key", nullable = false, length = 600)
     private String s3Key;
 
-    @Column(nullable = false, length = 1200)
+    @Column(name = "url", nullable = false, length = 1200)
     private String url;
 
-    @Column(length = 255)
+    @Column(name = "original_name", length = 255)
     private String originalName;
 
-    @Column(length = 100)
+    @Column(name = "content_type", length = 100)
     private String contentType;
 
+    @Column(name = "size", nullable = false)
     private long size;
 
-    @Column(nullable = false)
+    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     @PrePersist
