@@ -23,7 +23,8 @@ VALUES
                          `lat`=VALUES(`lat`),
                          `lng`=VALUES(`lng`);
 
--- SECTION: accounts
+
+-- SECTION: accounts (ADMIN)
 INSERT INTO `accounts` (`id`, `user_id`, `email`, `password_hash`, `role`, `status`) VALUES
                                                                                          (14,'council1','testemail1@sch.ac.kr','$2a$10$Gt7.NiZHLEnWZ49pHyFbhO.BnvnLA.N5TUHDv78/MjpQvz/m30AvO','ADMIN','ACTIVE'),
                                                                                          (15,'council2','testemail2@sch.ac.kr','$2a$10$bR0U2VVgO36DMhGEcRD2fuuoA0Ih9nZHfVsv.E6qQe816pl5ezaV.','ADMIN','ACTIVE'),
@@ -40,6 +41,20 @@ INSERT INTO `accounts` (`id`, `user_id`, `email`, `password_hash`, `role`, `stat
                          `role`=VALUES(`role`),
                          `status`=VALUES(`status`);
 
+
+-- SECTION: accounts (STUDENT)
+INSERT INTO `accounts`
+(`id`, `user_id`, `email`, `password_hash`, `role`, `status`)
+VALUES
+    (23,'student1','student1@sch.ac.kr','$2a$10$QpK0N8RzQ7Yq9Qm4cH0JEu2Z9Rr9c4WZkzYc8m3dU9sRrZyKk1U2a','STUDENT','ACTIVE')
+    ON DUPLICATE KEY UPDATE
+                         `user_id`=VALUES(`user_id`),
+                         `email`=VALUES(`email`),
+                         `password_hash`=VALUES(`password_hash`),
+                         `role`=VALUES(`role`),
+                         `status`=VALUES(`status`);
+
+
 -- SECTION: admin_profiles
 INSERT INTO `admin_profiles` (`id`, `account_id`, `store_id`, `admin_level`, `display_name`) VALUES
                                                                                                  (1,18,1,1,'admin1'),
@@ -55,5 +70,17 @@ INSERT INTO `admin_profiles` (`id`, `account_id`, `store_id`, `admin_level`, `di
                          `store_id`=VALUES(`store_id`),
                          `admin_level`=VALUES(`admin_level`),
                          `display_name`=VALUES(`display_name`);
+
+
+-- SECTION: user_profiles (STUDENT)
+INSERT INTO `user_profiles`
+(`id`, `account_id`, `department`, `name`, `phone`)
+VALUES
+    (2,23,'컴퓨터소프트웨어공학과','학생1','010-1111-2222')
+    ON DUPLICATE KEY UPDATE
+                         `department`=VALUES(`department`),
+                         `name`=VALUES(`name`),
+                         `phone`=VALUES(`phone`);
+
 
 SET FOREIGN_KEY_CHECKS=1;
