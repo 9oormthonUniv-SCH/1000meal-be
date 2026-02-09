@@ -6,15 +6,16 @@
 -- ============================================
 
 -- Step 1: is_default 컬럼 추가
-ALTER TABLE menu_group ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0;
+-- ALTER TABLE menu_group ADD COLUMN is_default TINYINT(1) NOT NULL DEFAULT 0;
 
 -- Step 2: 기존 "기본 메뉴" 그룹을 기본 그룹으로 표시
-UPDATE menu_group SET is_default = 1 WHERE name = '기본 메뉴';
+UPDATE menu_group
+SET is_default = b'1'
+WHERE name = '기본 메뉴';
 
--- Step 3: 기본 그룹 이름을 매장명으로 변경
+-- Step 3: 기본 그룹 이름을 매장명으로 변경 (V1 기준 단순 조인)
 UPDATE menu_group mg
-JOIN daily_menu dm ON mg.daily_menu_id = dm.id
-JOIN weekly_menu wm ON dm.weekly_menu_id = wm.id
-JOIN store s ON wm.store_id = s.id
-SET mg.name = s.name
-WHERE mg.is_default = 1;
+    JOIN daily_menu dm ON mg.daily_menu_id = dm.id
+    JOIN store s ON dm.store_id = s.id
+    SET mg.name = s.name
+WHERE mg.is_default = b'1';

@@ -12,7 +12,7 @@ spring:
 
   sql:
     init:
-#      data-locations: classpath:data.sql
+#      data-locations: classpath:R__seed_local.sql
       mode: never
 
   jpa:

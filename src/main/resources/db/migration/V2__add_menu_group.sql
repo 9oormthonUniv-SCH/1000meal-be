@@ -39,16 +39,26 @@
 -- 데이터 마이그레이션 (기존 데이터가 있는 경우 실행)
 -- ============================================
 
--- Step 4: 기존 daily_menu마다 "기본 메뉴" 그룹 생성
-INSERT INTO menu_group (daily_menu_id, name, sort_order)
-SELECT id, '기본 메뉴', 0 FROM daily_menu
-WHERE id NOT IN (SELECT DISTINCT daily_menu_id FROM menu_group);
+-- Step 4: 기존 daily_menu마다 "기본 메뉴" 그룹 생성 (V1 스키마 기준)
+INSERT INTO menu_group (store_id, daily_menu_id, name, sort_order, is_default)
+SELECT
+    dm.store_id,
+    dm.id,
+    '기본 메뉴',
+    0,
+    b'1'
+FROM daily_menu dm
+WHERE dm.id NOT IN (SELECT DISTINCT daily_menu_id FROM menu_group);
 
 -- Step 5: menu_group_stock에 기존 daily_menu.stock 복사
-INSERT INTO menu_group_stock (menu_group_id, stock, capacity, low_stock_notified)
-SELECT mg.id, COALESCE(dm.stock, 100), COALESCE(dm.stock, 100), 0
+INSERT INTO menu_group_stock (menu_group_id, stock, capacity, last_notified_threshold, last_notified_date)
+SELECT mg.id,
+       COALESCE(dm.stock, 100),
+       COALESCE(dm.stock, 100),
+       NULL,
+       NULL
 FROM menu_group mg
-JOIN daily_menu dm ON mg.daily_menu_id = dm.id
+         JOIN daily_menu dm ON mg.daily_menu_id = dm.id
 WHERE mg.id NOT IN (SELECT menu_group_id FROM menu_group_stock);
 
 -- Step 6: menu.menu_group_id 연결 (기존 메뉴를 기본 그룹에 연결)
