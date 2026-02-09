@@ -1,7 +1,4 @@
--- 1. 기존 notice 테이블 제거
-DROP TABLE IF EXISTS notice;
-
--- 2. 새로운 notices 테이블 생성
+-- 1) notices (Notice)
 CREATE TABLE `notices` (
                            `id`           BIGINT NOT NULL AUTO_INCREMENT,
                            `title`        VARCHAR(200) NOT NULL,
@@ -14,11 +11,12 @@ CREATE TABLE `notices` (
                            PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 3. notice_images 테이블 생성
+
+-- 2) notice_images (NoticeImage)
 CREATE TABLE `notice_images` (
                                  `id`            BIGINT NOT NULL AUTO_INCREMENT,
                                  `notice_id`     BIGINT NOT NULL,
-                                 `s3_key`        VARCHAR(600) NOT NULL,
+                                 `s3key`        VARCHAR(600) NOT NULL,
                                  `url`           VARCHAR(1200) NOT NULL,
                                  `original_name` VARCHAR(255) NULL,
                                  `content_type`  VARCHAR(100) NULL,
