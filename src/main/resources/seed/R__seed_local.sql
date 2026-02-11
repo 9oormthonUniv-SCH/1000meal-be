@@ -46,7 +46,7 @@ INSERT INTO `accounts` (`id`, `user_id`, `email`, `password_hash`, `role`, `stat
 INSERT INTO `accounts`
 (`id`, `user_id`, `email`, `password_hash`, `role`, `status`)
 VALUES
-    (23,'student1','student1@sch.ac.kr','$2a$10$QpK0N8RzQ7Yq9Qm4cH0JEu2Z9Rr9c4WZkzYc8m3dU9sRrZyKk1U2a','STUDENT','ACTIVE')
+    (23,'20204020','wngmstla@sch.ac.kr','$2a$10$ZVBQymsNIJ9im6/jUtTN.uLR7SOv0AXxarzwu4FlMY3yBSQ9Sa/7C','STUDENT','ACTIVE')
     ON DUPLICATE KEY UPDATE
                          `user_id`=VALUES(`user_id`),
                          `email`=VALUES(`email`),
@@ -76,7 +76,7 @@ INSERT INTO `admin_profiles` (`id`, `account_id`, `store_id`, `admin_level`, `di
 INSERT INTO `user_profiles`
 (`id`, `account_id`, `department`, `name`, `phone`)
 VALUES
-    (2,23,'컴퓨터소프트웨어공학과','학생1','010-1111-2222')
+    (2,23,'컴퓨터소프트웨어공학과','심주흔','010-1111-2222')
     ON DUPLICATE KEY UPDATE
                          `department`=VALUES(`department`),
                          `name`=VALUES(`name`),
