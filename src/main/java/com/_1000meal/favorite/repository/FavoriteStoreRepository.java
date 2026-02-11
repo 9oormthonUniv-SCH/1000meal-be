@@ -3,6 +3,7 @@ package com._1000meal.favorite.repository;
 import com._1000meal.favorite.domain.FavoriteStore;
 import com._1000meal.favorite.dto.FavoriteStoreResponse;
 import com._1000meal.fcm.dto.OpenNotificationTarget;
+import com._1000meal.fcm.dto.StockDeadlineCandidate;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -53,4 +54,26 @@ public interface FavoriteStoreRepository extends JpaRepository<FavoriteStore, Lo
         where np.enabled = true
     """)
     List<OpenNotificationTarget> findOpenNotificationTargets();
+
+    @Query("""
+        select new com._1000meal.fcm.dto.StockDeadlineCandidate(
+            fs.account.id,
+            s.id,
+            s.name,
+            s.imageUrl,
+            mg.id,
+            mg.name,
+            mg.sortOrder,
+            mgs.stock,
+            s.remain
+        )
+        from FavoriteStore fs
+        join fs.store s
+        join MenuGroup mg on mg.store.id = s.id
+        left join mg.stock mgs
+        join NotificationPreference np on np.accountId = fs.account.id
+        where np.enabled = true
+        order by fs.account.id asc, s.id asc, mg.sortOrder asc, mg.id asc
+    """)
+    List<StockDeadlineCandidate> findStockDeadlineCandidates();
 }

@@ -136,6 +136,56 @@ public class FcmPushService {
         }
     }
 
+    public void sendStockDeadlineNotification(
+            Long accountId,
+            Long storeId,
+            String storeName,
+            String storeImageUrl,
+            Long menuGroupId,
+            String menuGroupName,
+            int remaining
+    ) {
+        List<FcmToken> tokens = tokenRepository.findAllByAccountIdAndActiveTrue(accountId);
+        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
+
+        if (tokenStrings.isEmpty()) {
+            log.info("[FCM][STOCK_DEADLINE] accountId={}, storeId={}, groupId={}, skipped=no_active_tokens",
+                    accountId, storeId, menuGroupId);
+            return;
+        }
+
+        String title = "[" + menuGroupName + "] 마감 임박!";
+        String body = "천원의 아침밥 수량이 얼마 남지 않았어요";
+
+        MulticastMessage msg = MulticastMessage.builder()
+                .addAllTokens(tokenStrings)
+                .setNotification(Notification.builder()
+                        .setTitle(title)
+                        .setBody(body)
+                        .build())
+                .putData("type", "STOCK_DEADLINE")
+                .putData("storeId", String.valueOf(storeId))
+                .putData("storeName", storeName == null ? "" : storeName)
+                .putData("menuGroupId", String.valueOf(menuGroupId))
+                .putData("menuGroupName", menuGroupName == null ? "" : menuGroupName)
+                .putData("remain", String.valueOf(remaining))
+                .putData("imageUrl", storeImageUrl == null ? "" : storeImageUrl)
+                .build();
+
+        try {
+            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
+            log.info("[FCM][STOCK_DEADLINE] accountId={}, storeId={}, groupId={}, success={}, failure={}",
+                    accountId, storeId, menuGroupId, res.getSuccessCount(), res.getFailureCount());
+
+            List<String> invalidTokens = collectInvalidTokens(res, tokenStrings);
+            if (!invalidTokens.isEmpty()) {
+                invalidTokenHandler.handleInvalidTokens(invalidTokens);
+            }
+        } catch (FirebaseMessagingException e) {
+            log.error("[FCM][STOCK_DEADLINE] send failed: {}", e.getMessage(), e);
+        }
+    }
+
     /**
      * 품절 임박 알림 발송
      * 해당 매장을 즐겨찾기한 사용자 중 알림 ON + active 토큰 보유자에게 푸시

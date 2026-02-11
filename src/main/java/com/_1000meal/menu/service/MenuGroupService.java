@@ -360,7 +360,7 @@ public class MenuGroupService {
 
         // 비관적 락으로 재고 조회
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+                .orElseGet(() -> createStockIfMissing(group, 0));
 
         int beforeStock = stock.getStock();
         StockDeductResult result = stock.deduct(value, today);
@@ -403,9 +403,8 @@ public class MenuGroupService {
      */
     @Transactional
     public MenuGroupStockResponse updateStock(Long groupId, int newStock) {
-        getAuthorizedGroup(groupId);
-        MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+        MenuGroup group = getAuthorizedGroup(groupId);
+        MenuGroupStock stock = getOrCreateStock(group);
 
         stock.updateStock(newStock);
 
@@ -421,7 +420,7 @@ public class MenuGroupService {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+                .orElseGet(() -> createStockIfMissing(group, 0));
 
         int beforeStock = stock.getStock();
         StockDeductResult result = stock.deduct(value, today);
@@ -459,9 +458,8 @@ public class MenuGroupService {
 
     @Transactional
     public MenuGroupStockResponse updateStockForStore(Long storeId, Long groupId, int newStock) {
-        getAuthorizedGroupForStore(storeId, groupId);
-        MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+        MenuGroup group = getAuthorizedGroupForStore(storeId, groupId);
+        MenuGroupStock stock = getOrCreateStock(group);
 
         stock.updateStock(newStock);
 
@@ -554,33 +552,29 @@ public class MenuGroupService {
 
     private MenuGroup getAuthorizedGroup(Long groupId) {
         Long accountStoreId = currentAccountProvider.getCurrentStoreId();
-        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, accountStoreId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
-
-        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
-        if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
-            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
-            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
-                    currentAccountProvider.getCurrentAccountId(), accountStoreId, groupStoreId);
-            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
-        }
 
         return menuGroup;
     }
 
     private MenuGroup getAuthorizedGroupForStore(Long storeId, Long groupId) {
-        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, storeId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
-        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
-        if (groupStoreId == null || !groupStoreId.equals(storeId)) {
-            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
-            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
-                    currentAccountProvider.getCurrentAccountId(), storeId, groupStoreId);
-            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
-        }
-
         return menuGroup;
+    }
+
+    private MenuGroupStock getOrCreateStock(MenuGroup group) {
+        return stockRepository.findByMenuGroupId(group.getId())
+                .orElseGet(() -> createStockIfMissing(group, 0));
+    }
+
+    private MenuGroupStock createStockIfMissing(MenuGroup group, int capacity) {
+        if (group.getStock() == null) {
+            group.initializeStock(capacity);
+        }
+        return stockRepository.save(group.getStock());
     }
 
     /**

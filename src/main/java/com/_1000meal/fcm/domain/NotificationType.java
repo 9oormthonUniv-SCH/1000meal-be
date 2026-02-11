@@ -1,5 +1,6 @@
 package com._1000meal.fcm.domain;
 
 public enum NotificationType {
-    OPEN
+    OPEN,
+    STOCK_DEADLINE
 }

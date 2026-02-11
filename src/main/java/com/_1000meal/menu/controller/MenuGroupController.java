@@ -2,8 +2,10 @@ package com._1000meal.menu.controller;
 
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
-import com._1000meal.menu.dto.*;
-import com._1000meal.menu.enums.DeductionUnit;
+import com._1000meal.menu.dto.DailyMenuWithGroupsDto;
+import com._1000meal.menu.dto.MenuGroupCreateRequest;
+import com._1000meal.menu.dto.MenuGroupDto;
+import com._1000meal.menu.dto.WeeklyMenuWithGroupsResponse;
 import com._1000meal.menu.service.MenuGroupService;
 import com._1000meal.menu.service.MenuService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -64,75 +66,6 @@ public class MenuGroupController {
     ) {
         WeeklyMenuWithGroupsResponse response = menuService.getWeeklyMenuWithGroups(storeId, date);
         return ApiResponse.success(response, SuccessCode.OK);
-    }
-
-    @Operation(
-            summary = "그룹 재고 차감",
-            description = """
-                    메뉴 그룹의 재고를 차감합니다.
-
-                    - 차감 단위는 enum(DeductionUnit)으로 지정합니다.
-                    - 재고가 부족하면 INSUFFICIENT_STOCK 오류가 발생합니다.
-                    - 재고가 10개 이하로 떨어지면 즐겨찾기 사용자에게 품절 임박 알림이 발송됩니다.
-                    """
-    )
-    @PatchMapping("/groups/{groupId}/deduct")
-    public ApiResponse<MenuGroupStockResponse> deductGroupStock(
-            @Parameter(description = "그룹 ID", example = "1")
-            @PathVariable Long groupId,
-
-            @Parameter(
-                    description = "차감 단위 (SINGLE=1, MULTI_FIVE=5, MULTI_TEN=10)",
-                    example = "SINGLE"
-            )
-            @RequestParam DeductionUnit deductionUnit
-    ) {
-        return ApiResponse.ok(menuGroupService.deductStock(groupId, deductionUnit));
-    }
-
-    @Operation(
-            summary = "그룹 재고 직접 수정",
-            description = "메뉴 그룹의 재고를 특정 값으로 설정합니다."
-    )
-    @PostMapping("/groups/{groupId}/stock")
-    public ApiResponse<MenuGroupStockResponse> updateGroupStock(
-            @Parameter(description = "그룹 ID", example = "1")
-            @PathVariable Long groupId,
-
-            @Valid @RequestBody StockUpdateRequest request
-    ) {
-        return ApiResponse.success(
-                menuGroupService.updateStock(groupId, request.getStock()),
-                SuccessCode.UPDATED
-        );
-    }
-
-    @Operation(
-            summary = "그룹 메뉴 등록/교체",
-            description = """
-                    메뉴 그룹의 특정 날짜 메뉴를 등록하거나 기존 메뉴를 교체합니다.
-
-                    - (groupId, date) 조합으로 upsert 동작합니다.
-                    - 해당 조합이 없으면 새로 생성, 있으면 메뉴를 교체합니다.
-                    - 메뉴명은 trim 처리되며, 빈 값/중복 값은 제거됩니다.
-                    """,
-            deprecated = true
-    )
-    @Deprecated
-    @PostMapping("/groups/{groupId}/menus")
-    public ApiResponse<GroupDailyMenuResponse> updateMenusInGroup(
-            @Parameter(description = "그룹 ID", example = "1")
-            @PathVariable Long groupId,
-
-            @Parameter(description = "날짜 (YYYY-MM-DD)", example = "2026-01-23")
-            @RequestParam LocalDate date,
-
-            @Valid @RequestBody MenuUpdateRequest request
-    ) {
-        return ApiResponse.success(
-                menuGroupService.updateMenusInGroup(groupId, date, request),
-                SuccessCode.OK
-        );
     }
 
     @Operation(

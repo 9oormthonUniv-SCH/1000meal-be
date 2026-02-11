@@ -58,6 +58,7 @@ public class OpenNotificationService {
                     NotificationType.OPEN,
                     target.accountId(),
                     target.storeId(),
+                    null,
                     date
             );
             if (!recorded) {

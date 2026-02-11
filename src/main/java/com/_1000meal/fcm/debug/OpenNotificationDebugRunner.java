@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 
 // src/main/java/com/_1000meal/fcm/debug/OpenNotificationDebugRunner.java
-@Profile("local")
+@Profile("fcm-debug")
 @Component
 @RequiredArgsConstructor
 public class OpenNotificationDebugRunner implements CommandLineRunner {
