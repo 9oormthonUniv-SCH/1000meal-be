@@ -1,6 +1,8 @@
 package com._1000meal.favorite.repository;
 
 import com._1000meal.favorite.domain.FavoriteStore;
+import com._1000meal.favorite.dto.FavoriteStoreResponse;
+import com._1000meal.fcm.dto.OpenNotificationTarget;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,4 +25,32 @@ public interface FavoriteStoreRepository extends JpaRepository<FavoriteStore, Lo
 
     @Query("select fs from FavoriteStore fs join fetch fs.store where fs.account.id = :accountId")
     List<FavoriteStore> findAllByAccountIdWithStore(@Param("accountId") Long accountId);
+
+    @Query("""
+        select new com._1000meal.favorite.dto.FavoriteStoreResponse(
+            fs.store.id,
+            fs.store.name,
+            fs.store.imageUrl,
+            fs.store.isOpen
+        )
+        from FavoriteStore fs
+        join fs.store
+        where fs.account.id = :accountId
+        order by fs.id desc
+    """)
+    List<FavoriteStoreResponse> findFavoriteStores(@Param("accountId") Long accountId);
+
+    @Query("""
+        select new com._1000meal.fcm.dto.OpenNotificationTarget(
+            fs.account.id,
+            fs.store.id,
+            fs.store.name,
+            fs.store.imageUrl,
+            fs.store.isOpen
+        )
+        from FavoriteStore fs
+        join NotificationPreference np on np.accountId = fs.account.id
+        where np.enabled = true
+    """)
+    List<OpenNotificationTarget> findOpenNotificationTargets();
 }

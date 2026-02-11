@@ -83,4 +83,19 @@ VALUES
                          `phone`=VALUES(`phone`);
 
 
+-- SECTION: menu_group (default groups per store)
+INSERT INTO menu_group
+(store_id, daily_menu_id, name, sort_order, is_default)
+VALUES
+    (4, NULL, '크앙분식', 1, b'0'),
+    (4, NULL, '뼈해장국', 2, b'0'),
+    (1, NULL, '향설 1관', 1, b'0'),
+    (2, NULL, '야외 그라찌에', 1, b'0'),
+    (3, NULL, '베이커리 경', 1, b'0')
+    ON DUPLICATE KEY UPDATE
+                         -- seed에서는 name/store_id는 건드리지 않음
+                         sort_order = VALUES(sort_order);
+
+
+
 SET FOREIGN_KEY_CHECKS=1;

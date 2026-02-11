@@ -1,8 +1,7 @@
 package com._1000meal.favorite.controller;
 
 import com._1000meal.auth.model.AuthPrincipal;
-import com._1000meal.favorite.domain.FavoriteStore;
-import com._1000meal.favorite.dto.FavoriteStoreItemResponse;
+import com._1000meal.favorite.dto.FavoriteStoreResponse;
 import com._1000meal.favorite.dto.FavoriteStoreToggleResponse;
 import com._1000meal.favorite.service.FavoriteStoreService;
 import lombok.RequiredArgsConstructor;
@@ -39,14 +38,11 @@ public class FavoriteStoreController {
     }
 
     @GetMapping("/stores")
-    public List<FavoriteStoreItemResponse> myFavorites(
+    public List<FavoriteStoreResponse> myFavorites(
             @AuthenticationPrincipal AuthPrincipal principal
     ) {
         Long accountId = principal.id(); // 또는 principal.getId()
 
-        return favoriteStoreService.getMyFavorites(accountId).stream()
-                .map(FavoriteStore::getStore)
-                .map(FavoriteStoreItemResponse::from)
-                .toList();
+        return favoriteStoreService.getMyFavorites(accountId);
     }
 }
