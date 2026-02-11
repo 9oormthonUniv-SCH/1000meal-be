@@ -1,15 +1,18 @@
 package com._1000meal.fcm.service;
 
 import com._1000meal.fcm.domain.FcmToken;
+import com._1000meal.fcm.domain.NotificationType;
+import com._1000meal.fcm.message.FcmMessageFactory;
 import com._1000meal.fcm.repository.FcmTokenRepository;
-import com._1000meal.fcm.sender.InvalidTokenHandler;
-import com.google.firebase.messaging.*;
+import com._1000meal.fcm.sender.FcmSendResult;
+import com._1000meal.fcm.sender.FcmSender;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -17,49 +20,22 @@ import java.util.List;
 public class FcmPushService {
 
     private final FcmTokenRepository tokenRepository;
-    private final InvalidTokenHandler invalidTokenHandler;
+    private final FcmSender fcmSender;
 
     public void sendOpenNotification(Long accountId, Long storeId, String storeName, String storeImageUrl) {
-        List<FcmToken> tokens = tokenRepository.findAllByAccountIdAndActiveTrue(accountId);
-        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.OPEN, storeName, null, 0);
 
-        if (tokenStrings.isEmpty()) {
-            log.info("[FCM][OPEN] accountId={}, storeId={}, skipped=no_active_tokens",
-                    accountId, storeId);
-            return;
-        }
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "OPEN");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName);
+        data.put("imageUrl", storeImageUrl == null ? "" : storeImageUrl);
 
-        String title = "오픈 알림";
-        String body = "[" + storeName + "]이 영업을 시작했어요";
-
-        MulticastMessage msg = MulticastMessage.builder()
-                .addAllTokens(tokenStrings)
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .putData("type", "OPEN")
-                .putData("storeId", String.valueOf(storeId))
-                .putData("storeName", storeName)
-                .putData("imageUrl", storeImageUrl == null ? "" : storeImageUrl)
-                .build();
-
-        try {
-            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
-            log.info("[FCM][OPEN] accountId={}, storeId={}, success={}, failure={}",
-                    accountId, storeId, res.getSuccessCount(), res.getFailureCount());
-
-            List<String> invalidTokens = collectInvalidTokens(res, tokenStrings);
-            if (!invalidTokens.isEmpty()) {
-                invalidTokenHandler.handleInvalidTokens(invalidTokens);
-            }
-        } catch (FirebaseMessagingException e) {
-            log.error("[FCM][OPEN] send failed: {}", e.getMessage(), e);
-        }
+        sendMulticastForAccount(accountId, "[FCM][OPEN]", message.title(), message.body(), data);
     }
 
     public void sendStoreOpened(Long storeId, String storeName) {
-        // 해당 매장을 즐겨찾기한 사용자 중 알림 ON + active 토큰 보유자만 대상
         List<FcmToken> tokens = tokenRepository.findActiveTokensForFavoriteStore(storeId);
         List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
 
@@ -69,28 +45,23 @@ public class FcmPushService {
             return;
         }
 
-        String title = "오픈 알림";
-        String body  = "[" + storeName + "]이 영업을 시작했어요";
-
-        MulticastMessage msg = MulticastMessage.builder()
-                .addAllTokens(tokenStrings)
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .putData("type", "OPEN")
-                .putData("storeId", String.valueOf(storeId))
-                .putData("storeName", storeName)
-                .build();
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.OPEN, storeName, null, 0);
 
         try {
-            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
+            FcmSendResult result = fcmSender.sendMulticast(
+                    tokenStrings,
+                    message.title(),
+                    message.body(),
+                    Map.of(
+                            "type", "OPEN",
+                            "storeId", String.valueOf(storeId),
+                            "storeName", storeName
+                    )
+            );
             log.info("[FCM][OPEN] storeId={}, success={}, failure={}",
-                    storeId, res.getSuccessCount(), res.getFailureCount());
-
-            // 실패 토큰 정리(선택): invalid/registration-token-not-registered 등일 때 deactivate
-            // res.getResponses()를 순회하며 에러코드 보고 처리 가능
-        } catch (FirebaseMessagingException e) {
+                    storeId, result.successCount(), result.failureCount());
+        } catch (Exception e) {
             log.error("[FCM][OPEN] send failed: {}", e.getMessage(), e);
         }
     }
@@ -110,28 +81,26 @@ public class FcmPushService {
             return;
         }
 
-        String title = "재고 알림";
-        String body = String.format("[%s] %s 수량이 30개 이하로 줄었어요!", storeName, groupName);
-
-        MulticastMessage msg = MulticastMessage.builder()
-                .addAllTokens(tokenStrings)
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .putData("type", "LOW_STOCK_30")
-                .putData("storeId", String.valueOf(storeId))
-                .putData("storeName", storeName)
-                .putData("groupId", String.valueOf(groupId))
-                .putData("groupName", groupName)
-                .putData("stock", String.valueOf(remaining))
-                .build();
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.LOW_STOCK_30, storeName, groupName, remaining);
 
         try {
-            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
+            FcmSendResult result = fcmSender.sendMulticast(
+                    tokenStrings,
+                    message.title(),
+                    message.body(),
+                    Map.of(
+                            "type", "LOW_STOCK_30",
+                            "storeId", String.valueOf(storeId),
+                            "storeName", storeName,
+                            "groupId", String.valueOf(groupId),
+                            "groupName", groupName,
+                            "stock", String.valueOf(remaining)
+                    )
+            );
             log.info("[FCM][LOW_STOCK_30] storeId={}, groupId={}, success={}, failure={}",
-                    storeId, groupId, res.getSuccessCount(), res.getFailureCount());
-        } catch (FirebaseMessagingException e) {
+                    storeId, groupId, result.successCount(), result.failureCount());
+        } catch (Exception e) {
             log.error("[FCM][LOW_STOCK_30] send failed: {}", e.getMessage(), e);
         }
     }
@@ -145,45 +114,19 @@ public class FcmPushService {
             String menuGroupName,
             int remaining
     ) {
-        List<FcmToken> tokens = tokenRepository.findAllByAccountIdAndActiveTrue(accountId);
-        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.STOCK_DEADLINE, storeName, menuGroupName, remaining);
 
-        if (tokenStrings.isEmpty()) {
-            log.info("[FCM][STOCK_DEADLINE] accountId={}, storeId={}, groupId={}, skipped=no_active_tokens",
-                    accountId, storeId, menuGroupId);
-            return;
-        }
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "STOCK_DEADLINE");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName == null ? "" : storeName);
+        data.put("menuGroupId", String.valueOf(menuGroupId));
+        data.put("menuGroupName", menuGroupName == null ? "" : menuGroupName);
+        data.put("remain", String.valueOf(remaining));
+        data.put("imageUrl", storeImageUrl == null ? "" : storeImageUrl);
 
-        String title = "[" + menuGroupName + "] 마감 임박!";
-        String body = "천원의 아침밥 수량이 얼마 남지 않았어요";
-
-        MulticastMessage msg = MulticastMessage.builder()
-                .addAllTokens(tokenStrings)
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .putData("type", "STOCK_DEADLINE")
-                .putData("storeId", String.valueOf(storeId))
-                .putData("storeName", storeName == null ? "" : storeName)
-                .putData("menuGroupId", String.valueOf(menuGroupId))
-                .putData("menuGroupName", menuGroupName == null ? "" : menuGroupName)
-                .putData("remain", String.valueOf(remaining))
-                .putData("imageUrl", storeImageUrl == null ? "" : storeImageUrl)
-                .build();
-
-        try {
-            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
-            log.info("[FCM][STOCK_DEADLINE] accountId={}, storeId={}, groupId={}, success={}, failure={}",
-                    accountId, storeId, menuGroupId, res.getSuccessCount(), res.getFailureCount());
-
-            List<String> invalidTokens = collectInvalidTokens(res, tokenStrings);
-            if (!invalidTokens.isEmpty()) {
-                invalidTokenHandler.handleInvalidTokens(invalidTokens);
-            }
-        } catch (FirebaseMessagingException e) {
-            log.error("[FCM][STOCK_DEADLINE] send failed: {}", e.getMessage(), e);
-        }
+        sendMulticastForAccount(accountId, "[FCM][STOCK_DEADLINE]", message.title(), message.body(), data);
     }
 
     /**
@@ -201,49 +144,51 @@ public class FcmPushService {
             return;
         }
 
-        String title = "품절 임박 알림";
-        String body = String.format("[%s] 수량이 곧 품절돼요! (남은 수량: %d개)", storeName, remaining);
-
-        MulticastMessage msg = MulticastMessage.builder()
-                .addAllTokens(tokenStrings)
-                .setNotification(Notification.builder()
-                        .setTitle(title)
-                        .setBody(body)
-                        .build())
-                .putData("type", "LOW_STOCK")
-                .putData("storeId", String.valueOf(storeId))
-                .putData("storeName", storeName)
-                .putData("groupId", String.valueOf(groupId))
-                .putData("groupName", groupName)
-                .putData("remaining", String.valueOf(remaining))
-                .build();
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
 
         try {
-            BatchResponse res = FirebaseMessaging.getInstance().sendEachForMulticast(msg);
+            FcmSendResult result = fcmSender.sendMulticast(
+                    tokenStrings,
+                    message.title(),
+                    message.body(),
+                    Map.of(
+                            "type", "LOW_STOCK",
+                            "storeId", String.valueOf(storeId),
+                            "storeName", storeName,
+                            "groupId", String.valueOf(groupId),
+                            "groupName", groupName,
+                            "remaining", String.valueOf(remaining)
+                    )
+            );
             log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success={}, failure={}",
-                    storeId, groupId, res.getSuccessCount(), res.getFailureCount());
-        } catch (FirebaseMessagingException e) {
+                    storeId, groupId, result.successCount(), result.failureCount());
+        } catch (Exception e) {
             log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
         }
     }
 
-    private List<String> collectInvalidTokens(BatchResponse response, List<String> tokenStrings) {
-        List<String> invalidTokens = new ArrayList<>();
-        List<SendResponse> responses = response.getResponses();
-        for (int i = 0; i < responses.size(); i++) {
-            SendResponse sendResponse = responses.get(i);
-            if (sendResponse.isSuccessful()) {
-                continue;
-            }
-            FirebaseMessagingException ex = sendResponse.getException();
-            if (ex != null && isInvalidTokenError(ex)) {
-                invalidTokens.add(tokenStrings.get(i));
-            }
-        }
-        return invalidTokens;
-    }
+    private void sendMulticastForAccount(
+            Long accountId,
+            String logPrefix,
+            String title,
+            String body,
+            Map<String, String> data
+    ) {
+        List<FcmToken> tokens = tokenRepository.findAllByAccountIdAndActiveTrue(accountId);
+        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
 
-    private boolean isInvalidTokenError(FirebaseMessagingException exception) {
-        return exception.getMessagingErrorCode() == MessagingErrorCode.UNREGISTERED;
+        if (tokenStrings.isEmpty()) {
+            log.info("{} accountId={}, skipped=no_active_tokens", logPrefix, accountId);
+            return;
+        }
+
+        try {
+            FcmSendResult result = fcmSender.sendMulticast(tokenStrings, title, body, data);
+            log.info("{} accountId={}, success={}, failure={}",
+                    logPrefix, accountId, result.successCount(), result.failureCount());
+        } catch (Exception e) {
+            log.error("{} send failed: {}", logPrefix, e.getMessage(), e);
+        }
     }
 }
