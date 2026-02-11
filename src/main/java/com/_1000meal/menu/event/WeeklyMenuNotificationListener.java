@@ -4,6 +4,8 @@ import com._1000meal.favorite.repository.FavoriteStoreRepository;
 import com._1000meal.fcm.domain.NotificationType;
 import com._1000meal.fcm.service.FcmPushService;
 import com._1000meal.fcm.service.NotificationHistoryService;
+import com._1000meal.menu.domain.MenuGroup;
+import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,6 +25,7 @@ public class WeeklyMenuNotificationListener {
     private final NotificationHistoryService historyService;
     private final FcmPushService fcmPushService;
     private final StoreRepository storeRepository;
+    private final MenuGroupRepository menuGroupRepository;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onWeeklyMenuUploaded(WeeklyMenuUploadedEvent event) {
@@ -39,26 +42,37 @@ public class WeeklyMenuNotificationListener {
             return;
         }
 
-        for (Long accountId : accountIds) {
-            boolean recorded = historyService.tryMarkSent(
-                    NotificationType.WEEKLY_MENU_UPLOADED,
-                    accountId,
-                    store.getId(),
-                    null,
-                    event.weekStart(),
-                    event.weekKey()
-            );
-            if (!recorded) {
+        for (Long groupId : event.menuGroupIds()) {
+            MenuGroup group = menuGroupRepository.findById(groupId).orElse(null);
+            if (group == null) {
+                log.info("[WEEKLY_MENU] group not found. groupId={}", groupId);
                 continue;
             }
+            String groupName = group.getName();
 
-            fcmPushService.sendWeeklyMenuUploadedNotification(
-                    accountId,
-                    store.getId(),
-                    store.getName(),
-                    store.getImageUrl(),
-                    event.weekKey()
-            );
+            for (Long accountId : accountIds) {
+                boolean recorded = historyService.tryMarkSent(
+                        NotificationType.WEEKLY_MENU_UPLOADED,
+                        accountId,
+                        store.getId(),
+                        groupId,
+                        event.weekStart(),
+                        event.weekKey()
+                );
+                if (!recorded) {
+                    continue;
+                }
+
+                fcmPushService.sendWeeklyMenuUploadedNotification(
+                        accountId,
+                        store.getId(),
+                        store.getName(),
+                        groupId,
+                        groupName,
+                        store.getImageUrl(),
+                        event.weekKey()
+                );
+            }
         }
     }
 }

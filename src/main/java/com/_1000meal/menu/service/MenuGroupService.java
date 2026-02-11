@@ -518,10 +518,13 @@ public class MenuGroupService {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
         GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
 
-        if (isWeeklyMenuFilled(storeId, date)) {
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
+        if (filledByGroup.getOrDefault(groupId, false)) {
             LocalDate weekStart = getWeekStart(date);
             String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
-            eventPublisher.publishEvent(new WeeklyMenuUploadedEvent(storeId, weekKey, weekStart));
+            eventPublisher.publishEvent(
+                    new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
+            );
         }
 
         return response;
@@ -617,6 +620,44 @@ public class MenuGroupService {
             }
         }
         return true;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Boolean> isWeeklyMenuFilledByGroup(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = getWeekStart(anyDateInWeek);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
+        if (groups.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
+        List<GroupDailyMenu> groupDailyMenus =
+                groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(groupIds, weekStart, weekEnd);
+
+        Map<Long, Set<LocalDate>> filledByGroup = new HashMap<>();
+        for (GroupDailyMenu gdm : groupDailyMenus) {
+            if (gdm.getMenuNames() != null && !gdm.getMenuNames().isEmpty()) {
+                filledByGroup
+                        .computeIfAbsent(gdm.getMenuGroup().getId(), k -> new HashSet<>())
+                        .add(gdm.getDate());
+            }
+        }
+
+        Map<Long, Boolean> result = new HashMap<>();
+        for (Long groupId : groupIds) {
+            Set<LocalDate> dates = filledByGroup.getOrDefault(groupId, Set.of());
+            boolean ok = true;
+            for (int i = 0; i < 5; i++) {
+                if (!dates.contains(weekStart.plusDays(i))) {
+                    ok = false;
+                    break;
+                }
+            }
+            result.put(groupId, ok);
+        }
+        return result;
     }
 
     private LocalDate getWeekStart(LocalDate date) {

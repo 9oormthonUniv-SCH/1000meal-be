@@ -84,9 +84,51 @@ class MenuGroupServiceWeeklyMenuTest {
         assertFalse(menuGroupService.isWeeklyMenuFilled(storeId, weekStart.plusDays(2)));
     }
 
+    @Test
+    @DisplayName("그룹별 주간 메뉴 완성 여부를 계산한다")
+    void weeklyMenuFilledByGroup() {
+        Long storeId = 1L;
+        MenuGroup g1 = mock(MenuGroup.class);
+        MenuGroup g2 = mock(MenuGroup.class);
+        when(g1.getId()).thenReturn(10L);
+        when(g2.getId()).thenReturn(20L);
+        when(menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId)).thenReturn(List.of(g1, g2));
+
+        LocalDate weekStart = LocalDate.of(2026, 2, 9); // Monday
+        List<GroupDailyMenu> menus = List.of(
+                filledWithGroup(10L, weekStart),
+                filledWithGroup(10L, weekStart.plusDays(1)),
+                filledWithGroup(10L, weekStart.plusDays(2)),
+                filledWithGroup(10L, weekStart.plusDays(3)),
+                filledWithGroup(10L, weekStart.plusDays(4)),
+                filledWithGroup(20L, weekStart),
+                filledWithGroup(20L, weekStart.plusDays(1)),
+                filledWithGroup(20L, weekStart.plusDays(3))
+        );
+        when(groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(
+                List.of(10L, 20L), weekStart, weekStart.plusDays(4)
+        )).thenReturn(menus);
+
+        var result = menuGroupService.isWeeklyMenuFilledByGroup(storeId, weekStart.plusDays(2));
+
+        assertTrue(result.get(10L));
+        assertFalse(result.get(20L));
+    }
+
     private GroupDailyMenu filled(LocalDate date) {
         GroupDailyMenu gdm = GroupDailyMenu.builder()
                 .menuGroup(null)
+                .date(date)
+                .build();
+        gdm.replaceMenus(List.of("menu"));
+        return gdm;
+    }
+
+    private GroupDailyMenu filledWithGroup(Long groupId, LocalDate date) {
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getId()).thenReturn(groupId);
+        GroupDailyMenu gdm = GroupDailyMenu.builder()
+                .menuGroup(group)
                 .date(date)
                 .build();
         gdm.replaceMenus(List.of("menu"));
