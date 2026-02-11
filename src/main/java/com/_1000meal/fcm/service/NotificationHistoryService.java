@@ -18,9 +18,18 @@ public class NotificationHistoryService {
     private final NotificationHistoryRepository historyRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean tryMarkSent(NotificationType type, Long accountId, Long storeId, Long menuGroupId, LocalDate sentDate) {
+    public boolean tryMarkSent(
+            NotificationType type,
+            Long accountId,
+            Long storeId,
+            Long menuGroupId,
+            LocalDate sentDate,
+            String weekKey
+    ) {
         try {
-            historyRepository.saveAndFlush(NotificationHistory.create(type, accountId, storeId, menuGroupId, sentDate));
+            historyRepository.saveAndFlush(NotificationHistory.create(
+                    type, accountId, storeId, menuGroupId, sentDate, weekKey
+            ));
             return true;
         } catch (DataIntegrityViolationException e) {
             return false;

@@ -29,6 +29,10 @@ public final class FcmMessageFactory {
                     "[" + safeGroupName + "] 오픈 안내",
                     withOptionalStoreName("오늘도 천원의 아침밥이 오픈했어요!", storeName)
             );
+            case WEEKLY_MENU_UPLOADED -> new FcmMessage(
+                    "이번 주 메뉴가 올라왔어요",
+                    "[" + storeName + "]에 천원의 아침밥 메뉴를 확인해보세요"
+            );
         };
     }
 

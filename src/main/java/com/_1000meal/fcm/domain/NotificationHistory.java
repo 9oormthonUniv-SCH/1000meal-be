@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
         name = "notification_history",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_notification_history_type_account_store_date",
-                columnNames = {"type", "account_id", "store_id", "menu_group_id", "sent_date"}
+                columnNames = {"type", "account_id", "store_id", "menu_group_id", "sent_date", "week_key"}
         ),
         indexes = @Index(name = "idx_notification_history_account_sent_date", columnList = "account_id, sent_date")
 )
@@ -37,19 +37,30 @@ public class NotificationHistory {
     @Column(name = "menu_group_id")
     private Long menuGroupId;
 
+    @Column(name = "week_key", length = 20)
+    private String weekKey;
+
     @Column(name = "sent_date", nullable = false)
     private LocalDate sentDate;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    public static NotificationHistory create(NotificationType type, Long accountId, Long storeId, Long menuGroupId, LocalDate sentDate) {
+    public static NotificationHistory create(
+            NotificationType type,
+            Long accountId,
+            Long storeId,
+            Long menuGroupId,
+            LocalDate sentDate,
+            String weekKey
+    ) {
         NotificationHistory h = new NotificationHistory();
         h.type = type;
         h.accountId = accountId;
         h.storeId = storeId;
         h.menuGroupId = menuGroupId;
         h.sentDate = sentDate;
+        h.weekKey = weekKey;
         h.createdAt = LocalDateTime.now();
         return h;
     }

@@ -59,7 +59,8 @@ public class OpenNotificationService {
                     target.accountId(),
                     target.storeId(),
                     null,
-                    date
+                    date,
+                    null
             );
             if (!recorded) {
                 log.info("[FCM][OPEN] duplicate skip. accountId={}, storeId={}",

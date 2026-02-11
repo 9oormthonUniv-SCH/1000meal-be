@@ -76,4 +76,13 @@ public interface FavoriteStoreRepository extends JpaRepository<FavoriteStore, Lo
         order by fs.account.id asc, s.id asc, mg.sortOrder asc, mg.id asc
     """)
     List<StockDeadlineCandidate> findStockDeadlineCandidates();
+
+    @Query("""
+        select fs.account.id
+        from FavoriteStore fs
+        join NotificationPreference np on np.accountId = fs.account.id
+        where fs.store.id = :storeId
+          and np.enabled = true
+    """)
+    List<Long> findFavoriteSubscriberAccountIdsByStoreId(@Param("storeId") Long storeId);
 }

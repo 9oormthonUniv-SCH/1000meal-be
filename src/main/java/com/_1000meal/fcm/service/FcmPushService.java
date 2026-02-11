@@ -168,6 +168,27 @@ public class FcmPushService {
         }
     }
 
+    public void sendWeeklyMenuUploadedNotification(
+            Long accountId,
+            Long storeId,
+            String storeName,
+            String imageUrl,
+            String weekKey
+    ) {
+        String title = "이번 주 메뉴가 올라왔어요";
+        String body = "[" + storeName + "]에 천원의 아침밥 메뉴를 확인해보세요\n" +
+                "→ 월~금까지 메뉴가 채워졌을 시 알림";
+
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "WEEKLY_MENU_UPLOADED");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName);
+        data.put("imageUrl", imageUrl == null ? "" : imageUrl);
+        data.put("weekKey", weekKey == null ? "" : weekKey);
+
+        sendMulticastForAccount(accountId, "[FCM][WEEKLY_MENU_UPLOADED]", title, body, data);
+    }
+
     private void sendMulticastForAccount(
             Long accountId,
             String logPrefix,

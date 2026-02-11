@@ -14,6 +14,7 @@ import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
+import com._1000meal.menu.event.WeeklyMenuUploadedEvent;
 import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
@@ -29,7 +30,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +40,8 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -511,7 +516,15 @@ public class MenuGroupService {
             MenuUpdateRequest request
     ) {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
-        return upsertGroupDailyMenu(menuGroup, date, request);
+        GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
+
+        if (isWeeklyMenuFilled(storeId, date)) {
+            LocalDate weekStart = getWeekStart(date);
+            String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+            eventPublisher.publishEvent(new WeeklyMenuUploadedEvent(storeId, weekKey, weekStart));
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -575,6 +588,39 @@ public class MenuGroupService {
             group.initializeStock(capacity);
         }
         return stockRepository.save(group.getStock());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isWeeklyMenuFilled(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = getWeekStart(anyDateInWeek);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
+        if (groups.isEmpty()) {
+            return false;
+        }
+
+        List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
+        List<GroupDailyMenu> groupDailyMenus =
+                groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(groupIds, weekStart, weekEnd);
+
+        Set<LocalDate> filledDates = new HashSet<>();
+        for (GroupDailyMenu gdm : groupDailyMenus) {
+            if (gdm.getMenuNames() != null && !gdm.getMenuNames().isEmpty()) {
+                filledDates.add(gdm.getDate());
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            if (!filledDates.contains(weekStart.plusDays(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private LocalDate getWeekStart(LocalDate date) {
+        return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     /**

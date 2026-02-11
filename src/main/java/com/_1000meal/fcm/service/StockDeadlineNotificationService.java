@@ -49,7 +49,8 @@ public class StockDeadlineNotificationService {
                         target.accountId(),
                         target.storeId(),
                         target.menuGroupId(),
-                        date
+                        date,
+                        null
                 );
                 if (!recorded) {
                     continue;

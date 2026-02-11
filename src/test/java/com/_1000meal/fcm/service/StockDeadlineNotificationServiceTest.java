@@ -45,7 +45,7 @@ class StockDeadlineNotificationServiceTest {
 
         when(favoriteStoreRepository.findStockDeadlineCandidates()).thenReturn(List.of(g1, g2));
         when(policy.canSend(anyInt())).thenReturn(true);
-        when(historyService.tryMarkSent(any(), any(), any(), any(), any())).thenReturn(true);
+        when(historyService.tryMarkSent(any(), any(), any(), any(), any(), any())).thenReturn(true);
 
         service.sendStockDeadlineNotifications(date);
 
