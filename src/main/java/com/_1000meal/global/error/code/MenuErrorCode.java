@@ -15,6 +15,7 @@ public enum MenuErrorCode implements ErrorCodeIfs {
     DATE_REQUIRED("MENU_400", 400, "날짜가 누락됐습니다."),
     FAVORITE_GROUP_NOT_FOUND("MENU_404", 400, "즐겨찾는 메뉴를 찾을 수 없습니다."),
     MENU_GROUP_NOT_FOUND("MENU_GROUP_404", 404, "해당 메뉴 그룹을 찾을 수 없습니다."),
+    MENU_PRESET_NOT_FOUND("MENU_PRESET_404", 404, "자주 쓰는 메뉴를 찾을 수 없습니다."),
     CANNOT_DELETE_DEFAULT_GROUP("MENU_GROUP_400", 400, "기본 메뉴 그룹은 삭제할 수 없습니다."),
     DEFAULT_MENU_NOT_FOUND("DEFAULT_MENU_404", 404, "기본 메뉴 규칙을 찾을 수 없습니다."),
     DEFAULT_MENU_INVALID_MENU("DEFAULT_MENU_INVALID_MENU_400", 400, "그룹에 등록되지 않은 메뉴는 고정메뉴로 설정할 수 없습니다."),
