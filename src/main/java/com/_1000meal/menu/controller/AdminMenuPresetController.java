@@ -15,10 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(
-        name = "관리자 - 자주 쓰는 메뉴",
-        description = "관리자 전용 자주 쓰는 메뉴(프리셋) API"
-)
+@Tag(name = "Admin Menu Preset", description = "관리자 전용 자주 쓰는 메뉴 프리셋 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/admin")
@@ -29,80 +26,78 @@ public class AdminMenuPresetController {
     @Operation(
             summary = "자주 쓰는 메뉴 목록 조회",
             description = """
-                    매장별 자주 쓰는 메뉴(프리셋) 목록을 조회합니다.
-
-                    - 목록 항목은 preview(메뉴명을 콤마로 연결한 문자열)와 생성/수정일을 포함합니다.
-                    - 관리자 권한(ROLE_ADMIN)만 호출 가능합니다.
-                    - storeId는 현재 로그인한 관리자의 매장과 일치해야 합니다.
+                    특정 매장의 특정 메뉴 그룹에 속한 자주 쓰는 메뉴 프리셋 목록을 조회합니다.
+                    - storeId와 groupId 범위로 제한됩니다.
+                    - 목록이 비어 있으면 MENU_PRESET_EMPTY(404)를 반환합니다.
                     """
     )
-    @GetMapping("/stores/{storeId}/menu-presets")
+    @GetMapping("/stores/{storeId}/menus/daily/groups/{groupId}/menu-presets")
     public ApiResponse<List<MenuPresetSummaryResponse>> list(
             @Parameter(description = "매장 ID", example = "1")
-            @PathVariable Long storeId
+            @PathVariable Long storeId,
+            @Parameter(description = "메뉴 그룹 ID", example = "10")
+            @PathVariable Long groupId
     ) {
-        return ApiResponse.ok(menuPresetService.list(storeId));
+        return ApiResponse.ok(menuPresetService.list(storeId, groupId));
     }
 
     @Operation(
             summary = "자주 쓰는 메뉴 생성",
             description = """
-                    입력된 메뉴 목록(menus)만으로 자주 쓰는 메뉴(프리셋)를 생성합니다.
-
-                    - menus는 입력 순서를 유지합니다.
-                    - 서버에서 각 메뉴명을 trim 처리 후, 공백/빈 문자열은 제거합니다.
-                    - trim/제거 후 menus가 비어 있으면 MENU_EMPTY 오류가 발생합니다.
-                    - 관리자 권한(ROLE_ADMIN)만 호출 가능합니다.
-                    - storeId는 현재 로그인한 관리자의 매장과 일치해야 합니다.
+                    특정 매장의 특정 메뉴 그룹에 자주 쓰는 메뉴 프리셋을 생성합니다.
+                    - menus 입력 순서를 유지합니다.
+                    - trim/filter 이후 비어 있으면 MENU_EMPTY(404)를 반환합니다.
                     """
     )
-    @PostMapping("/stores/{storeId}/menu-presets")
+    @PostMapping("/stores/{storeId}/menus/daily/groups/{groupId}/menu-presets")
     public ApiResponse<MenuPresetDetailResponse> create(
             @Parameter(description = "매장 ID", example = "1")
             @PathVariable Long storeId,
+            @Parameter(description = "메뉴 그룹 ID", example = "10")
+            @PathVariable Long groupId,
             @Valid @RequestBody MenuPresetCreateRequest request
     ) {
-        MenuPresetDetailResponse response = menuPresetService.create(storeId, request);
-        return ApiResponse.success(response, SuccessCode.CREATED);
+        MenuPresetDetailResponse response = menuPresetService.create(storeId, groupId, request);
+        return ApiResponse.success(response, SuccessCode.OK);
     }
 
     @Operation(
             summary = "자주 쓰는 메뉴 상세 조회",
             description = """
-                    자주 쓰는 메뉴(프리셋) 상세 정보를 조회합니다.
-
-                    - menus(메뉴명 목록)과 preview(메뉴명을 콤마로 연결한 문자열)를 반환합니다.
-                    - 관리자 권한(ROLE_ADMIN)만 호출 가능합니다.
-                    - storeId는 현재 로그인한 관리자의 매장과 일치해야 합니다.
+                    특정 매장/메뉴 그룹 범위에서 프리셋 상세를 조회합니다.
+                    - 범위 밖 presetId는 MENU_PRESET_NOT_FOUND(404)를 반환합니다.
                     """
     )
-    @GetMapping("/stores/{storeId}/menu-presets/{presetId}")
+    @GetMapping("/stores/{storeId}/menus/daily/groups/{groupId}/menu-presets/{presetId}")
     public ApiResponse<MenuPresetDetailResponse> get(
             @Parameter(description = "매장 ID", example = "1")
             @PathVariable Long storeId,
+            @Parameter(description = "메뉴 그룹 ID", example = "10")
+            @PathVariable Long groupId,
             @Parameter(description = "자주 쓰는 메뉴 ID", example = "101")
             @PathVariable Long presetId
     ) {
-        return ApiResponse.ok(menuPresetService.get(storeId, presetId));
+        return ApiResponse.ok(menuPresetService.get(storeId, groupId, presetId));
     }
 
     @Operation(
             summary = "자주 쓰는 메뉴 삭제",
             description = """
-                    자주 쓰는 메뉴(프리셋)를 삭제합니다.
-
-                    - 관리자 권한(ROLE_ADMIN)만 호출 가능합니다.
-                    - storeId는 현재 로그인한 관리자의 매장과 일치해야 합니다.
+                    특정 매장/메뉴 그룹 범위에서 프리셋을 삭제합니다.
+                    - 범위 밖 presetId는 MENU_PRESET_NOT_FOUND(404)를 반환합니다.
                     """
     )
-    @DeleteMapping("/stores/{storeId}/menu-presets/{presetId}")
+    @DeleteMapping("/stores/{storeId}/menus/daily/groups/{groupId}/menu-presets/{presetId}")
     public ApiResponse<Void> delete(
             @Parameter(description = "매장 ID", example = "1")
             @PathVariable Long storeId,
+            @Parameter(description = "메뉴 그룹 ID", example = "10")
+            @PathVariable Long groupId,
             @Parameter(description = "자주 쓰는 메뉴 ID", example = "101")
             @PathVariable Long presetId
     ) {
-        menuPresetService.delete(storeId, presetId);
+        menuPresetService.delete(storeId, groupId, presetId);
         return ApiResponse.success(null, SuccessCode.OK);
     }
 }
+

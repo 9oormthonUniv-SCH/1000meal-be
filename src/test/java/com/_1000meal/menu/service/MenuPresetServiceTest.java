@@ -4,10 +4,12 @@ import com._1000meal.auth.service.CurrentAccountProvider;
 import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
+import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuPreset;
 import com._1000meal.menu.dto.MenuPresetCreateRequest;
 import com._1000meal.menu.dto.MenuPresetDetailResponse;
 import com._1000meal.menu.dto.MenuPresetSummaryResponse;
+import com._1000meal.menu.repository.MenuGroupRepository;
 import com._1000meal.menu.repository.MenuPresetRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -18,6 +20,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +35,9 @@ class MenuPresetServiceTest {
     MenuPresetRepository menuPresetRepository;
 
     @Mock
+    MenuGroupRepository menuGroupRepository;
+
+    @Mock
     StoreRepository storeRepository;
 
     @Mock
@@ -41,130 +47,173 @@ class MenuPresetServiceTest {
     MenuPresetService menuPresetService;
 
     @Test
-    @DisplayName("create: 성공 - 공백 제거 후 menus 저장")
+    @DisplayName("create: success in store+group scope")
     void create_success() throws Exception {
         Long storeId = 1L;
-        Long accountId = 10L;
+        Long groupId = 10L;
+        Long accountId = 100L;
 
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
         when(currentAccountProvider.getCurrentAccountId()).thenReturn(accountId);
 
         Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
 
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.of(group));
+
         MenuPresetCreateRequest request = new MenuPresetCreateRequest();
-        setField(request, "menus", List.of(" 김치찌개 ", " ", "김밥"));
+        setField(request, "menus", List.of(" Kimchi ", " ", "Kimbap"));
 
-        MenuPreset preset = MenuPreset.builder()
+        MenuPreset saved = MenuPreset.builder()
                 .store(store)
+                .groupId(groupId)
                 .createdByAccountId(accountId)
-                .menus(List.of("김치찌개", "김밥"))
+                .menus(List.of("Kimchi", "Kimbap"))
                 .build();
-        setField(preset, "id", 101L);
-        setField(preset, "createdAt", LocalDateTime.of(2026, 2, 9, 10, 0));
-        setField(preset, "updatedAt", LocalDateTime.of(2026, 2, 9, 10, 0));
+        setField(saved, "id", 101L);
+        setField(saved, "createdAt", LocalDateTime.of(2026, 2, 12, 10, 0));
+        setField(saved, "updatedAt", LocalDateTime.of(2026, 2, 12, 10, 0));
 
-        when(menuPresetRepository.save(any(MenuPreset.class))).thenReturn(preset);
+        when(menuPresetRepository.save(any(MenuPreset.class))).thenReturn(saved);
 
-        MenuPresetDetailResponse response = menuPresetService.create(storeId, request);
+        MenuPresetDetailResponse response = menuPresetService.create(storeId, groupId, request);
 
         assertEquals(101L, response.getId());
-        assertEquals(List.of("김치찌개", "김밥"), response.getMenus());
-        assertEquals("김치찌개, 김밥", response.getPreview());
+        assertEquals(storeId, response.getStoreId());
+        assertEquals(groupId, response.getGroupId());
+        assertEquals(List.of("Kimchi", "Kimbap"), response.getMenus());
     }
 
     @Test
-    @DisplayName("create: 공백 제거 후 비어있으면 MENU_EMPTY")
+    @DisplayName("create: MENU_EMPTY when menus become empty after trim")
     void create_emptyAfterTrim() {
         Long storeId = 1L;
+        Long groupId = 10L;
 
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mock(Store.class)));
 
+        MenuGroup group = mock(MenuGroup.class);
+        Store groupStore = mock(Store.class);
+        when(groupStore.getId()).thenReturn(storeId);
+        when(group.getStore()).thenReturn(groupStore);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.of(group));
+
         MenuPresetCreateRequest request = new MenuPresetCreateRequest();
-        setField(request, "menus", List.of("  ", ""));
+        setField(request, "menus", List.of(" ", ""));
 
         CustomException ex = assertThrows(CustomException.class,
-                () -> menuPresetService.create(storeId, request));
+                () -> menuPresetService.create(storeId, groupId, request));
 
         assertEquals(MenuErrorCode.MENU_EMPTY, ex.getErrorCodeIfs());
         verify(menuPresetRepository, never()).save(any());
     }
 
     @Test
-    @DisplayName("list: 요약 응답 preview 생성")
-    void list_success() throws Exception {
+    @DisplayName("list: MENU_PRESET_EMPTY when scoped list is empty")
+    void list_empty() {
         Long storeId = 1L;
+        Long groupId = 10L;
 
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
         when(storeRepository.findById(storeId)).thenReturn(Optional.of(mock(Store.class)));
 
-        MenuPreset preset = MenuPreset.builder()
-                .store(mock(Store.class))
-                .createdByAccountId(10L)
-                .menus(List.of("김치찌개", "김밥"))
-                .build();
-        setField(preset, "id", 1L);
-        setField(preset, "createdAt", LocalDateTime.of(2026, 2, 9, 10, 0));
-        setField(preset, "updatedAt", LocalDateTime.of(2026, 2, 9, 10, 0));
+        MenuGroup group = mock(MenuGroup.class);
+        Store groupStore = mock(Store.class);
+        when(groupStore.getId()).thenReturn(storeId);
+        when(group.getStore()).thenReturn(groupStore);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.of(group));
 
-        when(menuPresetRepository.findByStoreIdWithMenus(storeId)).thenReturn(List.of(preset));
+        when(menuPresetRepository.findAllByStoreIdAndGroupIdWithMenus(storeId, groupId)).thenReturn(List.of());
 
-        List<MenuPresetSummaryResponse> result = menuPresetService.list(storeId);
+        CustomException ex = assertThrows(CustomException.class,
+                () -> menuPresetService.list(storeId, groupId));
 
-        assertEquals(1, result.size());
-        assertEquals("김치찌개, 김밥", result.get(0).getPreview());
+        assertEquals(MenuErrorCode.MENU_PRESET_EMPTY, ex.getErrorCodeIfs());
     }
 
     @Test
-    @DisplayName("get: 상세 조회 성공")
+    @DisplayName("get: scoped detail success")
     void get_success() throws Exception {
         Long storeId = 1L;
-        Long presetId = 2L;
+        Long groupId = 10L;
+        Long presetId = 101L;
 
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
 
         Store store = mock(Store.class);
         when(store.getId()).thenReturn(storeId);
 
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.of(group));
+
         MenuPreset preset = MenuPreset.builder()
                 .store(store)
-                .createdByAccountId(10L)
-                .menus(List.of("우동", "라면"))
+                .groupId(groupId)
+                .createdByAccountId(100L)
+                .menus(List.of("A", "B"))
                 .build();
         setField(preset, "id", presetId);
-        setField(preset, "createdAt", LocalDateTime.of(2026, 2, 9, 10, 0));
-        setField(preset, "updatedAt", LocalDateTime.of(2026, 2, 9, 10, 0));
+        setField(preset, "createdAt", LocalDateTime.of(2026, 2, 12, 10, 0));
+        setField(preset, "updatedAt", LocalDateTime.of(2026, 2, 12, 10, 0));
 
-        when(menuPresetRepository.findByIdAndStoreIdWithMenus(presetId, storeId))
+        when(menuPresetRepository.findByIdAndStoreIdAndGroupIdWithMenus(presetId, storeId, groupId))
                 .thenReturn(Optional.of(preset));
 
-        MenuPresetDetailResponse response = menuPresetService.get(storeId, presetId);
+        MenuPresetDetailResponse response = menuPresetService.get(storeId, groupId, presetId);
 
         assertEquals(presetId, response.getId());
-        assertEquals(List.of("우동", "라면"), response.getMenus());
+        assertEquals(groupId, response.getGroupId());
     }
 
     @Test
-    @DisplayName("delete: 성공")
+    @DisplayName("delete: scoped delete success")
     void delete_success() {
         Long storeId = 1L;
-        Long presetId = 3L;
+        Long groupId = 10L;
+        Long presetId = 101L;
 
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
 
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
+
+        MenuGroup group = mock(MenuGroup.class);
+        when(group.getStore()).thenReturn(store);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.of(group));
+
         MenuPreset preset = MenuPreset.builder()
-                .store(mock(Store.class))
-                .createdByAccountId(10L)
-                .menus(List.of("비빔밥"))
+                .store(store)
+                .groupId(groupId)
+                .createdByAccountId(100L)
+                .menus(List.of("A"))
                 .build();
 
-        when(menuPresetRepository.findByIdAndStoreId(presetId, storeId))
+        when(menuPresetRepository.findByIdAndStoreIdAndGroupId(presetId, storeId, groupId))
                 .thenReturn(Optional.of(preset));
 
-        menuPresetService.delete(storeId, presetId);
+        menuPresetService.delete(storeId, groupId, presetId);
 
         verify(menuPresetRepository).delete(preset);
+    }
+
+    @Test
+    @DisplayName("group mismatch: MENU_GROUP_NOT_FOUND")
+    void groupMismatch() {
+        Long storeId = 1L;
+        Long groupId = 99L;
+
+        when(currentAccountProvider.getCurrentStoreId()).thenReturn(storeId);
+        when(menuGroupRepository.findByIdAndStoreId(groupId, storeId)).thenReturn(Optional.empty());
+
+        CustomException ex = assertThrows(CustomException.class,
+                () -> menuPresetService.list(storeId, groupId));
+
+        assertEquals(MenuErrorCode.MENU_GROUP_NOT_FOUND, ex.getErrorCodeIfs());
     }
 
     @Test
@@ -173,15 +222,20 @@ class MenuPresetServiceTest {
         when(currentAccountProvider.getCurrentStoreId()).thenReturn(2L);
 
         CustomException ex = assertThrows(CustomException.class,
-                () -> menuPresetService.list(1L));
+                () -> menuPresetService.list(1L, 10L));
 
         assertEquals(StoreErrorCode.STORE_ACCESS_DENIED, ex.getErrorCodeIfs());
-        verifyNoInteractions(storeRepository, menuPresetRepository);
+        verifyNoInteractions(storeRepository, menuGroupRepository, menuPresetRepository);
     }
 
-    private static void setField(Object target, String fieldName, Object value) throws Exception {
-        var field = target.getClass().getDeclaredField(fieldName);
-        field.setAccessible(true);
-        field.set(target, value);
+    private static void setField(Object target, String fieldName, Object value) {
+        try {
+            Field field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
+

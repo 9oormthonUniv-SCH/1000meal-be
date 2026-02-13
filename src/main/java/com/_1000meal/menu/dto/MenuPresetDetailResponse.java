@@ -12,6 +12,7 @@ import java.util.List;
 public class MenuPresetDetailResponse {
     private Long id;
     private Long storeId;
+    private Long groupId;
     private List<String> menus;
     private String preview;
     private LocalDateTime createdAt;
@@ -23,6 +24,7 @@ public class MenuPresetDetailResponse {
         return MenuPresetDetailResponse.builder()
                 .id(preset.getId())
                 .storeId(storeId)
+                .groupId(preset.getGroupId())
                 .menus(menus)
                 .preview(String.join(", ", menus))
                 .createdAt(preset.getCreatedAt())

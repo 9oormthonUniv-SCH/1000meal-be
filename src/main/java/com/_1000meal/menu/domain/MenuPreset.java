@@ -16,7 +16,10 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(
         name = "menu_presets",
-        indexes = @Index(name = "idx_menu_presets_store", columnList = "store_id")
+        indexes = {
+                @Index(name = "idx_menu_presets_store", columnList = "store_id"),
+                @Index(name = "idx_menu_presets_store_group", columnList = "store_id, group_id")
+        }
 )
 public class MenuPreset {
 
@@ -27,6 +30,9 @@ public class MenuPreset {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
+
+    @Column(name = "group_id", nullable = false)
+    private Long groupId;
 
     @Column(name = "created_by_account_id", nullable = false)
     private Long createdByAccountId;
@@ -47,8 +53,9 @@ public class MenuPreset {
     private LocalDateTime updatedAt;
 
     @Builder
-    public MenuPreset(Store store, Long createdByAccountId, List<String> menus) {
+    public MenuPreset(Store store, Long groupId, Long createdByAccountId, List<String> menus) {
         this.store = store;
+        this.groupId = groupId;
         this.createdByAccountId = createdByAccountId;
         if (menus != null) {
             this.menus.addAll(menus);
