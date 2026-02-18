@@ -46,7 +46,7 @@ INSERT INTO `accounts` (`id`, `user_id`, `email`, `password_hash`, `role`, `stat
 INSERT INTO `accounts`
 (`id`, `user_id`, `email`, `password_hash`, `role`, `status`)
 VALUES
-    (23,'student1','student1@sch.ac.kr','$2a$10$QpK0N8RzQ7Yq9Qm4cH0JEu2Z9Rr9c4WZkzYc8m3dU9sRrZyKk1U2a','STUDENT','ACTIVE')
+    (23,'20204020','wngmstla@sch.ac.kr','$2a$10$ZVBQymsNIJ9im6/jUtTN.uLR7SOv0AXxarzwu4FlMY3yBSQ9Sa/7C','STUDENT','ACTIVE')
     ON DUPLICATE KEY UPDATE
                          `user_id`=VALUES(`user_id`),
                          `email`=VALUES(`email`),
@@ -76,11 +76,26 @@ INSERT INTO `admin_profiles` (`id`, `account_id`, `store_id`, `admin_level`, `di
 INSERT INTO `user_profiles`
 (`id`, `account_id`, `department`, `name`, `phone`)
 VALUES
-    (2,23,'컴퓨터소프트웨어공학과','학생1','010-1111-2222')
+    (2,23,'컴퓨터소프트웨어공학과','심주흔','010-1111-2222')
     ON DUPLICATE KEY UPDATE
                          `department`=VALUES(`department`),
                          `name`=VALUES(`name`),
                          `phone`=VALUES(`phone`);
+
+
+-- SECTION: menu_group (default groups per store)
+INSERT INTO menu_group
+(store_id, daily_menu_id, name, sort_order, is_default)
+VALUES
+    (4, NULL, '크앙분식', 1, b'0'),
+    (4, NULL, '뼈해장국', 2, b'0'),
+    (1, NULL, '향설 1관', 1, b'0'),
+    (2, NULL, '야외 그라찌에', 1, b'0'),
+    (3, NULL, '베이커리 경', 1, b'0')
+    ON DUPLICATE KEY UPDATE
+                         -- seed에서는 name/store_id는 건드리지 않음
+                         sort_order = VALUES(sort_order);
+
 
 
 SET FOREIGN_KEY_CHECKS=1;
