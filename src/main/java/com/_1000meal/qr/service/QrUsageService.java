@@ -7,6 +7,7 @@ import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
+import com._1000meal.qr.exception.MissingStudentNumberException;
 import com._1000meal.qr.api.dto.QrUsageResponse;
 import com._1000meal.qr.domain.MealUsage;
 import com._1000meal.qr.domain.StoreQr;
@@ -55,9 +56,13 @@ public class QrUsageService {
         LocalDate usedDate = nowKst.toLocalDate();
         LocalDateTime usedAt = nowKst.toLocalDateTime();
 
-        String deptSnapshot = profile.getDepartment() == null ? "" : profile.getDepartment();
         String studentNoSnapshot = account.getUserId();
-        String nameSnapshot = profile.getName();
+        if (studentNoSnapshot == null || studentNoSnapshot.isBlank()) {
+            throw new MissingStudentNumberException();
+        }
+
+        String deptSnapshot = profile.getDepartment() == null ? "" : profile.getDepartment();
+        String nameSnapshot = profile.getName() == null ? "" : profile.getName();
 
         MealUsage mealUsage = MealUsage.create(
                 account,

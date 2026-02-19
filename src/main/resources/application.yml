@@ -153,3 +153,9 @@ app:
       vapid-public-key: ${VAPID_PUBLIC_KEY:}
       vapid-private-key: ${VAPID_PRIVATE_KEY:}
       subject: ${VAPID_SUBJECT:mailto:admin@your-domain.com}
+
+qr:
+  roster:
+    base-dir: ./var/rosters
+    file-encoding: UTF-8
+    include-bom: true
