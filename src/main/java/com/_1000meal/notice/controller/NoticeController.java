@@ -7,6 +7,7 @@ import com._1000meal.notice.dto.NoticeImagePresignRequest;
 import com._1000meal.notice.dto.NoticeImagePresignResponse;
 import com._1000meal.notice.dto.NoticeImageRegisterRequest;
 import com._1000meal.notice.dto.NoticeImageResponse;
+import com._1000meal.notice.dto.NoticeListItemResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import com._1000meal.notice.dto.NoticeUpdateRequest;
 import com._1000meal.notice.service.NoticeService;
@@ -38,8 +39,8 @@ public class NoticeController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "공지사항 목록 조회 성공")
     })
     @GetMapping
-    public ApiResponse<List<NoticeResponse>> list() {
-        List<NoticeResponse> response = noticeService.getAllNotice();
+    public ApiResponse<List<NoticeListItemResponse>> list() {
+        List<NoticeListItemResponse> response = noticeService.getAllNotice();
         return ApiResponse.success(response, SuccessCode.OK);
     }
 

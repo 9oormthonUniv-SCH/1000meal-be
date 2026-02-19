@@ -7,8 +7,10 @@ import com._1000meal.notice.dto.NoticeImagePresignRequest;
 import com._1000meal.notice.dto.NoticeImagePresignResponse;
 import com._1000meal.notice.dto.NoticeImageRegisterRequest;
 import com._1000meal.notice.dto.NoticeImageResponse;
+import com._1000meal.notice.dto.NoticeListItemResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import com._1000meal.notice.dto.NoticeUpdateRequest;
+import com._1000meal.notice.repository.NoticeImageRepository;
 import com._1000meal.notice.repository.NoticeRepository;
 import com._1000meal.global.error.code.NoticeErrorCode; // 가정: 존재
 import lombok.RequiredArgsConstructor;
@@ -18,7 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com._1000meal.notice.domain.Notice.toResponse;
 
@@ -28,14 +32,32 @@ import static com._1000meal.notice.domain.Notice.toResponse;
 public class NoticeService {
 
     private final NoticeRepository noticeRepository;
+    private final NoticeImageRepository noticeImageRepository;
     private final NoticeImageService noticeImageService;
 
     @Transactional(readOnly = true)
-    public List<NoticeResponse> getAllNotice() {
-        return noticeRepository.findAllByDeletedAtIsNullAndIsPublishedTrue(
-                        Sort.by(Sort.Order.desc("isPinned"), Sort.Order.desc("createdAt"))
-                ).stream()
-                .map(Notice::toResponse)
+    public List<NoticeListItemResponse> getAllNotice() {
+        List<Notice> notices = noticeRepository.findAllByDeletedAtIsNullAndIsPublishedTrue(
+                Sort.by(Sort.Order.desc("isPinned"), Sort.Order.desc("createdAt"))
+        );
+
+        if (notices.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> noticeIds = notices.stream()
+                .map(Notice::getId)
+                .toList();
+
+        Set<Long> noticeIdsWithImages = new HashSet<>(
+                noticeImageRepository.findNoticeIdsWithImagesIn(noticeIds)
+        );
+
+        return notices.stream()
+                .map(notice -> Notice.toListItemResponse(
+                        notice,
+                        noticeIdsWithImages.contains(notice.getId())
+                ))
                 .toList();
     }
 

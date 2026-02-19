@@ -1,6 +1,7 @@
 package com._1000meal.notice.domain;
 
 import com._1000meal.notice.dto.NoticeImageResponse;
+import com._1000meal.notice.dto.NoticeListItemResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import jakarta.persistence.*;
 import lombok.*;
@@ -80,6 +81,20 @@ public class Notice {
                 n.getCreatedAt().format(F),
                 n.getUpdatedAt().format(F),
                 images
+        );
+    }
+
+    public static NoticeListItemResponse toListItemResponse(Notice n, boolean hasImage) {
+        final DateTimeFormatter F = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+        return new NoticeListItemResponse(
+                n.getId(),
+                n.getTitle(),
+                n.getContent(),
+                n.isPublished(),
+                n.isPinned(),
+                hasImage,
+                n.getCreatedAt().format(F),
+                n.getUpdatedAt().format(F)
         );
     }
 }
