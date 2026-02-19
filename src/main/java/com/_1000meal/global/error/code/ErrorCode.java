@@ -11,6 +11,7 @@ public enum ErrorCode implements ErrorCodeIfs {
     // ===== 공용(HTTP 표준 맵핑) =====
     BAD_REQUEST("COMMON_400", 400, "잘못된 요청입니다."),
     VALIDATION_ERROR("COMMON_400_VALIDATION", 400, "요청 값 검증에 실패했습니다."),
+    UNPROCESSABLE_ENTITY("COMMON_422", 422, "요청을 처리할 수 없습니다."),
     UNAUTHORIZED("AUTH_401", 401, "인증이 필요합니다."),
     FORBIDDEN("AUTH_403", 403, "권한이 없습니다."),
     NOT_FOUND("COMMON_404", 404, "리소스를 찾을 수 없습니다."),
