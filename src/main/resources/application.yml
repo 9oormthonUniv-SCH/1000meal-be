@@ -123,6 +123,7 @@ jwt:
   access-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}
 
 fcm:
+  enabled: false
   service-account-base64: ${FCM_SERVICE_ACCOUNT_BASE64:}
 
 logging:

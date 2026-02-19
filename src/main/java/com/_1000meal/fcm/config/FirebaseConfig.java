@@ -6,8 +6,8 @@ import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -15,7 +15,7 @@ import java.util.Base64;
 import java.util.List;
 
 @Slf4j
-@Profile({"prod", "dev-firebase"})
+@ConditionalOnProperty(name = "fcm.enabled", havingValue = "true")
 @Configuration
 public class FirebaseConfig {
 
@@ -47,7 +47,7 @@ public class FirebaseConfig {
             return;
         }
 
-        throw new IllegalStateException("firebase.service-account-json is empty");
+        throw new IllegalStateException("FCM enabled but no service account credentials provided.");
     }
 
     private void initializeFromJson(String json) throws Exception {
