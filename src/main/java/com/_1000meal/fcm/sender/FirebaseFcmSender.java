@@ -6,15 +6,11 @@ import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@ConditionalOnProperty(name = "fcm.enabled", havingValue = "true")
-@Component
 @RequiredArgsConstructor
 public class FirebaseFcmSender implements FcmSender {
 
