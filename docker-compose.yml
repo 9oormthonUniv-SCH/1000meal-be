@@ -1,5 +1,3 @@
-
-
 services:
   app:
     build: .
@@ -11,8 +9,6 @@ services:
       - .env
 
     environment:
-
-      # 🔒 JPA 잠금
       SPRING_DATASOURCE_URL: jdbc:mysql://soonbob-db.cneoikiukcul.ap-northeast-2.rds.amazonaws.com:3306/1000meal_test?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=utf8
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: 242f4NLz
@@ -20,7 +16,6 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_SQL_INIT_MODE: never
 
-      # Flyway (최소 설정)
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_LOCATIONS: "classpath:db/migration"
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
@@ -29,14 +24,14 @@ services:
 
       LOGGING_LEVEL_org_flywaydb: DEBUG
 
-      # 기타
       ACCESS_KEY: ${ACCESS_KEY}
       SECRET_KEY: ${SECRET_KEY}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
 
-
+    volumes:
+      - ./var/rosters:/app/var/rosters   # 🔥 추가된 부분
 
     restart: "no"
 
@@ -46,8 +41,6 @@ services:
         awslogs-region: ap-northeast-2
         awslogs-group: /1000meal/test/app
         awslogs-create-group: "true"
-
-
 
 volumes:
   mysql-1000meal-data:
