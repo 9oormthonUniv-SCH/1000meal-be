@@ -9,6 +9,7 @@ import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.qr.exception.MissingStudentNumberException;
 import com._1000meal.qr.api.dto.QrUsageResponse;
+import com._1000meal.qr.api.dto.TodayQrUsageResponse;
 import com._1000meal.qr.domain.MealUsage;
 import com._1000meal.qr.domain.StoreQr;
 import com._1000meal.qr.repository.MealUsageRepository;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +87,34 @@ public class QrUsageService {
                 store.getName(),
                 nowKst.toOffsetDateTime().toString(),
                 usedDate
+        );
+    }
+
+    public TodayQrUsageResponse getTodayUsage(Long accountId) {
+        LocalDate usedDate = LocalDate.now(KST);
+        Optional<MealUsage> usage = mealUsageRepository
+                .findTop1ByUserIdAndUsedDateOrderByUsedAtDesc(accountId, usedDate);
+
+        if (usage.isEmpty()) {
+            return new TodayQrUsageResponse(false, null, null, null, null);
+        }
+
+        MealUsage mealUsage = usage.get();
+        Long storeId = mealUsage.getStore().getId();
+        String storeName = storeRepository.findById(storeId)
+                .map(Store::getName)
+                .orElse(null);
+        String usedAt = mealUsage.getUsedAt()
+                .atZone(KST)
+                .toOffsetDateTime()
+                .toString();
+
+        return new TodayQrUsageResponse(
+                true,
+                storeId,
+                storeName,
+                usedAt,
+                mealUsage.getUsedDate().toString()
         );
     }
 }
