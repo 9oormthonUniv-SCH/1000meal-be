@@ -7,7 +7,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 
 public interface MealUsageRepository extends JpaRepository<MealUsage, Long> {
-    Optional<MealUsage> findTop1ByUserIdAndUsedDate(Long userId, LocalDate usedDate);
+    Optional<MealUsage> findTop1ByUserIdAndUsedDateOrderByUsedAtDesc(Long userId, LocalDate usedDate);
 
     java.util.List<MealUsage> findAllByStoreIdAndUsedDateOrderByUsedAtAsc(Long storeId, LocalDate usedDate);
 
