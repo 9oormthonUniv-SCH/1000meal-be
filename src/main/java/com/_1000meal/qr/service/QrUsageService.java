@@ -80,7 +80,9 @@ public class QrUsageService {
                 nameSnapshot
         );
 
-        Long menuGroupId = qrTargetMenuGroupResolver.resolveMenuGroupId(store.getId(), usedDate);
+        Long menuGroupId = storeQr.getMenuGroupId() != null
+                ? storeQr.getMenuGroupId()
+                : qrTargetMenuGroupResolver.resolveMenuGroupId(store.getId(), usedDate);
         int updated = menuGroupStockRepository.decrementStockIfAvailable(menuGroupId);
         if (updated == 0) {
             throw new SoldOutException();

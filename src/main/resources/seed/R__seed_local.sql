@@ -97,5 +97,53 @@ VALUES
                          sort_order = VALUES(sort_order);
 
 
+-- 향설 1관 (store_id=1) : 그룹 지정 없이 대표 QR로 유지 (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (1, NULL, 'E722A795-B214-43E8-B8AE-A336ED0FBDC4', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+-- 향설 2관 - 크앙분식 (store_id=4, menu_group_id = (SELECT id ...))
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+SELECT 4, mg.id, 'C963DB9D-006A-47EB-A5AC-30FEEABF4004', 1, NOW(6)
+FROM menu_group mg
+WHERE mg.store_id = 4 AND mg.name = '크앙분식'
+    LIMIT 1
+ON DUPLICATE KEY UPDATE
+                     store_id = VALUES(store_id),
+                     menu_group_id = VALUES(menu_group_id),
+                     is_active = VALUES(is_active);
+
+-- 향설 2관 - 뼈해장국 (store_id=4, menu_group_id = (SELECT id ...))
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+SELECT 4, mg.id, 'E7CD3F45-D947-4F65-957C-8D9C0B11DF20', 1, NOW(6)
+FROM menu_group mg
+WHERE mg.store_id = 4 AND mg.name = '뼈해장국'
+    LIMIT 1
+ON DUPLICATE KEY UPDATE
+                     store_id = VALUES(store_id),
+                     menu_group_id = VALUES(menu_group_id),
+                     is_active = VALUES(is_active);
+
+-- 야외 그라찌에 (store_id=2) : 대표 QR (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (2, NULL, '1B5AA8A2-76D0-42C7-A5C5-CED284AB461B', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+-- 베이커리 경 (store_id=3) : 대표 QR (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (3, NULL, '9A29E537-BF66-4E58-87FC-4180C37C8D80', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+
+
 
 SET FOREIGN_KEY_CHECKS=1;
