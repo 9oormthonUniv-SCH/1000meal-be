@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "store_qr",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_store_qr_store", columnNames = "store_id"),
+                @UniqueConstraint(name = "uq_store_qr_store_group", columnNames = {"store_id", "menu_group_id"}),
                 @UniqueConstraint(name = "uk_store_qr_token", columnNames = "qr_token")
         }
 )
@@ -30,6 +30,9 @@ public class StoreQr {
 
     @Column(name = "qr_token", length = 100, nullable = false)
     private String qrToken;
+
+    @Column(name = "menu_group_id")
+    private Long menuGroupId;
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive;

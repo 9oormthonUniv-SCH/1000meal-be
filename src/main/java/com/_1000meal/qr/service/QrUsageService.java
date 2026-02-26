@@ -8,12 +8,14 @@ import com._1000meal.global.error.code.ErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.qr.exception.MissingStudentNumberException;
+import com._1000meal.qr.exception.SoldOutException;
 import com._1000meal.qr.api.dto.QrUsageResponse;
 import com._1000meal.qr.api.dto.TodayQrUsageResponse;
 import com._1000meal.qr.domain.MealUsage;
 import com._1000meal.qr.domain.StoreQr;
 import com._1000meal.qr.repository.MealUsageRepository;
 import com._1000meal.qr.repository.StoreQrRepository;
+import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,8 @@ public class QrUsageService {
     private final StoreRepository storeRepository;
     private final AccountRepository accountRepository;
     private final UserProfileRepository userProfileRepository;
+    private final MenuGroupStockRepository menuGroupStockRepository;
+    private final QrTargetMenuGroupResolver qrTargetMenuGroupResolver;
 
     @Transactional
     public QrUsageResponse createUsage(Long accountId, String qrToken) {
@@ -75,6 +79,14 @@ public class QrUsageService {
                 studentNoSnapshot,
                 nameSnapshot
         );
+
+        Long menuGroupId = storeQr.getMenuGroupId() != null
+                ? storeQr.getMenuGroupId()
+                : qrTargetMenuGroupResolver.resolveMenuGroupId(store.getId(), usedDate);
+        int updated = menuGroupStockRepository.decrementStockIfAvailable(menuGroupId);
+        if (updated == 0) {
+            throw new SoldOutException();
+        }
 
         try {
             mealUsageRepository.save(mealUsage);

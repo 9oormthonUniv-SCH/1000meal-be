@@ -4,6 +4,7 @@ import com._1000meal.menu.domain.MenuGroupStock;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -19,4 +20,13 @@ public interface MenuGroupStockRepository extends JpaRepository<MenuGroupStock, 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM MenuGroupStock s WHERE s.menuGroup.id = :groupId")
     Optional<MenuGroupStock> findByMenuGroupIdForUpdate(@Param("groupId") Long groupId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE MenuGroupStock s
+               SET s.stock = s.stock - 1
+             WHERE s.menuGroup.id = :menuGroupId
+               AND s.stock > 0
+            """)
+    int decrementStockIfAvailable(@Param("menuGroupId") Long menuGroupId);
 }
