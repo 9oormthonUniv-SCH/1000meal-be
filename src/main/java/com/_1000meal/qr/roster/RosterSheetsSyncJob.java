@@ -63,7 +63,8 @@ public class RosterSheetsSyncJob {
     private static final long INITIAL_DELAY_MS = 5000L; // 초기 딜레이 시간
     private static final long JITTER_MS = 500L; // 추가 딜레이 증가 값
 
-    @Scheduled(cron = "00 * 23 * * *", zone = "Asia/Seoul")
+    // 운영환경에서는 (00 00 11 ? * MON-FRI) 로 변경 예정
+    @Scheduled(cron = "00 00 * * * *", zone = "Asia/Seoul") // 테스트 진행을 위해 00 00 * * * * 로 설정
     public void syncDailyRoster() {
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
             log.warn("[CSV to Sheets] sheets.spreadsheet-id 가 설정되어 있지 않아 동기화를 건너뜁니다.");
