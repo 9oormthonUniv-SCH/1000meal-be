@@ -17,7 +17,7 @@ public class RosterExportJob {
 
     private final RosterExportService rosterExportService;
 
-    @Scheduled(cron = "0 0 10 * * *", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
     public void runDaily() {
         LocalDate usedDate = LocalDate.now(KST);
         log.info("Roster export job started: usedDate={}", usedDate);
