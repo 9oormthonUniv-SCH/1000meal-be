@@ -70,19 +70,20 @@ public class QrUsageService {
         String deptSnapshot = profile.getDepartment() == null ? "" : profile.getDepartment();
         String nameSnapshot = profile.getName() == null ? "" : profile.getName();
 
+        Long menuGroupId = storeQr.getMenuGroupId() != null
+                ? storeQr.getMenuGroupId()
+                : qrTargetMenuGroupResolver.resolveMenuGroupId(store.getId(), usedDate);
+
         MealUsage mealUsage = MealUsage.create(
                 account,
                 store,
+                menuGroupId,
                 usedAt,
                 usedDate,
                 deptSnapshot,
                 studentNoSnapshot,
                 nameSnapshot
         );
-
-        Long menuGroupId = storeQr.getMenuGroupId() != null
-                ? storeQr.getMenuGroupId()
-                : qrTargetMenuGroupResolver.resolveMenuGroupId(store.getId(), usedDate);
         int updated = menuGroupStockRepository.decrementStockIfAvailable(menuGroupId);
         if (updated == 0) {
             throw new SoldOutException();

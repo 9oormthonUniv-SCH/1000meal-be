@@ -63,4 +63,6 @@ public interface MenuGroupRepository extends JpaRepository<MenuGroup, Long> {
     Optional<MenuGroup> findByIdAndStoreId(Long groupId, Long storeId);
 
     List<MenuGroup> findByStoreIdOrderBySortOrderAscIdAsc(Long storeId);
+
+    List<MenuGroup> findByIdIn(List<Long> groupIds);
 }

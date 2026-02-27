@@ -19,7 +19,8 @@ import java.time.LocalDateTime;
         },
         indexes = {
                 @Index(name = "idx_meal_usage_used_date", columnList = "used_date"),
-                @Index(name = "idx_meal_usage_store_date", columnList = "store_id, used_date")
+                @Index(name = "idx_meal_usage_store_date", columnList = "store_id, used_date"),
+                @Index(name = "idx_meal_usage_date_store_group", columnList = "used_date, store_id, menu_group_id")
         }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -36,6 +37,9 @@ public class MealUsage {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "store_id", nullable = false)
     private Store store;
+
+    @Column(name = "menu_group_id")
+    private Long menuGroupId;
 
     @Column(name = "used_at", nullable = false)
     private LocalDateTime usedAt;
@@ -55,10 +59,11 @@ public class MealUsage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private MealUsage(Account user, Store store, LocalDateTime usedAt, LocalDate usedDate,
+    private MealUsage(Account user, Store store, Long menuGroupId, LocalDateTime usedAt, LocalDate usedDate,
                       String deptSnapshot, String studentNoSnapshot, String nameSnapshot) {
         this.user = user;
         this.store = store;
+        this.menuGroupId = menuGroupId;
         this.usedAt = usedAt;
         this.usedDate = usedDate;
         this.deptSnapshot = deptSnapshot;
@@ -66,9 +71,9 @@ public class MealUsage {
         this.nameSnapshot = nameSnapshot;
     }
 
-    public static MealUsage create(Account user, Store store, LocalDateTime usedAt, LocalDate usedDate,
+    public static MealUsage create(Account user, Store store, Long menuGroupId, LocalDateTime usedAt, LocalDate usedDate,
                                    String deptSnapshot, String studentNoSnapshot, String nameSnapshot) {
-        return new MealUsage(user, store, usedAt, usedDate, deptSnapshot, studentNoSnapshot, nameSnapshot);
+        return new MealUsage(user, store, menuGroupId, usedAt, usedDate, deptSnapshot, studentNoSnapshot, nameSnapshot);
     }
 
     @PrePersist

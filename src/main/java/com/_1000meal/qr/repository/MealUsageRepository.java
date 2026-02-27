@@ -11,6 +11,8 @@ public interface MealUsageRepository extends JpaRepository<MealUsage, Long> {
 
     java.util.List<MealUsage> findAllByStoreIdAndUsedDateOrderByUsedAtAsc(Long storeId, LocalDate usedDate);
 
+    java.util.List<MealUsage> findAllByUsedDateOrderByUsedAtAsc(LocalDate usedDate);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("delete from MealUsage mu where mu.usedDate < :cutoff")
     int deleteByUsedDateBefore(@org.springframework.data.repository.query.Param("cutoff") LocalDate cutoff);
