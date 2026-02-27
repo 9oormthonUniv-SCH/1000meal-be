@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -62,10 +65,6 @@ public class RosterExportService {
         }
 
         List<MealUsage> usages = mealUsageRepository.findAllByUsedDateOrderByUsedAtAsc(usedDate);
-        if (usages.isEmpty()) {
-            log.info("Roster export skip: usedDate={}, rowCount=0", usedDate);
-            return;
-        }
 
         Map<Long, Store> storeById = storeRepository.findAll().stream()
                 .collect(Collectors.toMap(Store::getId, store -> store));
@@ -104,14 +103,17 @@ public class RosterExportService {
             log.info("Roster export done: usedDate={}, storeId={}, menuGroupId={}, rowCount={}, outputPath={} ",
                     usedDate, key.storeId(), key.menuGroupId(), groupUsages.size(), outputPath);
         }
+
+        exportMergedDailyRoster(usedDate, dateDir, storeById, groupNameById);
     }
 
     private void writeCsv(Path outputPath, Store store, String groupName, List<MealUsage> usages) {
         Charset charset = Charset.forName(fileEncoding);
         String storeName = store == null || store.getName() == null ? "" : store.getName();
 
+        Path tempPath = createTempFile(outputPath);
         try (OutputStream os = Files.newOutputStream(
-                outputPath,
+                tempPath,
                 StandardOpenOption.CREATE,
                 StandardOpenOption.TRUNCATE_EXISTING
         );
@@ -134,6 +136,7 @@ public class RosterExportService {
                 writer.write(csvLine(dept, studentNo, name, storeName, groupName, usedAt, "1"));
                 writer.newLine();
             }
+            moveAtomically(tempPath, outputPath);
         } catch (Exception e) {
             throw new IllegalStateException("로스터 CSV 생성에 실패했습니다: " + outputPath, e);
         }
@@ -157,6 +160,84 @@ public class RosterExportService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private void exportMergedDailyRoster(
+            LocalDate usedDate,
+            Path dateDir,
+            Map<Long, Store> storeById,
+            Map<Long, String> groupNameById
+    ) {
+        List<MealUsage> merged = mealUsageRepository.findAllByUsedDateOrderByStoreAndGroupAndUsedAt(usedDate);
+
+        Path outputPath = dateDir.resolve("roster-" + usedDate + ".csv");
+        Charset charset = Charset.forName(fileEncoding);
+        Path tempPath = createTempFile(outputPath);
+
+        Set<Long> missingGroupNames = new HashSet<>();
+
+        try (OutputStream os = Files.newOutputStream(
+                tempPath,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING
+        );
+             OutputStreamWriter osw = new OutputStreamWriter(os, charset);
+             BufferedWriter writer = new BufferedWriter(osw)
+        ) {
+            if (includeBom && "UTF-8".equalsIgnoreCase(fileEncoding)) {
+                os.write(UTF8_BOM);
+            }
+
+            writer.write("학과,학번,이름,매장명,그룹명,인식시간,수량");
+            writer.newLine();
+
+            for (MealUsage usage : merged) {
+                String dept = safe(usage.getDeptSnapshot());
+                String studentNo = safe(usage.getStudentNoSnapshot());
+                String name = safe(usage.getNameSnapshot());
+                Long storeId = usage.getStore().getId();
+                Store store = storeById.get(storeId);
+                String storeName = store == null || store.getName() == null ? "" : store.getName();
+                Long menuGroupId = usage.getMenuGroupId();
+                String groupName = "";
+                if (menuGroupId != null) {
+                    groupName = groupNameById.get(menuGroupId);
+                    if (groupName == null) {
+                        if (missingGroupNames.add(menuGroupId)) {
+                            log.warn("Roster export missing group name: menuGroupId={}", menuGroupId);
+                        }
+                        groupName = "(알 수 없음)";
+                    }
+                }
+                String usedAt = usage.getUsedAt() == null ? "" : usage.getUsedAt().format(USED_AT_FORMAT);
+
+                writer.write(csvLine(dept, studentNo, name, storeName, groupName, usedAt, "1"));
+                writer.newLine();
+            }
+
+            moveAtomically(tempPath, outputPath);
+            log.info("Merged roster export done: usedDate={}, rowCount={}, outputPath={} ",
+                    usedDate, merged.size(), outputPath);
+        } catch (Exception e) {
+            throw new IllegalStateException("통합 로스터 CSV 생성에 실패했습니다: " + outputPath, e);
+        }
+    }
+
+    private Path createTempFile(Path outputPath) {
+        try {
+            Path dir = outputPath.getParent();
+            return Files.createTempFile(dir, outputPath.getFileName().toString(), ".tmp");
+        } catch (Exception e) {
+            throw new IllegalStateException("임시 파일 생성에 실패했습니다: " + outputPath, e);
+        }
+    }
+
+    private void moveAtomically(Path tempPath, Path outputPath) throws Exception {
+        try {
+            Files.move(tempPath, outputPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (Exception e) {
+            Files.move(tempPath, outputPath, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     private record GroupKey(Long storeId, Long menuGroupId) {
