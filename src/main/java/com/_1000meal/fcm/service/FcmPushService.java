@@ -105,6 +105,28 @@ public class FcmPushService {
         }
     }
 
+    public void sendLowStock30NotificationForAccount(
+            Long accountId,
+            Long storeId,
+            String storeName,
+            Long groupId,
+            String groupName,
+            int remaining
+    ) {
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.LOW_STOCK_30, storeName, groupName, remaining);
+
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "LOW_STOCK_30");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName);
+        data.put("groupId", String.valueOf(groupId));
+        data.put("groupName", groupName);
+        data.put("stock", String.valueOf(remaining));
+
+        sendMulticastForAccount(accountId, "[FCM][LOW_STOCK_30]", message.title(), message.body(), data);
+    }
+
     public void sendStockDeadlineNotification(
             Long accountId,
             Long storeId,
@@ -166,6 +188,28 @@ public class FcmPushService {
         } catch (Exception e) {
             log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
         }
+    }
+
+    public void sendLowStockNotificationForAccount(
+            Long accountId,
+            Long storeId,
+            String storeName,
+            Long groupId,
+            String groupName,
+            int remaining
+    ) {
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
+
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "LOW_STOCK");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName);
+        data.put("groupId", String.valueOf(groupId));
+        data.put("groupName", groupName);
+        data.put("remaining", String.valueOf(remaining));
+
+        sendMulticastForAccount(accountId, "[FCM][LOW_STOCK]", message.title(), message.body(), data);
     }
 
     public void sendWeeklyMenuUploadedNotification(
