@@ -2,6 +2,7 @@ services:
   app:
     build: .
     container_name: app-1000meal
+    user: "1000:1000"
     ports:
       - "8080:8080"
 
