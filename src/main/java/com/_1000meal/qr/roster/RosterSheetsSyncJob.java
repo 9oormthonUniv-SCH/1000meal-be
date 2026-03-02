@@ -63,8 +63,8 @@ public class RosterSheetsSyncJob {
     private static final long INITIAL_DELAY_MS = 5000L; // 초기 딜레이 시간
     private static final long JITTER_MS = 500L; // 추가 딜레이 증가 값
 
-    // 운영환경에서는 (00 00 11 ? * MON-FRI) 로 변경 예정
-    @Scheduled(cron = "00 00 * * * *", zone = "Asia/Seoul") // 테스트 진행을 위해 00 00 * * * * 로 설정
+    // 운영환경에서는 (00 30 10 ? * MON-FRI) 로 변경 예정
+    @Scheduled(cron = "00 30 10 * * *", zone = "Asia/Seoul") // 테스트 진행을 위해 00 00 * * * * 로 설정
     public void syncDailyRoster() {
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
             log.warn("[CSV to Sheets] sheets.spreadsheet-id 가 설정되어 있지 않아 동기화를 건너뜁니다.");
@@ -136,12 +136,12 @@ public class RosterSheetsSyncJob {
                 .setHeader()
                 .setSkipHeaderRecord(true)
                 .setIgnoreEmptyLines(true)
-                .build();
+                .get();
 
         // CSV 파일 읽어오기 및 헤더 확인 
         for (Path csv : csvFiles) {
             try (Reader reader = Files.newBufferedReader(csv, StandardCharsets.UTF_8);
-                 CSVParser parser = new CSVParser(reader, format)) {
+            CSVParser parser = CSVParser.parse(reader, format)){
 
                 if (!headerSet) {
                     List<String> header = new ArrayList<>(parser.getHeaderNames());
