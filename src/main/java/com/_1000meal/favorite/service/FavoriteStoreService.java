@@ -3,6 +3,7 @@ package com._1000meal.favorite.service;
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.favorite.domain.FavoriteStore;
+import com._1000meal.favorite.dto.FavoriteStoreResponse;
 import com._1000meal.favorite.repository.FavoriteStoreRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -49,7 +50,7 @@ public class FavoriteStoreService {
         favoriteStoreRepository.deleteByAccountIdAndStoreId(accountId, storeId);
     }
 
-    public List<FavoriteStore> getMyFavorites(Long accountId) {
-        return favoriteStoreRepository.findAllByAccountId(accountId);
+    public List<FavoriteStoreResponse> getMyFavorites(Long accountId) {
+        return favoriteStoreRepository.findFavoriteStores(accountId);
     }
 }

@@ -11,10 +11,12 @@ public enum MenuErrorCode implements ErrorCodeIfs {
     MENU_ALREADY_EXISTS("MENU_409", 409, "이미 존재하는 메뉴입니다."),
     INVALID_MENU_NAME("MENU_400", 400, "잘못된 메뉴 이름입니다."),
     INTERNAL_SERVER_ERROR("MENU_500", 500, "서버 오류가 발생했습니다."),
-    INSUFFICIENT_STOCK("DAILY_MENU_500", 500, "해당 메뉴의 재고가 요청량보다 작습니다."),
-    DATE_REQUIRED("MENU_400", 400, "날짜가 누락됐습니다."),
+    INSUFFICIENT_STOCK("DAILY_MENU_500", 500, "해당 메뉴의 재고가 요청량보다 적습니다."),
+    DATE_REQUIRED("MENU_400", 400, "날짜가 누락되었습니다."),
     FAVORITE_GROUP_NOT_FOUND("MENU_404", 400, "즐겨찾는 메뉴를 찾을 수 없습니다."),
     MENU_GROUP_NOT_FOUND("MENU_GROUP_404", 404, "해당 메뉴 그룹을 찾을 수 없습니다."),
+    MENU_PRESET_NOT_FOUND("MENU_PRESET_404", 404, "자주 쓰는 메뉴를 찾을 수 없습니다."),
+    MENU_PRESET_EMPTY("MENU_PRESET_404", 404, "해당 그룹에 자주 쓰는 메뉴가 없습니다."),
     CANNOT_DELETE_DEFAULT_GROUP("MENU_GROUP_400", 400, "기본 메뉴 그룹은 삭제할 수 없습니다."),
     DEFAULT_MENU_NOT_FOUND("DEFAULT_MENU_404", 404, "기본 메뉴 규칙을 찾을 수 없습니다."),
     DEFAULT_MENU_INVALID_MENU("DEFAULT_MENU_INVALID_MENU_400", 400, "그룹에 등록되지 않은 메뉴는 고정메뉴로 설정할 수 없습니다."),
@@ -45,3 +47,4 @@ public enum MenuErrorCode implements ErrorCodeIfs {
         return message;
     }
 }
+

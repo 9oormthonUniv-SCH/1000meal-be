@@ -1,9 +1,8 @@
-
-
 services:
   app:
     build: .
     container_name: app-1000meal
+    user: "1000:1000"
     ports:
       - "8080:8080"
 
@@ -20,7 +19,6 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_SQL_INIT_MODE: never
 
-      # Flyway (최소 설정)
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_LOCATIONS: "classpath:db/migration"
       SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
@@ -29,14 +27,16 @@ services:
 
       LOGGING_LEVEL_org_flywaydb: DEBUG
 
-      # 기타
       ACCESS_KEY: ${ACCESS_KEY}
       SECRET_KEY: ${SECRET_KEY}
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
+
+      FCM_ENABLED: "true"
       FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
 
-
+    volumes:
+      - ./var/rosters:/app/var/rosters   # 🔥 추가된 부분
 
     restart: "no"
 
@@ -46,8 +46,6 @@ services:
         awslogs-region: ${AWS_REGION}
         awslogs-group: ${CW_LOG_GROUP}
         awslogs-create-group: "true"
-
-
 
 volumes:
   mysql-1000meal-data:

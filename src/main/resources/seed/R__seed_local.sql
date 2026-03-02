@@ -1,0 +1,149 @@
+-- generated seed (local)
+SET FOREIGN_KEY_CHECKS=0;
+
+-- SECTION: store
+INSERT INTO `store`
+(`id`, `image_url`, `name`, `address`, `phone`, `description`, `open_time`, `close_time`, `is_open`, `remain`, `hours`, `lat`, `lng`)
+VALUES
+    (1,'https://1000mealsql.s3.ap-northeast-2.amazonaws.com/66ce7785-c1fb-4a38-a475-2c43d28dc856.png','향설 1관','충청남도 아산시 신창면','010-0000-0000','향설 생활관 학식','08:00:00.000000','20:00:00.000000',b'1',50,'08:00 ~ 소진 시',36.7688,126.9323),
+    (2,'https://1000mealsql.s3.ap-northeast-2.amazonaws.com/dc0a5daa-4ed3-4df8-a1f0-f3d338c3c991.png','야외 그라찌에','충청남도 아산시 신창면','010-0000-0000','교내 카페 브랜드','08:00:00.000000','21:00:00.000000',b'1',30,'08:00 ~ 소진 시',36.7712,126.9327),
+    (3,'https://1000mealsql.s3.ap-northeast-2.amazonaws.com/d10cf7b4-ef7d-4719-b22a-9d785e6aefc2.png','베이커리 경','충청남도 아산시 신창면','041-531-6930','수제 베이커리','08:00:00.000000','22:00:00.000000',b'1',20,'08:00 ~ 소진 시',36.774667,126.93362),
+    (4,'https://1000mealsql.s3.ap-northeast-2.amazonaws.com/0d3044c2-f29f-4a62-bf32-578d491765ae.png','향설 2관','충청남도 아산시 신창면','010-0000-0000','향설 생활관 학식','08:00:00.000000','20:00:00.000000',b'1',0,'08:00 ~ 소진 시',36.76810630469366,126.93359748523937)
+    ON DUPLICATE KEY UPDATE
+                         `image_url`=VALUES(`image_url`),
+                         `name`=VALUES(`name`),
+                         `address`=VALUES(`address`),
+                         `phone`=VALUES(`phone`),
+                         `description`=VALUES(`description`),
+                         `open_time`=VALUES(`open_time`),
+                         `close_time`=VALUES(`close_time`),
+                         `is_open`=VALUES(`is_open`),
+                         `remain`=VALUES(`remain`),
+                         `hours`=VALUES(`hours`),
+                         `lat`=VALUES(`lat`),
+                         `lng`=VALUES(`lng`);
+
+
+-- SECTION: accounts (ADMIN)
+INSERT INTO `accounts` (`id`, `user_id`, `email`, `password_hash`, `role`, `status`) VALUES
+                                                                                         (14,'council1','testemail1@sch.ac.kr','$2a$10$Gt7.NiZHLEnWZ49pHyFbhO.BnvnLA.N5TUHDv78/MjpQvz/m30AvO','ADMIN','ACTIVE'),
+                                                                                         (15,'council2','testemail2@sch.ac.kr','$2a$10$bR0U2VVgO36DMhGEcRD2fuuoA0Ih9nZHfVsv.E6qQe816pl5ezaV.','ADMIN','ACTIVE'),
+                                                                                         (16,'council3','testemail3@sch.ac.kr','$2a$10$XB78LfyS38dH1.6k.GRGu.uA19x5b/jd/oVKvak62.GkuIOYfx4Ny','ADMIN','ACTIVE'),
+                                                                                         (17,'council4','testemail4@sch.ac.kr','$2a$10$xRHdyDCMJEGEtnwfMI8BTuKJJSP3G.vAmZs3LFOjUypc/ECdM05Ki','ADMIN','ACTIVE'),
+                                                                                         (18,'admin1','storeemail1@sch.ac.kr','$2a$10$gHk/oqyT/jpAiJWqdAsNJ./NHgrrQ9n8xYbfZ4FaGfF7CwsRFw1du','ADMIN','ACTIVE'),
+                                                                                         (19,'admin2','storeemail2@sch.ac.kr','$2a$10$uDDGIJO.tMDurBx4Ev3LGuljRNlTevW2Z254QhYQmwnBK3dyWuZH.','ADMIN','ACTIVE'),
+                                                                                         (20,'admin3','storeemail3@sch.ac.kr','$2a$10$shzwTXzXD23Uph5mwVtrJuPbifT62/yd99zZdX5IYEbOdGd/j4Zw.','ADMIN','ACTIVE'),
+                                                                                         (21,'admin4','storeemail4@sch.ac.kr','$2a$10$wVEYAdQH7LVQ1qZkMTFbq.iwXaSWydUE4N.M35LhpQ75scixfG3E6','ADMIN','ACTIVE')
+    ON DUPLICATE KEY UPDATE
+                         `user_id`=VALUES(`user_id`),
+                         `email`=VALUES(`email`),
+                         `password_hash`=VALUES(`password_hash`),
+                         `role`=VALUES(`role`),
+                         `status`=VALUES(`status`);
+
+
+-- SECTION: accounts (STUDENT)
+INSERT INTO `accounts`
+(`id`, `user_id`, `email`, `password_hash`, `role`, `status`)
+VALUES
+    (23,'20204020','wngmstla@sch.ac.kr','$2a$10$ZVBQymsNIJ9im6/jUtTN.uLR7SOv0AXxarzwu4FlMY3yBSQ9Sa/7C','STUDENT','ACTIVE')
+    ON DUPLICATE KEY UPDATE
+                         `user_id`=VALUES(`user_id`),
+                         `email`=VALUES(`email`),
+                         `password_hash`=VALUES(`password_hash`),
+                         `role`=VALUES(`role`),
+                         `status`=VALUES(`status`);
+
+
+-- SECTION: admin_profiles
+INSERT INTO `admin_profiles` (`id`, `account_id`, `store_id`, `admin_level`, `display_name`) VALUES
+                                                                                                 (1,18,1,1,'admin1'),
+                                                                                                 (2,19,2,1,'admin2'),
+                                                                                                 (3,20,3,1,'admin3'),
+                                                                                                 (4,21,4,1,'admin4'),
+                                                                                                 (5,14,1,1,'향설 1관'),
+                                                                                                 (6,15,2,1,'야외 그라찌에'),
+                                                                                                 (7,16,3,1,'베이커리 경'),
+                                                                                                 (8,17,4,1,'향설 2관')
+    ON DUPLICATE KEY UPDATE
+                         `account_id`=VALUES(`account_id`),
+                         `store_id`=VALUES(`store_id`),
+                         `admin_level`=VALUES(`admin_level`),
+                         `display_name`=VALUES(`display_name`);
+
+
+-- SECTION: user_profiles (STUDENT)
+INSERT INTO `user_profiles`
+(`id`, `account_id`, `department`, `name`, `phone`)
+VALUES
+    (2,23,'컴퓨터소프트웨어공학과','심주흔','010-1111-2222')
+    ON DUPLICATE KEY UPDATE
+                         `department`=VALUES(`department`),
+                         `name`=VALUES(`name`),
+                         `phone`=VALUES(`phone`);
+
+
+-- SECTION: menu_group (default groups per store)
+INSERT INTO menu_group
+(store_id, daily_menu_id, name, sort_order, is_default)
+VALUES
+    (4, NULL, '크앙분식', 1, b'0'),
+    (4, NULL, '뼈해장국', 2, b'0'),
+    (1, NULL, '향설 1관', 1, b'0'),
+    (2, NULL, '야외 그라찌에', 1, b'0'),
+    (3, NULL, '베이커리 경', 1, b'0')
+    ON DUPLICATE KEY UPDATE
+                         -- seed에서는 name/store_id는 건드리지 않음
+                         sort_order = VALUES(sort_order);
+
+
+-- 향설 1관 (store_id=1) : 그룹 지정 없이 대표 QR로 유지 (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (1, NULL, 'E722A795-B214-43E8-B8AE-A336ED0FBDC4', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+-- 향설 2관 - 크앙분식 (store_id=4, menu_group_id = (SELECT id ...))
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+SELECT 4, mg.id, 'C963DB9D-006A-47EB-A5AC-30FEEABF4004', 1, NOW(6)
+FROM menu_group mg
+WHERE mg.store_id = 4 AND mg.name = '크앙분식'
+    LIMIT 1
+ON DUPLICATE KEY UPDATE
+                     store_id = VALUES(store_id),
+                     menu_group_id = VALUES(menu_group_id),
+                     is_active = VALUES(is_active);
+
+-- 향설 2관 - 뼈해장국 (store_id=4, menu_group_id = (SELECT id ...))
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+SELECT 4, mg.id, 'E7CD3F45-D947-4F65-957C-8D9C0B11DF20', 1, NOW(6)
+FROM menu_group mg
+WHERE mg.store_id = 4 AND mg.name = '뼈해장국'
+    LIMIT 1
+ON DUPLICATE KEY UPDATE
+                     store_id = VALUES(store_id),
+                     menu_group_id = VALUES(menu_group_id),
+                     is_active = VALUES(is_active);
+
+-- 야외 그라찌에 (store_id=2) : 대표 QR (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (2, NULL, '1B5AA8A2-76D0-42C7-A5C5-CED284AB461B', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+-- 베이커리 경 (store_id=3) : 대표 QR (menu_group_id NULL)
+INSERT INTO store_qr (store_id, menu_group_id, qr_token, is_active, created_at)
+VALUES (3, NULL, '9A29E537-BF66-4E58-87FC-4180C37C8D80', 1, NOW(6))
+    ON DUPLICATE KEY UPDATE
+                         store_id = VALUES(store_id),
+                         menu_group_id = VALUES(menu_group_id),
+                         is_active = VALUES(is_active);
+
+
+
+
+SET FOREIGN_KEY_CHECKS=1;

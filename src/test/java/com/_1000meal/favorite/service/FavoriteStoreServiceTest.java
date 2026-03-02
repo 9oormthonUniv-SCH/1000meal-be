@@ -3,6 +3,7 @@ package com._1000meal.favorite.service;
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.favorite.domain.FavoriteStore;
+import com._1000meal.favorite.dto.FavoriteStoreResponse;
 import com._1000meal.favorite.repository.FavoriteStoreRepository;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
@@ -198,18 +199,19 @@ class FavoriteStoreServiceTest {
             // given
             Long accountId = 1L;
 
-            FavoriteStore favorite1 = mock(FavoriteStore.class);
-            FavoriteStore favorite2 = mock(FavoriteStore.class);
-            List<FavoriteStore> favorites = List.of(favorite1, favorite2);
+            List<FavoriteStoreResponse> favorites = List.of(
+                    new FavoriteStoreResponse(1L, "A", "imgA", true),
+                    new FavoriteStoreResponse(2L, "B", "imgB", false)
+            );
 
-            when(favoriteStoreRepository.findAllByAccountId(accountId)).thenReturn(favorites);
+            when(favoriteStoreRepository.findFavoriteStores(accountId)).thenReturn(favorites);
 
             // when
-            List<FavoriteStore> result = favoriteStoreService.getMyFavorites(accountId);
+            List<FavoriteStoreResponse> result = favoriteStoreService.getMyFavorites(accountId);
 
             // then
             assertEquals(2, result.size());
-            verify(favoriteStoreRepository).findAllByAccountId(accountId);
+            verify(favoriteStoreRepository).findFavoriteStores(accountId);
         }
 
         @Test
@@ -218,14 +220,14 @@ class FavoriteStoreServiceTest {
             // given
             Long accountId = 1L;
 
-            when(favoriteStoreRepository.findAllByAccountId(accountId)).thenReturn(Collections.emptyList());
+            when(favoriteStoreRepository.findFavoriteStores(accountId)).thenReturn(Collections.emptyList());
 
             // when
-            List<FavoriteStore> result = favoriteStoreService.getMyFavorites(accountId);
+            List<FavoriteStoreResponse> result = favoriteStoreService.getMyFavorites(accountId);
 
             // then
             assertTrue(result.isEmpty());
-            verify(favoriteStoreRepository).findAllByAccountId(accountId);
+            verify(favoriteStoreRepository).findFavoriteStores(accountId);
         }
     }
 }

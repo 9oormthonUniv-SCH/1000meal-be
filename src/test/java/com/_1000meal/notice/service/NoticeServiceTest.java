@@ -4,8 +4,10 @@ import com._1000meal.global.error.code.NoticeErrorCode;
 import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.notice.domain.Notice;
 import com._1000meal.notice.dto.NoticeCreateRequest;
+import com._1000meal.notice.dto.NoticeListItemResponse;
 import com._1000meal.notice.dto.NoticeResponse;
 import com._1000meal.notice.dto.NoticeUpdateRequest;
+import com._1000meal.notice.repository.NoticeImageRepository;
 import com._1000meal.notice.repository.NoticeRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,9 @@ class NoticeServiceTest {
 
     @Mock
     private NoticeRepository noticeRepository;
+
+    @Mock
+    private NoticeImageRepository noticeImageRepository;
 
     @InjectMocks
     private NoticeService noticeService;
@@ -51,6 +56,9 @@ class NoticeServiceTest {
                 .isPinned(false)
                 .build());
 
+        doReturn(1L).when(pinned).getId();
+        doReturn(2L).when(normal).getId();
+
         // ✅ toResponse 내부에서 createdAt/updatedAt format() 호출 -> 둘 다 null 방지
         doReturn(LocalDateTime.of(2026, 1, 1, 10, 0)).when(pinned).getCreatedAt();
         doReturn(LocalDateTime.of(2026, 1, 1, 10, 0)).when(pinned).getUpdatedAt();
@@ -58,18 +66,20 @@ class NoticeServiceTest {
         doReturn(LocalDateTime.of(2026, 1, 1, 9, 0)).when(normal).getCreatedAt();
         doReturn(LocalDateTime.of(2026, 1, 1, 9, 0)).when(normal).getUpdatedAt();
 
-        when(noticeRepository.findAllByDeletedAtIsNull(any(Sort.class)))
+        when(noticeRepository.findAllByDeletedAtIsNullAndIsPublishedTrue(any(Sort.class)))
                 .thenReturn(List.of(pinned, normal));
+        when(noticeImageRepository.findNoticeIdsWithImagesIn(List.of(1L, 2L)))
+                .thenReturn(List.of(1L));
 
         // when
-        var result = noticeService.list();
+        List<NoticeListItemResponse> result = noticeService.getAllNotice();
 
         // then
         assertNotNull(result);
         assertEquals(2, result.size());
 
         ArgumentCaptor<Sort> sortCaptor = ArgumentCaptor.forClass(Sort.class);
-        verify(noticeRepository).findAllByDeletedAtIsNull(sortCaptor.capture());
+        verify(noticeRepository).findAllByDeletedAtIsNullAndIsPublishedTrue(sortCaptor.capture());
 
         List<Sort.Order> orders = sortCaptor.getValue().toList();
         assertEquals(2, orders.size());
@@ -80,7 +90,12 @@ class NoticeServiceTest {
         assertEquals("createdAt", orders.get(1).getProperty());
         assertTrue(orders.get(1).isDescending());
 
-        verifyNoMoreInteractions(noticeRepository);
+        assertTrue(result.get(0).hasImage());
+        assertFalse(result.get(1).hasImage());
+
+        verify(noticeImageRepository).findNoticeIdsWithImagesIn(List.of(1L, 2L));
+
+        verifyNoMoreInteractions(noticeRepository, noticeImageRepository);
     }
 
     @Test
@@ -90,7 +105,7 @@ class NoticeServiceTest {
         when(noticeRepository.findById(1L)).thenReturn(Optional.empty());
 
         // when
-        CustomException ex = assertThrows(CustomException.class, () -> noticeService.get(1L));
+        CustomException ex = assertThrows(CustomException.class, () -> noticeService.getNotice(1L));
 
         // then
         assertEquals(NoticeErrorCode.NOTICE_NOT_FOUND, ex.getErrorCodeIfs());

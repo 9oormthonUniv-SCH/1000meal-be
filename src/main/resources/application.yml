@@ -12,7 +12,7 @@ spring:
 
   sql:
     init:
-#      data-locations: classpath:data.sql
+#      data-locations: classpath:R__seed_local.sql
       mode: never
 
   jpa:
@@ -123,6 +123,7 @@ jwt:
   access-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}
 
 fcm:
+  enabled: false
   service-account-base64: ${FCM_SERVICE_ACCOUNT_BASE64:}
 
 logging:
@@ -153,3 +154,9 @@ app:
       vapid-public-key: ${VAPID_PUBLIC_KEY:}
       vapid-private-key: ${VAPID_PRIVATE_KEY:}
       subject: ${VAPID_SUBJECT:mailto:admin@your-domain.com}
+
+qr:
+  roster:
+    base-dir: ./var/rosters
+    file-encoding: UTF-8
+    include-bom: true

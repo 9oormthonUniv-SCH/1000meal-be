@@ -14,6 +14,7 @@ import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
 import com._1000meal.menu.event.LowStockEvent;
+import com._1000meal.menu.event.WeeklyMenuUploadedEvent;
 import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.GroupDailyMenuRepository;
@@ -29,7 +30,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
@@ -37,6 +40,8 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -360,7 +365,7 @@ public class MenuGroupService {
 
         // 비관적 락으로 재고 조회
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+                .orElseGet(() -> createStockIfMissing(group, 0));
 
         int beforeStock = stock.getStock();
         StockDeductResult result = stock.deduct(value, today);
@@ -403,9 +408,8 @@ public class MenuGroupService {
      */
     @Transactional
     public MenuGroupStockResponse updateStock(Long groupId, int newStock) {
-        getAuthorizedGroup(groupId);
-        MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+        MenuGroup group = getAuthorizedGroup(groupId);
+        MenuGroupStock stock = getOrCreateStock(group);
 
         stock.updateStock(newStock);
 
@@ -421,7 +425,7 @@ public class MenuGroupService {
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
 
         MenuGroupStock stock = stockRepository.findByMenuGroupIdForUpdate(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+                .orElseGet(() -> createStockIfMissing(group, 0));
 
         int beforeStock = stock.getStock();
         StockDeductResult result = stock.deduct(value, today);
@@ -459,9 +463,8 @@ public class MenuGroupService {
 
     @Transactional
     public MenuGroupStockResponse updateStockForStore(Long storeId, Long groupId, int newStock) {
-        getAuthorizedGroupForStore(storeId, groupId);
-        MenuGroupStock stock = stockRepository.findByMenuGroupId(groupId)
-                .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
+        MenuGroup group = getAuthorizedGroupForStore(storeId, groupId);
+        MenuGroupStock stock = getOrCreateStock(group);
 
         stock.updateStock(newStock);
 
@@ -513,7 +516,18 @@ public class MenuGroupService {
             MenuUpdateRequest request
     ) {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
-        return upsertGroupDailyMenu(menuGroup, date, request);
+        GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
+
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
+        if (filledByGroup.getOrDefault(groupId, false)) {
+            LocalDate weekStart = getWeekStart(date);
+            String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+            eventPublisher.publishEvent(
+                    new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
+            );
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -554,33 +568,100 @@ public class MenuGroupService {
 
     private MenuGroup getAuthorizedGroup(Long groupId) {
         Long accountStoreId = currentAccountProvider.getCurrentStoreId();
-        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, accountStoreId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
-
-        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
-        if (groupStoreId == null || !groupStoreId.equals(accountStoreId)) {
-            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
-            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
-                    currentAccountProvider.getCurrentAccountId(), accountStoreId, groupStoreId);
-            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
-        }
 
         return menuGroup;
     }
 
     private MenuGroup getAuthorizedGroupForStore(Long storeId, Long groupId) {
-        MenuGroup menuGroup = menuGroupRepository.findByIdWithStore(groupId)
+        MenuGroup menuGroup = menuGroupRepository.findByIdAndStoreId(groupId, storeId)
                 .orElseThrow(() -> new CustomException(MenuErrorCode.MENU_GROUP_NOT_FOUND));
 
-        Long groupStoreId = menuGroup.getStore() != null ? menuGroup.getStore().getId() : null;
-        if (groupStoreId == null || !groupStoreId.equals(storeId)) {
-            // TODO(2026-02-05): 안정화 후 제거 - STORE_403 원인 추적 로그
-            log.debug("[STORE_403][MENU_GROUP] accountId={}, adminProfileStoreId={}, targetStoreId={}",
-                    currentAccountProvider.getCurrentAccountId(), storeId, groupStoreId);
-            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED);
+        return menuGroup;
+    }
+
+    private MenuGroupStock getOrCreateStock(MenuGroup group) {
+        return stockRepository.findByMenuGroupId(group.getId())
+                .orElseGet(() -> createStockIfMissing(group, 0));
+    }
+
+    private MenuGroupStock createStockIfMissing(MenuGroup group, int capacity) {
+        if (group.getStock() == null) {
+            group.initializeStock(capacity);
+        }
+        return stockRepository.save(group.getStock());
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isWeeklyMenuFilled(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = getWeekStart(anyDateInWeek);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
+        if (groups.isEmpty()) {
+            return false;
         }
 
-        return menuGroup;
+        List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
+        List<GroupDailyMenu> groupDailyMenus =
+                groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(groupIds, weekStart, weekEnd);
+
+        Set<LocalDate> filledDates = new HashSet<>();
+        for (GroupDailyMenu gdm : groupDailyMenus) {
+            if (gdm.getMenuNames() != null && !gdm.getMenuNames().isEmpty()) {
+                filledDates.add(gdm.getDate());
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            if (!filledDates.contains(weekStart.plusDays(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, Boolean> isWeeklyMenuFilledByGroup(Long storeId, LocalDate anyDateInWeek) {
+        LocalDate weekStart = getWeekStart(anyDateInWeek);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
+        if (groups.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> groupIds = groups.stream().map(MenuGroup::getId).toList();
+        List<GroupDailyMenu> groupDailyMenus =
+                groupDailyMenuRepository.findByMenuGroupIdInAndDateBetween(groupIds, weekStart, weekEnd);
+
+        Map<Long, Set<LocalDate>> filledByGroup = new HashMap<>();
+        for (GroupDailyMenu gdm : groupDailyMenus) {
+            if (gdm.getMenuNames() != null && !gdm.getMenuNames().isEmpty()) {
+                filledByGroup
+                        .computeIfAbsent(gdm.getMenuGroup().getId(), k -> new HashSet<>())
+                        .add(gdm.getDate());
+            }
+        }
+
+        Map<Long, Boolean> result = new HashMap<>();
+        for (Long groupId : groupIds) {
+            Set<LocalDate> dates = filledByGroup.getOrDefault(groupId, Set.of());
+            boolean ok = true;
+            for (int i = 0; i < 5; i++) {
+                if (!dates.contains(weekStart.plusDays(i))) {
+                    ok = false;
+                    break;
+                }
+            }
+            result.put(groupId, ok);
+        }
+        return result;
+    }
+
+    private LocalDate getWeekStart(LocalDate date) {
+        return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
     }
 
     /**
