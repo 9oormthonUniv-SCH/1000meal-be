@@ -2,14 +2,20 @@ package com._1000meal.auth.controller;
 
 import com._1000meal.auth.dto.LoginRequest;
 import com._1000meal.auth.dto.LoginResponse;
+import com._1000meal.auth.dto.LogoutRequest;
+import com._1000meal.auth.dto.RefreshTokenRequest;
+import com._1000meal.auth.dto.RefreshTokenResponse;
+import com._1000meal.auth.dto.SimpleMessageResponse;
 import com._1000meal.auth.dto.SignupRequest;
 import com._1000meal.auth.dto.SignupResponse;
+import com._1000meal.auth.refresh.RefreshTokenService;
 import com._1000meal.auth.service.AuthService;
 import com._1000meal.global.error.code.SuccessCode;
 import com._1000meal.global.response.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -22,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final RefreshTokenService refreshTokenService;
 
     @Operation(
             summary = "통합 회원가입",
@@ -50,9 +57,29 @@ public class AuthController {
                     """
     )
     @PostMapping("/login")
-    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
-        LoginResponse resp = authService.login(req);
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+        LoginResponse resp = authService.login(req, request);
         return ApiResponse.ok(resp);
+    }
+
+    @Operation(
+            summary = "Access Token 재발급",
+            description = "만료된 Access Token 이후 Refresh Token으로 새로운 Access Token을 발급합니다."
+    )
+    @PostMapping("/refresh")
+    public ApiResponse<RefreshTokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        RefreshTokenResponse response = refreshTokenService.refresh(request.refreshToken());
+        return ApiResponse.ok(response);
+    }
+
+    @Operation(
+            summary = "로그아웃",
+            description = "전달된 Refresh Token을 폐기합니다. 이미 폐기/미존재여도 200을 반환합니다."
+    )
+    @PostMapping("/logout")
+    public ApiResponse<SimpleMessageResponse> logout(@Valid @RequestBody LogoutRequest request) {
+        refreshTokenService.logout(request.refreshToken());
+        return ApiResponse.ok(new SimpleMessageResponse("로그아웃 되었습니다."));
     }
 
     @SecurityRequirement(name = "bearerAuth")

@@ -6,6 +6,7 @@ public record LoginResponse(
         Long accountId,
         Role role,
         String userId,       // username -> userId 로 변경
+        String name,
         String email,
         String accessToken,
         String refreshToken,
