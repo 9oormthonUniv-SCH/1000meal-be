@@ -163,9 +163,8 @@ qr:
     include-bom: true
 
 sheets:
-  # 우선 비활성화
-  enabled: false
-  # Google Sheets 연동용 서비스 계정 JSON 경로 (어디에 둬야할지 모르겠어요...)
-  service-account-json-path: 1000meal_sheets_service_account.json
+  enabled: true
+  # Google Sheets 연동용 서비스 계정 JSON
+  service-account-base64: ${SHEETS_SERVICE_ACCOUNT_BASE64:}
   # 해당 서비스 계정으로 권한을 부여한 스프레드시트 ID입니다.
   spreadsheet-id: 1qkhnwg9BduAzALaWnF2DaX8fsqcANS79AHtOLOeQtaA
