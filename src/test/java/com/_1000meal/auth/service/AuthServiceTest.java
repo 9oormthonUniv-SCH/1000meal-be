@@ -5,6 +5,7 @@ import com._1000meal.auth.dto.LoginResponse;
 import com._1000meal.auth.dto.SignupRequest;
 import com._1000meal.auth.dto.SignupResponse;
 import com._1000meal.auth.model.*;
+import com._1000meal.auth.refresh.RefreshTokenService;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.auth.repository.AdminProfileRepository;
 import com._1000meal.auth.repository.UserProfileRepository;
@@ -22,7 +23,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.lang.reflect.Field;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,6 +39,7 @@ class AuthServiceTest {
     @Mock StoreRepository storeRepo;
     @Mock PasswordEncoder passwordEncoder;
     @Mock JwtProvider jwtProvider;
+    @Mock RefreshTokenService refreshTokenService;
     @Mock EmailService emailService;
 
     @InjectMocks AuthService authService;
@@ -130,12 +131,15 @@ class AuthServiceTest {
         // 표시 이름은 userProfileRepo에서 가져오므로 없으면 null 가능
         when(userProfileRepo.findByAccountId(10L)).thenReturn(Optional.empty());
         when(jwtProvider.createToken(any(AuthPrincipal.class), any())).thenReturn("ACCESS_TOKEN");
+        when(refreshTokenService.issueOnLogin(any(Account.class), any(), any(), any())).thenReturn("REFRESH_TOKEN");
 
         LoginResponse res = authService.login(req);
 
         assertEquals("ACCESS_TOKEN", res.accessToken());
+        assertEquals("REFRESH_TOKEN", res.refreshToken());
         assertEquals(10L, res.accountId());
         verify(jwtProvider).createToken(any(AuthPrincipal.class), isNull());
+        verify(refreshTokenService).issueOnLogin(any(Account.class), isNull(), isNull(), isNull());
     }
 
     @Test

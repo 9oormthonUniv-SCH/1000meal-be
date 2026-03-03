@@ -4,6 +4,7 @@ import com._1000meal.auth.dto.LoginRequest;
 import com._1000meal.auth.dto.LoginResponse;
 import com._1000meal.auth.dto.SignupRequest;
 import com._1000meal.auth.dto.SignupResponse;
+import com._1000meal.auth.refresh.RefreshTokenService;
 import com._1000meal.auth.model.*;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.auth.repository.AdminProfileRepository;
@@ -16,14 +17,14 @@ import com._1000meal.global.error.exception.CustomException;
 import com._1000meal.global.security.JwtProvider;
 import com._1000meal.store.domain.Store;
 import com._1000meal.store.repository.StoreRepository;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashMap;   // ✅ 추가
-import java.util.Map;      // ✅ 추가
+import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -34,6 +35,7 @@ public class AuthService {
     private final StoreRepository storeRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final RefreshTokenService refreshTokenService;
     private final EmailService emailService;
 
     private final FcmService fcmService;
@@ -144,6 +146,11 @@ public class AuthService {
     /* -------------------- 로그인 -------------------- */
     @Transactional
     public LoginResponse login(LoginRequest req) {
+        return login(req, null);
+    }
+
+    @Transactional
+    public LoginResponse login(LoginRequest req, HttpServletRequest httpRequest) {
         final String rawUserId = req.userId();
         final Role reqRole     = req.role();
 
@@ -198,6 +205,12 @@ public class AuthService {
         );
         Map<String, Object> extra = (storeId == null) ? null : Map.of("storeId", storeId, "storeName", storeName);
         String accessToken = jwtProvider.createToken(principal, extra);
+        String refreshToken = refreshTokenService.issueOnLogin(
+                account,
+                extractDeviceId(httpRequest),
+                extractUserAgent(httpRequest),
+                extractIpAddress(httpRequest)
+        );
 
 
         return new LoginResponse(
@@ -206,7 +219,7 @@ public class AuthService {
                 account.getUserId(),
                 account.getEmail(),
                 accessToken,
-                null,
+                refreshToken,
                 storeId,
                 storeName
         );
@@ -252,5 +265,24 @@ public class AuthService {
                     .map(AdminProfile::getDisplayName)
                     .orElse(null);
         }
+    }
+
+    private String extractDeviceId(HttpServletRequest request) {
+        return request == null ? null : request.getHeader("X-Device-Id");
+    }
+
+    private String extractUserAgent(HttpServletRequest request) {
+        return request == null ? null : request.getHeader("User-Agent");
+    }
+
+    private String extractIpAddress(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

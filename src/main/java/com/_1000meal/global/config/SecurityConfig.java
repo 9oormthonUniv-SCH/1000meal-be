@@ -31,6 +31,8 @@ public class SecurityConfig {
     private static final String[] AUTH_WHITELIST = {
             "/api/v1/auth/signup",
             "/api/v1/auth/login",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
             "/api/v1/auth/email/**",
             "/api/v1/auth/password/reset/**",
             "/api/v1/auth/find-id",

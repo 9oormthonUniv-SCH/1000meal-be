@@ -120,7 +120,8 @@ management:
 
 jwt:
   secret: ${JWT_SECRET:CHANGE_ME_TO_A_LONG_RANDOM_SECRET_AT_LEAST_32_CHARS}
-  access-exp-seconds: ${JWT_ACCESS_EXP_SECONDS:3600}
+  access-exp-minutes: ${JWT_ACCESS_EXP_MINUTES:30}
+  refresh-exp-days: ${JWT_REFRESH_EXP_DAYS:30}
 
 fcm:
   enabled: false

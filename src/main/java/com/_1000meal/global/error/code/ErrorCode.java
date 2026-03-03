@@ -32,6 +32,9 @@ public enum ErrorCode implements ErrorCodeIfs {
     EMAIL_CODE_MISMATCH("EMAIL_400", 400, "인증 코드가 일치하지 않습니다."),
     EMAIL_CODE_EXPIRED("EMAIL_410", 410, "인증 코드가 만료되었습니다."),
     INVALID_TOKEN("AUTH_400_TOKEN", 400, "유효하지 않거나 만료된 토큰입니다."), // ★ 추가
+    INVALID_REFRESH_TOKEN("AUTH_401_REFRESH_INVALID", 401, "유효하지 않은 리프레시 토큰입니다."),
+    EXPIRED_REFRESH_TOKEN("AUTH_401_REFRESH_EXPIRED", 401, "만료된 리프레시 토큰입니다."),
+    REVOKED_REFRESH_TOKEN("AUTH_401_REFRESH_REVOKED", 401, "폐기된 리프레시 토큰입니다."),
 
     // ===== 샘플 & 서버 내부 =====
     SAMPLE_ERROR("COMMON_500_SAMPLE", 500, "Sample Error"),
