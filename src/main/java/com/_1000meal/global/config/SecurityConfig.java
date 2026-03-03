@@ -46,7 +46,8 @@ public class SecurityConfig {
             "/api/v1/stores/**",
             "/api/v1/menus/**",
             "/file",
-            "/api/v1/notices/**"
+            "/api/v1/notices/**",
+            "/qr/stores/**" // TODO: 운영 전환 시 ADMIN 권한으로 제한
     };
 
     // 3) Swagger 경로 (원하면 permitAll로 열어두고, 운영에서만 막는 식으로도 가능)
