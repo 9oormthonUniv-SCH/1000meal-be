@@ -64,7 +64,7 @@ public class RosterSheetsSyncJob {
     private static final long JITTER_MS = 500L; // 추가 딜레이 증가 값
 
     // 운영환경에서는 (00 30 10 ? * MON-FRI) 로 변경 예정
-    @Scheduled(cron = "00 30 10 * * *", zone = "Asia/Seoul") // 테스트 진행을 위해 00 00 * * * * 로 설정
+    @Scheduled(cron = "00 30 10 * * *", zone = "Asia/Seoul")
     public void syncDailyRoster() {
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
             log.warn("[CSV to Sheets] sheets.spreadsheet-id 가 설정되어 있지 않아 동기화를 건너뜁니다.");
@@ -105,6 +105,9 @@ public class RosterSheetsSyncJob {
                 log.info("[CSV to Sheets] 헤더만 존재하거나 비어있습니다. 스킵 진행. dir={}", dateDir);
                 return;
             }
+
+            // 마지막 열에 총 데이터 개수 추가
+            //appendTotalCountColumn(values);
 
             // 시트 존재 확인 및 생성 진행
             ensureSheetExists(sheetName);
@@ -162,6 +165,16 @@ public class RosterSheetsSyncJob {
 
         return values;
     }
+
+    // 헤더 마지막에 "총데이터수" 열 추가, 마지막 데이터 행에만 총 개수 기록 */
+    // private void appendTotalCountColumn(List<List<Object>> values) {
+    //     int totalCount = values.size() - 1; // 헤더 제외
+    //     if (totalCount <= 0) return;
+
+    //     values.get(0).add("총데이터수");
+    //     List<Object> row = values.get(1);
+    //     row.add(totalCount);
+    // }
 
     // Byte Order Mark 제거
     // 이를 제거하지 않으면 시트에 올릴 때 오류가 발생할 수도 있다고 합니다.
