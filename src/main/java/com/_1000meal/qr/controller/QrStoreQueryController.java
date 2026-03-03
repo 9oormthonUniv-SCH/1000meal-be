@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/qr/stores")
+@RequestMapping("/api/v1/qr/stores")
 public class QrStoreQueryController {
 
     private final QrStoreQueryService qrStoreQueryService;
