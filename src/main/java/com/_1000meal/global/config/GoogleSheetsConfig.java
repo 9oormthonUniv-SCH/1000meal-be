@@ -12,10 +12,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 /**
  * Google Sheets API 클라이언트 설정.
@@ -27,24 +27,25 @@ import java.nio.file.Path;
 @ConditionalOnProperty(name = "sheets.enabled", havingValue = "true")
 public class GoogleSheetsConfig {
 
-    @Value("${sheets.service-account-json-path:1000meal_sheets_service_account.json}")
-    private String serviceAccountJsonPath;
+    @Value("${sheets.service-account-base64:}")
+    private String serviceAccountBase64;
 
     @Value("${sheets.application-name:1000meal-roster-export}")
     private String applicationName;
 
     @Bean
     public Sheets sheetsService() throws Exception {
-        Path path = Path.of(serviceAccountJsonPath).toAbsolutePath().normalize();
-        if (!Files.exists(path)) {
-            throw new IllegalStateException("Google Sheets service account JSON not found: " + path);
+        if (serviceAccountBase64 == null || serviceAccountBase64.isBlank()) {
+            throw new IllegalStateException(
+                    "sheets.enabled=true but SHEETS_SERVICE_ACCOUNT_BASE64 is not found.");
         }
 
-        try (InputStream is = Files.newInputStream(path)) {
+        byte[] decoded = Base64.getDecoder().decode(serviceAccountBase64.getBytes(StandardCharsets.UTF_8));
+        try (ByteArrayInputStream is = new ByteArrayInputStream(decoded)) {
             var credentials = ServiceAccountCredentials.fromStream(is)
                     .createScoped("https://www.googleapis.com/auth/spreadsheets");
 
-            log.info("[Sheets] Initializing Sheets client with service account json at {}", path);
+            log.info("[Sheets] Initializing Sheets client with base64 service-account");
 
             JsonFactory jsonFactory = GsonFactory.getDefaultInstance();
 
@@ -54,7 +55,7 @@ public class GoogleSheetsConfig {
                     new HttpCredentialsAdapter(credentials)
             ).setApplicationName(applicationName).build();
         } catch (IOException e) {
-            throw new IllegalStateException("Failed to load Google Sheets service account JSON: " + path, e);
+            throw new IllegalStateException("Failed to load Google Sheets service account from SHEETS_SERVICE_ACCOUNT_BASE64", e);
         }
     }
 }
