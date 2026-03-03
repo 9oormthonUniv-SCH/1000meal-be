@@ -15,6 +15,7 @@ public enum ErrorCode implements ErrorCodeIfs {
     UNAUTHORIZED("AUTH_401", 401, "인증이 필요합니다."),
     FORBIDDEN("AUTH_403", 403, "권한이 없습니다."),
     NOT_FOUND("COMMON_404", 404, "리소스를 찾을 수 없습니다."),
+    QR_TOKEN_NOT_FOUND("QR_404_NOT_FOUND", 404, "QR 토큰을 찾을 수 없습니다."),
     CONFLICT("COMMON_409", 409, "요청이 현재 리소스 상태와 충돌합니다."),
     PRECONDITION_REQUIRED("COMMON_428", 428, "요청 선행 조건이 충족되어야 합니다."),
     TOO_MANY_REQUESTS("COMMON_429", 429, "너무 많은 요청이 발생했습니다."), // ★ 추가
