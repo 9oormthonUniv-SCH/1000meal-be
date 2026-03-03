@@ -2,6 +2,7 @@ package com._1000meal.fcm.sender;
 
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
 import com.google.firebase.messaging.SendResponse;
@@ -13,8 +14,6 @@ import java.util.Map;
 
 @RequiredArgsConstructor
 public class FirebaseFcmSender implements FcmSender {
-
-    private final InvalidTokenHandler invalidTokenHandler;
 
     @Override
     public FcmSendResult sendMulticast(List<String> tokens,
@@ -29,29 +28,31 @@ public class FirebaseFcmSender implements FcmSender {
 
         try {
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(message);
-            handleInvalidTokens(response, tokens);
-            return new FcmSendResult(response.getSuccessCount(), response.getFailureCount());
+            List<FcmSendFailure> failures = collectFailures(response, tokens);
+            return new FcmSendResult(response.getSuccessCount(), response.getFailureCount(), failures);
         } catch (Exception e) {
             throw new IllegalStateException("Firebase send failed", e);
         }
     }
 
-    private void handleInvalidTokens(BatchResponse response, List<String> tokenStrings) {
-        List<String> invalidTokens = new ArrayList<>();
+    private List<FcmSendFailure> collectFailures(BatchResponse response, List<String> tokenStrings) {
+        List<FcmSendFailure> failures = new ArrayList<>();
         List<SendResponse> responses = response.getResponses();
         for (int i = 0; i < responses.size(); i++) {
             SendResponse sendResponse = responses.get(i);
             if (sendResponse.isSuccessful()) {
                 continue;
             }
-            if (sendResponse.getException() != null
-                    && sendResponse.getException().getMessagingErrorCode()
-                    == com.google.firebase.messaging.MessagingErrorCode.UNREGISTERED) {
-                invalidTokens.add(tokenStrings.get(i));
-            }
+            FirebaseMessagingException ex = sendResponse.getException();
+            String messagingErrorCode = ex != null && ex.getMessagingErrorCode() != null
+                    ? ex.getMessagingErrorCode().name()
+                    : null;
+            String errorCode = ex != null && ex.getErrorCode() != null
+                    ? ex.getErrorCode().name()
+                    : null;
+            String message = ex != null ? ex.getMessage() : "unknown FCM send failure";
+            failures.add(new FcmSendFailure(tokenStrings.get(i), messagingErrorCode, errorCode, message));
         }
-        if (!invalidTokens.isEmpty()) {
-            invalidTokenHandler.handleInvalidTokens(invalidTokens);
-        }
+        return failures;
     }
 }

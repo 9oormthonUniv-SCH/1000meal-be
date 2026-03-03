@@ -3,6 +3,7 @@ package com._1000meal.fcm.service;
 import com._1000meal.fcm.domain.FcmToken;
 import com._1000meal.fcm.domain.NotificationType;
 import com._1000meal.fcm.message.FcmMessageFactory;
+import com._1000meal.fcm.sender.FcmSendFailure;
 import com._1000meal.fcm.repository.FcmTokenRepository;
 import com._1000meal.fcm.sender.FcmSendResult;
 import com._1000meal.fcm.sender.FcmSender;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -61,6 +63,7 @@ public class FcmPushService {
             );
             log.info("[FCM][OPEN] storeId={}, success={}, failure={}",
                     storeId, result.successCount(), result.failureCount());
+            handleSendFailures("[FCM][OPEN]", result.failures(), accountIdByToken(tokens));
         } catch (Exception e) {
             log.error("[FCM][OPEN] send failed: {}", e.getMessage(), e);
         }
@@ -100,6 +103,7 @@ public class FcmPushService {
             );
             log.info("[FCM][LOW_STOCK_30] storeId={}, groupId={}, success={}, failure={}",
                     storeId, groupId, result.successCount(), result.failureCount());
+            handleSendFailures("[FCM][LOW_STOCK_30]", result.failures(), accountIdByToken(tokens));
         } catch (Exception e) {
             log.error("[FCM][LOW_STOCK_30] send failed: {}", e.getMessage(), e);
         }
@@ -185,6 +189,7 @@ public class FcmPushService {
             );
             log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success={}, failure={}",
                     storeId, groupId, result.successCount(), result.failureCount());
+            handleSendFailures("[FCM][LOW_STOCK]", result.failures(), accountIdByToken(tokens));
         } catch (Exception e) {
             log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
         }
@@ -256,8 +261,76 @@ public class FcmPushService {
             FcmSendResult result = fcmSender.sendMulticast(tokenStrings, title, body, data);
             log.info("{} accountId={}, success={}, failure={}",
                     logPrefix, accountId, result.successCount(), result.failureCount());
+            handleSendFailures(logPrefix, result.failures(), accountIdByToken(tokens));
         } catch (Exception e) {
             log.error("{} send failed: {}", logPrefix, e.getMessage(), e);
         }
+    }
+
+    private Map<String, Long> accountIdByToken(List<FcmToken> tokens) {
+        return tokens.stream()
+                .collect(Collectors.toMap(
+                        FcmToken::getToken,
+                        FcmToken::getAccountId,
+                        (left, right) -> left
+                ));
+    }
+
+    private void handleSendFailures(
+            String logPrefix,
+            List<FcmSendFailure> failures,
+            Map<String, Long> accountIdByToken
+    ) {
+        if (failures == null || failures.isEmpty()) {
+            return;
+        }
+
+        for (FcmSendFailure failure : failures) {
+            String messagingErrorCode = failure.messagingErrorCode() == null
+                    ? "UNKNOWN"
+                    : failure.messagingErrorCode();
+            Long accountId = accountIdByToken.get(failure.token());
+            String tokenPrefix = maskToken(failure.token());
+
+            if ("UNREGISTERED".equals(messagingErrorCode) || "INVALID_ARGUMENT".equals(messagingErrorCode)) {
+                int updated = tokenRepository.deactivateByToken(failure.token());
+                log.warn("{}[FAIL] accountId={} tokenPrefix={} messagingErrorCode={} errorCode={} msg={} action=deactivate updated={}",
+                        logPrefix,
+                        accountId,
+                        tokenPrefix,
+                        messagingErrorCode,
+                        failure.errorCode(),
+                        failure.message(),
+                        updated);
+                continue;
+            }
+
+            if ("THIRD_PARTY_AUTH_ERROR".equals(messagingErrorCode)) {
+                log.warn("{}[FAIL] accountId={} tokenPrefix={} messagingErrorCode={} errorCode={} msg={} action=keep_token note=possible_apns_config_issue",
+                        logPrefix,
+                        accountId,
+                        tokenPrefix,
+                        messagingErrorCode,
+                        failure.errorCode(),
+                        failure.message());
+                continue;
+            }
+
+            log.warn("{}[FAIL] accountId={} tokenPrefix={} messagingErrorCode={} errorCode={} msg={}",
+                    logPrefix,
+                    accountId,
+                    tokenPrefix,
+                    messagingErrorCode,
+                    failure.errorCode(),
+                    failure.message());
+        }
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "(empty)";
+        }
+        int prefixLength = Math.min(16, token.length());
+        return token.substring(0, prefixLength) + "...";
     }
 }

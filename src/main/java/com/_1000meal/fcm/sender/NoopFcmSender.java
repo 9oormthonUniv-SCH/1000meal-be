@@ -16,6 +16,6 @@ public class NoopFcmSender implements FcmSender {
                                        Map<String, String> data) {
         log.info("[FCM-NOOP] skip sending push tokens={}, title='{}', body='{}', data={}",
                 tokens != null ? tokens.size() : 0, title, body, data);
-        return new FcmSendResult(0, 0);
+        return new FcmSendResult(0, 0, List.of());
     }
 }

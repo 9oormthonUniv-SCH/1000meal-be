@@ -2,7 +2,6 @@ package com._1000meal.fcm.config;
 
 import com._1000meal.fcm.sender.FcmSender;
 import com._1000meal.fcm.sender.FirebaseFcmSender;
-import com._1000meal.fcm.sender.InvalidTokenHandler;
 import com._1000meal.fcm.sender.NoopFcmSender;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -14,8 +13,8 @@ public class FcmSenderConfiguration {
 
     @Bean
     @ConditionalOnProperty(name = "fcm.enabled", havingValue = "true")
-    public FcmSender firebaseFcmSender(InvalidTokenHandler invalidTokenHandler) {
-        return new FirebaseFcmSender(invalidTokenHandler);
+    public FcmSender firebaseFcmSender() {
+        return new FirebaseFcmSender();
     }
 
     @Bean
