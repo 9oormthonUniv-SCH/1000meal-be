@@ -32,6 +32,7 @@ services:
 
       FCM_ENABLED: "true"
       FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
+      SHEETS_SERVICE_ACCOUNT_BASE64: ${SHEETS_SERVICE_ACCOUNT_BASE64}
 
     volumes:
       - ./var/rosters:/app/var/rosters   # 🔥 추가된 부분
