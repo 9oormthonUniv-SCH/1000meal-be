@@ -217,6 +217,7 @@ public class AuthService {
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
+                displayName,
                 account.getEmail(),
                 accessToken,
                 refreshToken,
@@ -228,10 +229,13 @@ public class AuthService {
     /* -------------------- 내 정보 -------------------- */
     @Transactional(readOnly = true)
     public LoginResponse me(Authentication authentication) {
-        AuthPrincipal principal = (AuthPrincipal) authentication.getPrincipal();
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthPrincipal principal)) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
         Account account = accountRepo.findById(principal.id())
                 .orElseThrow(() -> new CustomException(ErrorCode.NOT_FOUND, "계정이 존재하지 않습니다."));
 
+        String name = firstNonBlank(resolveName(account), principal.name(), "");
         Long storeId = null;
         String storeName = null;
         if (account.getRole() == Role.ADMIN) {
@@ -246,6 +250,7 @@ public class AuthService {
                 account.getId(),
                 account.getRole(),
                 account.getUserId(),
+                name,
                 account.getEmail(),
                 null,   // accessToken 없음
                 null,   // refreshToken 없음
@@ -265,6 +270,18 @@ public class AuthService {
                     .map(AdminProfile::getDisplayName)
                     .orElse(null);
         }
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private String extractDeviceId(HttpServletRequest request) {
