@@ -10,10 +10,6 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "notification_history",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_notification_history_type_account_store_date",
-                columnNames = {"type", "account_id", "store_id", "menu_group_id", "sent_date", "week_key"}
-        ),
         indexes = @Index(name = "idx_notification_history_account_sent_date", columnList = "account_id, sent_date")
 )
 @Getter
