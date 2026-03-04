@@ -1,26 +1,5 @@
 package com._1000meal.qr.roster;
 
-import com.google.api.services.sheets.v4.Sheets;
-import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
-import com.google.api.services.sheets.v4.model.ClearValuesRequest;
-import com.google.api.services.sheets.v4.model.Request;
-import com.google.api.services.sheets.v4.model.Sheet;
-import com.google.api.services.sheets.v4.model.SheetProperties;
-import com.google.api.services.sheets.v4.model.Spreadsheet;
-import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
-import com.google.api.services.sheets.v4.model.ValueRange;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
-
-import com.google.api.client.googleapis.json.GoogleJsonResponseException;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +14,28 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+import com.google.api.services.sheets.v4.Sheets;
+import com.google.api.services.sheets.v4.model.BatchUpdateSpreadsheetRequest;
+import com.google.api.services.sheets.v4.model.ClearValuesRequest;
+import com.google.api.services.sheets.v4.model.Request;
+import com.google.api.services.sheets.v4.model.Sheet;
+import com.google.api.services.sheets.v4.model.SheetProperties;
+import com.google.api.services.sheets.v4.model.Spreadsheet;
+import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
+import com.google.api.services.sheets.v4.model.ValueRange;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 로컬에 생성된 QR 로스터 CSV를 Google Sheets에 동기화
@@ -89,7 +90,11 @@ public class RosterSheetsSyncJob {
             List<Path> csvFiles;
             try (Stream<Path> stream = Files.list(dateDir)) {
                 csvFiles = stream
-                        .filter(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(".csv"))
+                        .filter(p -> {
+                            if (!Files.isRegularFile(p)) return false;
+                            String name = p.getFileName().toString();
+                            return name.startsWith("roster-") && name.endsWith(".csv");
+                        })
                         .sorted()
                         .collect(Collectors.toList());
             }
@@ -108,6 +113,9 @@ public class RosterSheetsSyncJob {
 
             // 마지막 열에 총 데이터 개수 추가
             //appendTotalCountColumn(values);
+
+            // 헤더에 "그룹명"이 있으면 시트에는 기록하지 않도록 제거
+            //removeGroupNameColumnIfExists(values);
 
             // 시트 존재 확인 및 생성 진행
             ensureSheetExists(sheetName);
@@ -165,6 +173,32 @@ public class RosterSheetsSyncJob {
 
         return values;
     }
+
+    // 헤더에 그룹명 컬럼이 있으면 제거, 시트에는 학과,학번,이름,매장명,인식시간,수량만 기록
+    // private void removeGroupNameColumnIfExists(List<List<Object>> values) {
+    //     if (values == null || values.isEmpty()) {
+    //         return;
+    //     }
+    //     List<Object> header = values.get(0);
+    //     int groupNameIndex = -1;
+    //     for (int i = 0; i < header.size(); i++) {
+    //         String colName = String.valueOf(header.get(i)).trim();
+    //         if ("그룹명".equals(colName)) {
+    //             groupNameIndex = i;
+    //             break;
+    //         }
+    //     }
+    //     if (groupNameIndex < 0) {
+    //         return;
+    //     }
+    //     header.remove(groupNameIndex);
+    //     for (int r = 1; r < values.size(); r++) {
+    //         List<Object> row = values.get(r);
+    //         if (row.size() > groupNameIndex) {
+    //             row.remove(groupNameIndex);
+    //         }
+    //     }
+    // }
 
     // 헤더 마지막에 "총데이터수" 열 추가, 마지막 데이터 행에만 총 개수 기록 */
     // private void appendTotalCountColumn(List<List<Object>> values) {
