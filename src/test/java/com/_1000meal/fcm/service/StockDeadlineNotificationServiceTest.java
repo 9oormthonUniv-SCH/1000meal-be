@@ -56,4 +56,23 @@ class StockDeadlineNotificationServiceTest {
                 1L, 4L, "향설2관", "img", 11L, "B", 20
         );
     }
+
+    @Test
+    @DisplayName("dedup 충돌 시 마감임박 푸시를 건너뛴다")
+    void skipsWhenDedupRejected() {
+        LocalDate date = LocalDate.of(2026, 2, 11);
+        StockDeadlineCandidate g1 = new StockDeadlineCandidate(
+                1L, 4L, "향설2관", "img", 10L, "A", 1, 30, 99
+        );
+
+        when(favoriteStoreRepository.findStockDeadlineCandidates()).thenReturn(List.of(g1));
+        when(policy.canSend(anyInt())).thenReturn(true);
+        when(historyService.tryMarkSent(any(), any(), any(), any(), any(), any())).thenReturn(false);
+
+        service.sendStockDeadlineNotifications(date);
+
+        verify(fcmPushService, never()).sendStockDeadlineNotification(
+                anyLong(), anyLong(), anyString(), anyString(), anyLong(), anyString(), anyInt()
+        );
+    }
 }

@@ -29,6 +29,9 @@ public class StockDeadlineNotificationService {
             log.info("[FCM][STOCK_DEADLINE] no favorite targets");
             return;
         }
+        int sentCount = 0;
+        int dedupSkipCount = 0;
+        int policySkipCount = 0;
 
         Map<String, List<StockDeadlineCandidate>> grouped = new HashMap<>();
         for (StockDeadlineCandidate c : candidates) {
@@ -41,6 +44,7 @@ public class StockDeadlineNotificationService {
             for (StockDeadlineCandidate target : targets) {
                 int remain = target.groupStock() != null ? target.groupStock() : safeRemain(target.storeRemain());
                 if (!policy.canSend(remain)) {
+                    policySkipCount++;
                     continue;
                 }
 
@@ -53,6 +57,7 @@ public class StockDeadlineNotificationService {
                         null
                 );
                 if (!recorded) {
+                    dedupSkipCount++;
                     continue;
                 }
 
@@ -65,8 +70,11 @@ public class StockDeadlineNotificationService {
                         target.menuGroupName(),
                         remain
                 );
+                sentCount++;
             }
         }
+        log.info("[FCM][STOCK_DEADLINE] run summary. date={}, candidates={}, groups={}, sent={}, dedupSkip={}, policySkip={}",
+                date, candidates.size(), grouped.size(), sentCount, dedupSkipCount, policySkipCount);
     }
 
     private List<StockDeadlineCandidate> selectTargets(List<StockDeadlineCandidate> candidates) {
