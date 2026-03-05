@@ -52,6 +52,10 @@ public class QrUsageService {
         Store store = storeRepository.findById(storeQr.getStore().getId())
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
+        if (!store.isOpen()) {
+            throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED, "영업 중인 매장이 아닙니다.");
+        }
+
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -61,6 +65,16 @@ public class QrUsageService {
         ZonedDateTime nowKst = ZonedDateTime.now(KST);
         LocalDate usedDate = nowKst.toLocalDate();
         LocalDateTime usedAt = nowKst.toLocalDateTime();
+        // 필요시 : 차후 openTime/closeTime 기반 시간 검증 적용
+        // LocalTime nowTime = nowKst.toLocalTime();
+        // LocalTime openTime = store.getOpenTime();
+        // LocalTime closeTime = store.getCloseTime();
+        // if (openTime != null && nowTime.isBefore(openTime)) {
+        //     throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED, "오픈 시간 이전에는 이용할 수 없습니다.");
+        // }
+        // if (closeTime != null && nowTime.isAfter(closeTime)) {
+        //     throw new CustomException(StoreErrorCode.STORE_ACCESS_DENIED, "영업 종료 후에는 이용할 수 없습니다.");
+        // }
 
         String studentNoSnapshot = account.getUserId();
         if (studentNoSnapshot == null || studentNoSnapshot.isBlank()) {

@@ -3,15 +3,18 @@ package com._1000meal.fcm.service;
 import com._1000meal.favorite.repository.FavoriteStoreRepository;
 import com._1000meal.fcm.domain.NotificationType;
 import com._1000meal.fcm.dto.StockDeadlineCandidate;
+import com._1000meal.qr.repository.MealUsageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -19,6 +22,7 @@ import java.util.Map;
 public class StockDeadlineNotificationService {
 
     private final FavoriteStoreRepository favoriteStoreRepository;
+    private final MealUsageRepository mealUsageRepository;
     private final StockDeadlineNotificationPolicy policy;
     private final NotificationHistoryService historyService;
     private final FcmPushService fcmPushService;
@@ -29,9 +33,13 @@ public class StockDeadlineNotificationService {
             log.info("[FCM][STOCK_DEADLINE] no favorite targets");
             return;
         }
+
+        Set<Long> accountIdsUsedQrToday = new HashSet<>(mealUsageRepository.findDistinctAccountIdsByUsedDate(date));
+
         int sentCount = 0;
         int dedupSkipCount = 0;
         int policySkipCount = 0;
+        int qrUsedTodaySkipCount = 0;
 
         Map<String, List<StockDeadlineCandidate>> grouped = new HashMap<>();
         for (StockDeadlineCandidate c : candidates) {
@@ -42,6 +50,10 @@ public class StockDeadlineNotificationService {
         for (List<StockDeadlineCandidate> group : grouped.values()) {
             List<StockDeadlineCandidate> targets = selectTargets(group);
             for (StockDeadlineCandidate target : targets) {
+                if (accountIdsUsedQrToday.contains(target.accountId())) {
+                    qrUsedTodaySkipCount++;
+                    continue;
+                }
                 int remain = target.groupStock() != null ? target.groupStock() : safeRemain(target.storeRemain());
                 if (!policy.canSend(remain)) {
                     policySkipCount++;
@@ -73,8 +85,8 @@ public class StockDeadlineNotificationService {
                 sentCount++;
             }
         }
-        log.info("[FCM][STOCK_DEADLINE] run summary. date={}, candidates={}, groups={}, sent={}, dedupSkip={}, policySkip={}",
-                date, candidates.size(), grouped.size(), sentCount, dedupSkipCount, policySkipCount);
+        log.info("[FCM][STOCK_DEADLINE] run summary. date={}, candidates={}, groups={}, sent={}, dedupSkip={}, policySkip={}, qrUsedTodaySkip={}",
+                date, candidates.size(), grouped.size(), sentCount, dedupSkipCount, policySkipCount, qrUsedTodaySkipCount);
     }
 
     private List<StockDeadlineCandidate> selectTargets(List<StockDeadlineCandidate> candidates) {
