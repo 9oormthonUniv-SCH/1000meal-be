@@ -175,7 +175,7 @@ public class RosterExportService {
         Charset charset = Charset.forName(fileEncoding);
         Path tempPath = createTempFile(outputPath);
 
-        //Set<Long> missingGroupNames = new HashSet<>();
+        Set<Long> missingGroupNames = new HashSet<>();
 
         try (OutputStream os = Files.newOutputStream(
                 tempPath,
@@ -197,9 +197,9 @@ public class RosterExportService {
                 String dept = safe(usage.getDeptSnapshot());
                 String studentNo = safe(usage.getStudentNoSnapshot());
                 String name = safe(usage.getNameSnapshot());
-                Long storeId = usage.getStore().getId();
-                Store store = storeById.get(storeId);
-                String storeName = store == null || store.getName() == null ? "" : store.getName();
+                // Long storeId = usage.getStore().getId();
+                // Store store = storeById.get(storeId);
+                // String storeName = store == null || store.getName() == null ? "" : store.getName();
                 // Long menuGroupId = usage.getMenuGroupId();
                 // String groupName = "";
                 // if (menuGroupId != null) {
@@ -211,10 +211,22 @@ public class RosterExportService {
                 //         groupName = "(알 수 없음)";
                 //     }
                 // }
+                Long menuGroupId = usage.getMenuGroupId();
+                String groupName = "";
+                if (menuGroupId != null) {
+                    groupName = groupNameById.get(menuGroupId);
+                    if (groupName == null) {
+                        if (missingGroupNames.add(menuGroupId)) {
+                            log.warn("Roster export missing group name: menuGroupId={}", menuGroupId);
+                        }
+                        groupName = "(알 수 없음)";
+                    }
+                }
+
                 String usedAt = usage.getUsedAt() == null ? "" : usage.getUsedAt().format(USED_AT_FORMAT);
 
                 //writer.write(csvLine(dept, studentNo, name, storeName, groupName, usedAt, "1"));
-                writer.write(csvLine(dept, studentNo, name, storeName, usedAt, "1"));
+                writer.write(csvLine(dept, studentNo, name, groupName, usedAt, "1"));
                 writer.newLine();
             }
 
