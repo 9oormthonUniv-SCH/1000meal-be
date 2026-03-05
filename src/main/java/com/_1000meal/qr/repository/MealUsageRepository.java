@@ -2,8 +2,11 @@ package com._1000meal.qr.repository;
 
 import com._1000meal.qr.domain.MealUsage;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 public interface MealUsageRepository extends JpaRepository<MealUsage, Long> {
@@ -28,4 +31,7 @@ public interface MealUsageRepository extends JpaRepository<MealUsage, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("delete from MealUsage mu where mu.usedDate < :cutoff")
     int deleteByUsedDateBefore(@org.springframework.data.repository.query.Param("cutoff") LocalDate cutoff);
+
+    @Query("SELECT DISTINCT mu.user.id FROM MealUsage mu WHERE mu.usedDate = :usedDate")
+    List<Long> findDistinctAccountIdsByUsedDate(@Param("usedDate") LocalDate usedDate);
 }
