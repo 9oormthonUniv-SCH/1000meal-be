@@ -222,8 +222,7 @@ public class FcmPushService {
             String weekKey
     ) {
         String title = "이번 주 메뉴가 올라왔어요";
-        String body = "[" + groupName + "]에 천원의 아침밥 메뉴를 확인해보세요\n" +
-                "→ 월~금까지 메뉴가 채워졌을 시 알림";
+        String body = "[" + groupName + "]에 천원의 아침밥 메뉴를 확인해보세요";
 
         Map<String, String> data = new HashMap<>();
         data.put("type", "WEEKLY_MENU_UPLOADED");
