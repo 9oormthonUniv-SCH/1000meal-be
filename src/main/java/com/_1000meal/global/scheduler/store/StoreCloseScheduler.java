@@ -5,6 +5,7 @@ import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.store.repository.StoreRepository;
+import com._1000meal.qr.roster.RosterExportJob;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -25,6 +26,7 @@ public class StoreCloseScheduler {
 
     private final StoreRepository storeRepository;
     private final DailyMenuRepository dailyMenuRepository;
+    private final RosterExportJob rosterExportJob;
 
     /**
      * 매장 영업 종료 스케줄러
@@ -69,6 +71,13 @@ public class StoreCloseScheduler {
         }
 
         log.info("[스케줄러][STORE_CLOSE] date={}, dailyMenusUpdated={}", today, dailyMenus.size());
+
+        try {
+            rosterExportJob.runOnce(today);
+            log.info("[스케줄러][STORE_CLOSE] roster export+sync completed. date={}", today);
+        } catch (Exception e) {
+            log.error("[스케줄러][STORE_CLOSE] roster export+sync failed. date={}, error={}", today, e.getMessage(), e);
+        }
     }
 }
 
