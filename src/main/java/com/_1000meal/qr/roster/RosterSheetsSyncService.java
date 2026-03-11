@@ -6,7 +6,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -20,8 +19,7 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import com.google.api.services.sheets.v4.Sheets;
@@ -33,24 +31,16 @@ import com.google.api.services.sheets.v4.model.SheetProperties;
 import com.google.api.services.sheets.v4.model.Spreadsheet;
 import com.google.api.services.sheets.v4.model.UpdateValuesResponse;
 import com.google.api.services.sheets.v4.model.ValueRange;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-/**
- * 로컬에 생성된 QR 로스터 CSV를 Google Sheets에 동기화
- *
- * 데이터 소스: qr.roster.base-dir (기본 ./var/rosters) 아래의 {yyyy-MM-dd} 디렉토리.
- * - 각 디렉토리 내의 모든 *.csv 파일을 읽어, 헤더 1줄 + 데이터 행들로 합쳐서
- *   "yyyy-MM-dd" 이름의 시트에 A1부터 덮어쓴다.
- */
+
+//로컬에 생성된 QR 로스터 CSV를 Google Sheets에 동기화
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "sheets.enabled", havingValue = "true")
-public class RosterSheetsSyncJob {
-
-    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+public class RosterSheetsSyncService {
 
     private final Sheets sheets;
 
@@ -60,20 +50,17 @@ public class RosterSheetsSyncJob {
     @Value("${sheets.spreadsheet-id:}")
     private String spreadsheetId;
 
-    private static final int MAX_RETRY_ATTEMPTS = 4;    // 최대 재시도 횟수
-    private static final long INITIAL_DELAY_MS = 5000L; // 초기 딜레이 시간
-    private static final long JITTER_MS = 500L; // 추가 딜레이 증가 값
+    private static final int MAX_RETRY_ATTEMPTS = 4;
+    private static final long INITIAL_DELAY_MS = 5000L;
+    private static final long JITTER_MS = 500L;
 
-    // 운영환경에서는 (00 30 10 ? * MON-FRI) 로 변경 예정
-    @Scheduled(cron = "00 30 10 * * *", zone = "Asia/Seoul")
-    public void syncDailyRoster() {
+    //해당 날짜 디렉터리의 통합 CSV(roster-*.csv)를 읽어 동명 시트에 덮어씀
+    public boolean syncRosterForDate(LocalDate targetDate) {
         if (spreadsheetId == null || spreadsheetId.isBlank()) {
             log.warn("[CSV to Sheets] sheets.spreadsheet-id 가 설정되어 있지 않아 동기화를 건너뜁니다.");
-            return;
+            return false;
         }
 
-        // 오늘 날짜 기준으로 시트 이름 결정
-        LocalDate targetDate = LocalDate.now(KST);
         String sheetName = targetDate.toString();
 
         try {
@@ -82,11 +69,10 @@ public class RosterSheetsSyncJob {
             Path basePath = Path.of(baseDir).toAbsolutePath().normalize();
             Path dateDir = basePath.resolve(sheetName);
             if (!Files.exists(dateDir) || !Files.isDirectory(dateDir)) {
-                log.info("[CSV to Sheets] dateDir 가 존재하지 않습니다. 스킵 진행. dir={}", dateDir);
-                return;
+                log.warn("[CSV to Sheets] dateDir 가 존재하지 않습니다. dir={}", dateDir);
+                return false;
             }
 
-            // 해당 날짜 디렉토리 내의 모든 CSV 파일 목록 조회 진행
             List<Path> csvFiles;
             try (Stream<Path> stream = Files.list(dateDir)) {
                 csvFiles = stream
@@ -100,65 +86,55 @@ public class RosterSheetsSyncJob {
             }
 
             if (csvFiles.isEmpty()) {
-                log.info("[CSV to Sheets] CSV 파일이 존재하지 않습니다. 스킵 진행. dir={}", dateDir);
-                return;
+                log.warn("[CSV to Sheets] roster-*.csv 가 없습니다. dir={}", dateDir);
+                return false;
             }
 
-            // CSV 파일 읽어오기 및 헤더 확인 
             List<List<Object>> values = readCsvFiles(csvFiles);
-            if (values.size() <= 1) {
-                log.info("[CSV to Sheets] 헤더만 존재하거나 비어있습니다. 스킵 진행. dir={}", dateDir);
-                return;
+
+            if (values.isEmpty()) {
+                log.warn("[CSV to Sheets] CSV 내용이 비어 있습니다. dir={}", dateDir);
+                return false;
             }
 
-            // 마지막 열에 총 데이터 개수 추가
-            //appendTotalCountColumn(values);
-
-            // 헤더에 "그룹명"이 있으면 시트에는 기록하지 않도록 제거
-            //removeGroupNameColumnIfExists(values);
-
-            // 시트 존재 확인 및 생성 진행
             ensureSheetExists(sheetName);
-            
-            // 시트 데이터 초기화 진행 (기존 데이터 삭제)
             retryOnSheetsError("clearSheet", () -> {
                 clearSheet(sheetName);
                 return null;
             });
-            // 시트 쓰기 진행
             retryOnSheetsError("writeToSheet", () -> {
                 writeToSheet(sheetName, values);
                 return null;
             });
 
             log.info("[CSV to Sheets] 동기화 완료. date={}, rows={}", targetDate, values.size());
+            return true;
         } catch (Exception e) {
             log.error("[CSV to Sheets] 동기화 실패: {}", e.getMessage(), e);
+            return false;
         }
     }
-    
-    // CSV 파일 읽어오기 및 헤더 확인 
+
+    //CSV 파일 읽어오기 및 헤더 확인
     private List<List<Object>> readCsvFiles(List<Path> csvFiles) throws IOException {
         List<List<Object>> values = new ArrayList<>();
         boolean headerSet = false;
 
-        // CSV 파일 포맷
         CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader()
                 .setSkipHeaderRecord(true)
                 .setIgnoreEmptyLines(true)
                 .get();
 
-        // CSV 파일 읽어오기 및 헤더 확인 
         for (Path csv : csvFiles) {
             try (Reader reader = Files.newBufferedReader(csv, StandardCharsets.UTF_8);
-            CSVParser parser = CSVParser.parse(reader, format)){
 
+            CSVParser parser = CSVParser.parse(reader, format)) {
                 if (!headerSet) {
                     List<String> header = new ArrayList<>(parser.getHeaderNames());
-                    if (!header.isEmpty()) {
-                        header.set(0, stripBom(header.get(0)));
-                    }
+                    // if (!header.isEmpty()) {
+                    //     header.set(0, stripBom(header.get(0)));
+                    // }
                     values.add(new ArrayList<>(header));
                     headerSet = true;
                 }
@@ -174,58 +150,18 @@ public class RosterSheetsSyncJob {
         return values;
     }
 
-    // 헤더에 그룹명 컬럼이 있으면 제거, 시트에는 학과,학번,이름,매장명,인식시간,수량만 기록
-    // private void removeGroupNameColumnIfExists(List<List<Object>> values) {
-    //     if (values == null || values.isEmpty()) {
-    //         return;
+    //Byte Order Mark 제거
+    //이를 제거하지 않으면 시트에 올릴 때 오류가 발생할 수도 있다고 합니다.
+    //(필요시 사용 예정)
+    // private String stripBom(String value) {
+    //     if (value == null || value.isEmpty()) return value;
+    //     if (value.charAt(0) == '\uFEFF') {
+    //         return value.substring(1);
     //     }
-    //     List<Object> header = values.get(0);
-    //     int groupNameIndex = -1;
-    //     for (int i = 0; i < header.size(); i++) {
-    //         String colName = String.valueOf(header.get(i)).trim();
-    //         if ("그룹명".equals(colName)) {
-    //             groupNameIndex = i;
-    //             break;
-    //         }
-    //     }
-    //     if (groupNameIndex < 0) {
-    //         return;
-    //     }
-    //     header.remove(groupNameIndex);
-    //     for (int r = 1; r < values.size(); r++) {
-    //         List<Object> row = values.get(r);
-    //         if (row.size() > groupNameIndex) {
-    //             row.remove(groupNameIndex);
-    //         }
-    //     }
+    //     return value;
     // }
 
-    // 헤더 마지막에 "총데이터수" 열 추가, 마지막 데이터 행에만 총 개수 기록 */
-    // private void appendTotalCountColumn(List<List<Object>> values) {
-    //     int totalCount = values.size() - 1; // 헤더 제외
-    //     if (totalCount <= 0) return;
-
-    //     values.get(0).add("총데이터수");
-    //     List<Object> row = values.get(1);
-    //     row.add(totalCount);
-    // }
-
-    // Byte Order Mark 제거
-    // 이를 제거하지 않으면 시트에 올릴 때 오류가 발생할 수도 있다고 합니다.
-    private String stripBom(String value) {
-        if (value == null || value.isEmpty()) return value;
-        if (value.charAt(0) == '\uFEFF') {
-            return value.substring(1);
-        }
-        return value;
-    }
-
-    // 차후 필요 시 사용 예정 : A1 표기 시 시트명에 특수문자(하이픈 등)가 있으면 작은따옴표로 감싼다. (에러 방지용도 입니다.)
-    // private String toA1Range(String sheetName, String range) {
-    //     return "'" + sheetName.replace("'", "''") + "'!" + range;
-    // }
-
-    /** 에러 발생 시 재시도 */
+    //에러 발생 시 재시도
     private <T> T retryOnSheetsError(String opName, Callable<T> action) throws Exception {
         long delayMs = INITIAL_DELAY_MS;
         for (int attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
@@ -271,7 +207,7 @@ public class RosterSheetsSyncJob {
         throw new IllegalStateException("unreachable");
     }
 
-    // 시트 존재 확인 및 생성
+    //시트 존재 확인 및 생성
     private void ensureSheetExists(String sheetName) throws IOException {
         Spreadsheet spreadsheet = sheets.spreadsheets().get(spreadsheetId).execute();
         boolean exists = spreadsheet.getSheets() != null &&
@@ -297,7 +233,7 @@ public class RosterSheetsSyncJob {
         sheets.spreadsheets().batchUpdate(spreadsheetId, batchRequest).execute();
     }
 
-    // 시트 데이터 초기화 (기존 데이터 삭제)
+    //시트 데이터 초기화 (기존 데이터 삭제)
     private void clearSheet(String sheetName) throws IOException {
         ClearValuesRequest requestBody = new ClearValuesRequest();
         sheets.spreadsheets().values()
@@ -305,7 +241,7 @@ public class RosterSheetsSyncJob {
                 .execute();
     }
 
-    // 시트 쓰기
+    //시트 쓰기
     private void writeToSheet(String sheetName, List<List<Object>> values) throws IOException {
         ValueRange body = new ValueRange().setValues(values);
         UpdateValuesResponse response = sheets.spreadsheets().values()
@@ -317,4 +253,3 @@ public class RosterSheetsSyncJob {
                 response.getUpdatedRows(), response.getUpdatedColumns());
     }
 }
-

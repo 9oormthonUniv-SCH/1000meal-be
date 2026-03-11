@@ -18,8 +18,10 @@ import com._1000meal.qr.repository.StoreQrRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
+import com._1000meal.store.event.StoreClosedEvent;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,6 +47,7 @@ public class QrUsageService {
     private final MenuGroupStockRepository menuGroupStockRepository;
     private final QrTargetMenuGroupResolver qrTargetMenuGroupResolver;
     private final DailyMenuRepository dailyMenuRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public QrUsageResponse createUsage(Long accountId, String qrToken) {
@@ -104,20 +107,6 @@ public class QrUsageService {
         if (updated == 0) {
             throw new SoldOutException();
         }
-
-        // 재고 차감 이후, 매장의 전체 재고가 0이면 자동으로 영업 종료 처리 (주흔 선배 확인 부탁드립니다.)
-        dailyMenuRepository.findTotalGroupStockByStoreIdAndDate(store.getId(), usedDate)
-                .filter(totalStock -> totalStock <= 0)
-                .ifPresent(totalStock -> {
-                    // 매장과 오늘 일일 메뉴를 모두 토글
-                    store.toggleIsOpen();
-                    dailyMenuRepository.findDailyMenuByStoreIdAndDate(store.getId(), usedDate)
-                            .ifPresent(dm -> {
-                                if (dm.isOpen()) {
-                                    dm.toggleIsOpen();
-                                }
-                            });
-                });
 
         try {
             mealUsageRepository.save(mealUsage);
