@@ -168,3 +168,7 @@ sheets:
   service-account-base64: ${SHEETS_SERVICE_ACCOUNT_BASE64:}
   # 해당 서비스 계정으로 권한을 부여한 스프레드시트 ID입니다.
   spreadsheet-id: 1qkhnwg9BduAzALaWnF2DaX8fsqcANS79AHtOLOeQtaA
+
+api:
+  holiday:
+    service-key: ${API_HOLIDAY_SERVICE_KEY:}
