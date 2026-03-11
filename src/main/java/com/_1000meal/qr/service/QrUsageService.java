@@ -15,10 +15,13 @@ import com._1000meal.qr.domain.MealUsage;
 import com._1000meal.qr.domain.StoreQr;
 import com._1000meal.qr.repository.MealUsageRepository;
 import com._1000meal.qr.repository.StoreQrRepository;
+import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.domain.Store;
+import com._1000meal.store.event.StoreClosedEvent;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +46,8 @@ public class QrUsageService {
     private final UserProfileRepository userProfileRepository;
     private final MenuGroupStockRepository menuGroupStockRepository;
     private final QrTargetMenuGroupResolver qrTargetMenuGroupResolver;
+    private final DailyMenuRepository dailyMenuRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public QrUsageResponse createUsage(Long accountId, String qrToken) {

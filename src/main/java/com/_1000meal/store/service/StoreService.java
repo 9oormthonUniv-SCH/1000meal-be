@@ -11,6 +11,7 @@ import com._1000meal.store.domain.Store;
 import com._1000meal.store.dto.StoreDetailedResponse;
 import com._1000meal.store.dto.StoreResponse;
 import com._1000meal.store.dto.StoreTodayMenuDto;
+import com._1000meal.store.event.StoreClosedEvent;
 import com._1000meal.store.event.StoreOpenedEvent;
 import com._1000meal.store.repository.StoreRepository;
 import lombok.RequiredArgsConstructor;
@@ -98,10 +99,16 @@ public class StoreService {
         dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, today)
                 .ifPresent(DailyMenu::toggleIsOpen);
 
-        // ✅ OFF -> ON 일 때만 오픈 알림 이벤트 발행
+        // OFF -> ON 일 때만 오픈 알림 이벤트 발행
         boolean openedNow = !previousState && store.isOpen();
         if (openedNow) {
             eventPublisher.publishEvent(new StoreOpenedEvent(store.getId(), store.getName()));
+        }
+
+        // ON -> OFF 일 때는 close 이벤트 발행
+        boolean closedNow = previousState && !store.isOpen();
+        if (closedNow) {
+            eventPublisher.publishEvent(new StoreClosedEvent(store.getId(), today));
         }
 
         return "가게와 오늘의 메뉴 운영 상태가 업데이트 되었습니다.";
