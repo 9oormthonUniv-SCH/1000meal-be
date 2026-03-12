@@ -1,6 +1,8 @@
 package com._1000meal.fcm.scheduler;
 
 import com._1000meal.fcm.domain.FcmToken;
+import com._1000meal.fcm.domain.NotificationType;
+import com._1000meal.fcm.message.FcmMessageFactory;
 import com._1000meal.fcm.repository.FcmTokenRepository;
 import com._1000meal.fcm.repository.NotificationPreferenceRepository;
 import com._1000meal.fcm.sender.FcmSendResult;
@@ -54,15 +56,15 @@ public class OpenReminderScheduler {
             return;
         }
 
-        String title = "천원의 아침밥 오픈 사전 알림";
-        String body  = "10분 후 천원의 아침밥이 시작돼요.";
-
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.OPEN_REMINDER, null, null, 0);
         Map<String, String> data = Map.of(
-                "type", "OPEN_REMINDER"
+                "type", NotificationType.OPEN_REMINDER.name()
         );
 
         try {
-            FcmSendResult result = fcmSender.sendMulticast(tokenStrings, title, body, data);
+            FcmSendResult result = fcmSender.sendMulticast(
+                    tokenStrings, message.title(), message.body(), data);
             log.info("[FCM][OPEN_REMINDER] success={}, failure={}",
                     result.successCount(), result.failureCount());
         } catch (Exception e) {

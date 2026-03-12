@@ -25,37 +25,36 @@ public class LowStockNotificationListener {
     private final FavoriteStoreRepository favoriteStoreRepository;
     private final NotificationHistoryService historyService;
 
+    // LOW_STOCK_10 알림 비활성화
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onLowStock(LowStockEvent event) {
-        log.info("[LOW_STOCK EVENT] storeId={}, groupId={}, groupName={}, remaining={}",
-                event.storeId(), event.groupId(), event.groupName(), event.remainingStock());
-
-        LocalDate today = LocalDate.now(ZONE_ID);
-        List<Long> accountIds = favoriteStoreRepository.findFavoriteSubscriberAccountIdsByStoreId(event.storeId());
-        for (Long accountId : accountIds) {
-            boolean recorded = historyService.tryMarkSent(
-                    NotificationType.LOW_STOCK_10,
-                    accountId,
-                    event.storeId(),
-                    event.groupId(),
-                    today,
-                    null
-            );
-            if (!recorded) {
-                log.info("[FCM][LOW_STOCK] duplicate skip. accountId={}, storeId={}, groupId={}",
-                        accountId, event.storeId(), event.groupId());
-                continue;
-            }
-
-            fcmPushService.sendLowStockNotificationForAccount(
-                    accountId,
-                    event.storeId(),
-                    event.storeName(),
-                    event.groupId(),
-                    event.groupName(),
-                    event.remainingStock()
-            );
-        }
+        // log.info("[LOW_STOCK EVENT] storeId={}, groupId={}, groupName={}, remaining={}",
+        //         event.storeId(), event.groupId(), event.groupName(), event.remainingStock());
+        // LocalDate today = LocalDate.now(ZONE_ID);
+        // List<Long> accountIds = favoriteStoreRepository.findFavoriteSubscriberAccountIdsByStoreId(event.storeId());
+        // for (Long accountId : accountIds) {
+        //     boolean recorded = historyService.tryMarkSent(
+        //             NotificationType.LOW_STOCK_10,
+        //             accountId,
+        //             event.storeId(),
+        //             event.groupId(),
+        //             today,
+        //             null
+        //     );
+        //     if (!recorded) {
+        //         log.info("[FCM][LOW_STOCK] duplicate skip. accountId={}, storeId={}, groupId={}",
+        //                 accountId, event.storeId(), event.groupId());
+        //         continue;
+        //     }
+        //     fcmPushService.sendLowStockNotificationForAccount(
+        //             accountId,
+        //             event.storeId(),
+        //             event.storeName(),
+        //             event.groupId(),
+        //             event.groupName(),
+        //             event.remainingStock()
+        //     );
+        // }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

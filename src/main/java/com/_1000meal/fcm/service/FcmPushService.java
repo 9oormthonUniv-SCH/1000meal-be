@@ -152,44 +152,43 @@ public class FcmPushService {
     }
 
     /**
-     * 품절 임박 알림 발송
+     * 품절 임박 알림 발송 (LOW_STOCK_10 알림 비활성화)
      * 해당 매장을 즐겨찾기한 사용자 중 알림 ON + active 토큰 보유자에게 푸시
      */
     public void sendLowStockNotification(Long storeId, String storeName,
                                           Long groupId, String groupName, int remaining) {
-        List<FcmToken> tokens = tokenRepository.findActiveTokensForFavoriteStore(storeId);
-        List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
-
-        if (tokenStrings.isEmpty()) {
-            log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success=0, failure=0, skipped=no_favorite_subscribers",
-                    storeId, groupId);
-            return;
-        }
-
-        FcmMessageFactory.FcmMessage message =
-                FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
-
-        try {
-            FcmSendResult result = fcmSender.sendMulticast(
-                    tokenStrings,
-                    message.title(),
-                    message.body(),
-                    Map.of(
-                            "type", "LOW_STOCK",
-                            "storeId", String.valueOf(storeId),
-                            "storeName", storeName,
-                            "groupId", String.valueOf(groupId),
-                            "groupName", groupName,
-                            "remaining", String.valueOf(remaining)
-                    )
-            );
-            log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success={}, failure={}",
-                    storeId, groupId, result.successCount(), result.failureCount());
-        } catch (Exception e) {
-            log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
-        }
+        // LOW_STOCK_10 알림 비활성화
+        // List<FcmToken> tokens = tokenRepository.findActiveTokensForFavoriteStore(storeId);
+        // List<String> tokenStrings = tokens.stream().map(FcmToken::getToken).distinct().toList();
+        // if (tokenStrings.isEmpty()) {
+        //     log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success=0, failure=0, skipped=no_favorite_subscribers",
+        //             storeId, groupId);
+        //     return;
+        // }
+        // FcmMessageFactory.FcmMessage message =
+        //         FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
+        // try {
+        //     FcmSendResult result = fcmSender.sendMulticast(
+        //             tokenStrings,
+        //             message.title(),
+        //             message.body(),
+        //             Map.of(
+        //                     "type", "LOW_STOCK",
+        //                     "storeId", String.valueOf(storeId),
+        //                     "storeName", storeName,
+        //                     "groupId", String.valueOf(groupId),
+        //                     "groupName", groupName,
+        //                     "remaining", String.valueOf(remaining)
+        //             )
+        //     );
+        //     log.info("[FCM][LOW_STOCK] storeId={}, groupId={}, success={}, failure={}",
+        //             storeId, groupId, result.successCount(), result.failureCount());
+        // } catch (Exception e) {
+        //     log.error("[FCM][LOW_STOCK] send failed: {}", e.getMessage(), e);
+        // }
     }
 
+    /** LOW_STOCK_10 알림 비활성화 */
     public void sendLowStockNotificationForAccount(
             Long accountId,
             Long storeId,
@@ -198,18 +197,17 @@ public class FcmPushService {
             String groupName,
             int remaining
     ) {
-        FcmMessageFactory.FcmMessage message =
-                FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
-
-        Map<String, String> data = new HashMap<>();
-        data.put("type", "LOW_STOCK");
-        data.put("storeId", String.valueOf(storeId));
-        data.put("storeName", storeName);
-        data.put("groupId", String.valueOf(groupId));
-        data.put("groupName", groupName);
-        data.put("remaining", String.valueOf(remaining));
-
-        sendMulticastForAccount(accountId, "[FCM][LOW_STOCK]", message.title(), message.body(), data);
+        // LOW_STOCK_10 알림 비활성화
+        // FcmMessageFactory.FcmMessage message =
+        //         FcmMessageFactory.of(NotificationType.LOW_STOCK_10, storeName, groupName, remaining);
+        // Map<String, String> data = new HashMap<>();
+        // data.put("type", "LOW_STOCK");
+        // data.put("storeId", String.valueOf(storeId));
+        // data.put("storeName", storeName);
+        // data.put("groupId", String.valueOf(groupId));
+        // data.put("groupName", groupName);
+        // data.put("remaining", String.valueOf(remaining));
+        // sendMulticastForAccount(accountId, "[FCM][LOW_STOCK]", message.title(), message.body(), data);
     }
 
     public void sendWeeklyMenuUploadedNotification(

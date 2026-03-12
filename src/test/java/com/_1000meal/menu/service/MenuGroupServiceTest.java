@@ -91,9 +91,9 @@ class MenuGroupServiceTest {
     }
 
     @Test
-    @DisplayName("재고 차감 성공 - 10 임계치 알림 조건 충족 (11 → 10 이하)")
+    @DisplayName("재고 차감 - 10 임계치 알림 비활성화로 LowStockEvent 미발행")
     void deductStock_withNotification10() {
-        // given
+        // given: 11 → 10 이하로 떨어져도 LOW_STOCK_10 알림 비활성화로 이벤트 미발행
         Store store = mock(Store.class);
         MenuGroup group = mock(MenuGroup.class);
         mockAuthorizedGroup(1L, 100L, group, store);
@@ -108,22 +108,13 @@ class MenuGroupServiceTest {
         when(group.getName()).thenReturn("기본 메뉴");
         when(group.getStore()).thenReturn(store);
 
-        // 차감 후 재고값 설정
         when(stock.getStock()).thenReturn(8);
 
         // when
         service.deductStock(1L, DeductionUnit.MULTI_FIVE);
 
-        // then
-        ArgumentCaptor<LowStockEvent> eventCaptor = ArgumentCaptor.forClass(LowStockEvent.class);
-        verify(eventPublisher).publishEvent(eventCaptor.capture());
-
-        LowStockEvent event = eventCaptor.getValue();
-        assertEquals(100L, event.storeId());
-        assertEquals("향설 1관", event.storeName());
-        assertEquals(1L, event.groupId());
-        assertEquals("기본 메뉴", event.groupName());
-        assertEquals(8, event.remainingStock());
+        // then: LOW_STOCK_10 알림 비활성화로 LowStockEvent는 발행되지 않음
+        verify(eventPublisher, never()).publishEvent(any(LowStockEvent.class));
     }
 
     @Test
@@ -775,9 +766,9 @@ class MenuGroupServiceTest {
     }
 
     @Test
-    @DisplayName("31 → 5 대량 차감 시 30 + 10 두 이벤트 모두 발행")
+    @DisplayName("31 → 5 대량 차감 시 30 이벤트만 발행 (10 알림 비활성화)")
     void deductStock_bothThresholdsCrossed() {
-        // given: 31에서 5로 대량 차감 → 30 및 10 동시 돌파
+        // given: 31에서 5로 대량 차감 → 30 및 10 동시 돌파하나, LOW_STOCK_10 비활성화로 30만 발행
         Store store = mock(Store.class);
         MenuGroup group = mock(MenuGroup.class);
         mockAuthorizedGroup(1L, 100L, group, store);
@@ -797,22 +788,15 @@ class MenuGroupServiceTest {
         // when
         service.deductStock(1L, DeductionUnit.MULTI_TEN);
 
-        // then: 두 이벤트 모두 발행
+        // then: LowStock30Event만 1회 발행 (LOW_STOCK_10 알림 비활성화)
+        verify(eventPublisher, times(1)).publishEvent(any(LowStock30Event.class));
+        verify(eventPublisher, never()).publishEvent(any(LowStockEvent.class));
         ArgumentCaptor<LowStock30Event> event30Captor = ArgumentCaptor.forClass(LowStock30Event.class);
         verify(eventPublisher).publishEvent(event30Captor.capture());
-
         LowStock30Event event30 = event30Captor.getValue();
         assertEquals(100L, event30.storeId());
         assertEquals("향설 1관", event30.storeName());
         assertEquals(5, event30.remainingStock());
-
-        ArgumentCaptor<LowStockEvent> event10Captor = ArgumentCaptor.forClass(LowStockEvent.class);
-        verify(eventPublisher).publishEvent(event10Captor.capture());
-
-        LowStockEvent event10 = event10Captor.getValue();
-        assertEquals(100L, event10.storeId());
-        assertEquals("향설 1관", event10.storeName());
-        assertEquals(5, event10.remainingStock());
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {
