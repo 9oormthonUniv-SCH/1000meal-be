@@ -54,7 +54,7 @@ public class RosterExportService {
     @Value("${qr.roster.include-bom:true}")
     private boolean includeBom;
 
-    public void exportDailyRosters(LocalDate usedDate) {
+    public Path exportDailyRosters(LocalDate usedDate) {
         Path basePath = Paths.get(baseDir).toAbsolutePath().normalize();
         Path dateDir = basePath.resolve(usedDate.toString());
 
@@ -104,7 +104,7 @@ public class RosterExportService {
                     usedDate, key.storeId(), key.menuGroupId(), groupUsages.size(), outputPath);
         }
 
-        exportMergedDailyRoster(usedDate, dateDir, storeById, groupNameById);
+        return exportMergedDailyRoster(usedDate, dateDir, storeById, groupNameById);
     }
 
     private void writeCsv(Path outputPath, Store store, String groupName, List<MealUsage> usages) {
@@ -163,7 +163,7 @@ public class RosterExportService {
         return value == null ? "" : value;
     }
 
-    private void exportMergedDailyRoster(
+    private Path exportMergedDailyRoster(
             LocalDate usedDate,
             Path dateDir,
             Map<Long, Store> storeById,
@@ -200,17 +200,6 @@ public class RosterExportService {
                 // Long storeId = usage.getStore().getId();
                 // Store store = storeById.get(storeId);
                 // String storeName = store == null || store.getName() == null ? "" : store.getName();
-                // Long menuGroupId = usage.getMenuGroupId();
-                // String groupName = "";
-                // if (menuGroupId != null) {
-                //     groupName = groupNameById.get(menuGroupId);
-                //     if (groupName == null) {
-                //         if (missingGroupNames.add(menuGroupId)) {
-                //             log.warn("Roster export missing group name: menuGroupId={}", menuGroupId);
-                //         }
-                //         groupName = "(알 수 없음)";
-                //     }
-                // }
                 Long menuGroupId = usage.getMenuGroupId();
                 String groupName = "";
                 if (menuGroupId != null) {
@@ -233,6 +222,7 @@ public class RosterExportService {
             moveAtomically(tempPath, outputPath);
             log.info("Merged roster export done: usedDate={}, rowCount={}, outputPath={} ",
                     usedDate, merged.size(), outputPath);
+            return outputPath;
         } catch (Exception e) {
             throw new IllegalStateException("통합 로스터 CSV 생성에 실패했습니다: " + outputPath, e);
         }

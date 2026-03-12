@@ -13,7 +13,6 @@ import com._1000meal.menu.dto.*;
 import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
-import com._1000meal.menu.event.LowStockEvent;
 import com._1000meal.menu.event.WeeklyMenuUploadedEvent;
 import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
@@ -388,16 +387,16 @@ public class MenuGroupService {
                 ));
             }
 
-            // 10 임계치 하향 돌파 알림 이벤트
-            if (result.notifyLowStock10()) {
-                eventPublisher.publishEvent(new LowStockEvent(
-                        store.getId(),
-                        store.getName(),
-                        groupId,
-                        group.getName(),
-                        afterStock
-                ));
-            }
+            // LOW_STOCK_10 알림 비활성화
+            // if (result.notifyLowStock10()) {
+            //     eventPublisher.publishEvent(new LowStockEvent(
+            //             store.getId(),
+            //             store.getName(),
+            //             groupId,
+            //             group.getName(),
+            //             afterStock
+            //     ));
+            // }
         }
 
         return new MenuGroupStockResponse(groupId, afterStock);
@@ -447,15 +446,16 @@ public class MenuGroupService {
                 ));
             }
 
-            if (result.notifyLowStock10()) {
-                eventPublisher.publishEvent(new LowStockEvent(
-                        store.getId(),
-                        store.getName(),
-                        groupId,
-                        group.getName(),
-                        afterStock
-                ));
-            }
+            // LOW_STOCK_10 알림 비활성화
+            // if (result.notifyLowStock10()) {
+            //     eventPublisher.publishEvent(new LowStockEvent(
+            //             store.getId(),
+            //             store.getName(),
+            //             groupId,
+            //             group.getName(),
+            //             afterStock
+            //     ));
+            // }
         }
 
         return new MenuGroupStockResponse(groupId, afterStock);

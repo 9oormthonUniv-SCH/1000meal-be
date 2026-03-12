@@ -13,10 +13,15 @@ public final class FcmMessageFactory {
         String safeGroupName = (groupName == null || groupName.isBlank()) ? storeName : groupName;
 
         return switch (type) {
+            case OPEN_REMINDER -> new FcmMessage(
+                    "천원의 아침밥 오픈 사전 알림",
+                    "10분 후 천원의 아침밥이 시작돼요."
+            );
             case LOW_STOCK_30 -> new FcmMessage(
                     "[" + safeGroupName + "] 마감 임박!",
                     withOptionalStoreName("천원의 아침밥 수량이 30개 이하로 줄었어요!", storeName)
             );
+            // LOW_STOCK_10 알림 비활성화 (발행/리스너 주석 처리됨)
             case LOW_STOCK_10 -> new FcmMessage(
                     "[" + safeGroupName + "] 마감 직전!",
                     withOptionalStoreName("천원의 아침밥 수량이 10개 이하로 줄었어요!", storeName)
