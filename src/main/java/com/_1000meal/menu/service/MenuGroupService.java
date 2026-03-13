@@ -521,33 +521,16 @@ public class MenuGroupService {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
         GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
 
-
-        /**
-         * [ 주차 메뉴 업로드 알림 ]
-         * 대상: 이번주 메뉴들의 업로드 혹은 변경사항.
-         *
-         */
-
-
-        LocalDate targetWeekStart = getWeekStart(date); // 채울려는 메뉴의, 주차 첫날
-        LocalDate currentWeekStart = getWeekStart(LocalDate.now(KST)); // 현재 점주의, 주차 첫날
-
-        // 1. 현재 주차의 이전 일요일 18:00 이후에
-        // 2. 현재 주차의 메뉴를 변경하는 경우. -> 알람.
-        if (targetWeekStart.isEqual(currentWeekStart) &&
-                isPastWeeklyMenuNotificationCutoff(currentWeekStart)) {
-
-            // date 주차에 5일치 메뉴 등록이 완료된, group들
-            Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
-            if (filledByGroup.getOrDefault(groupId, false)) {
-                LocalDate weekStart = getWeekStart(date);
-                String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
-                eventPublisher.publishEvent(
-                        new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
-                );
-            }
-
+        // date 주차에 5일치 메뉴 등록이 완료된, group들
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
+        if (filledByGroup.getOrDefault(groupId, false)) {
+            LocalDate weekStart = getWeekStart(date);
+            String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+            eventPublisher.publishEvent(
+                    new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
+            );
         }
+
         return response;
     }
 
@@ -709,37 +692,6 @@ public class MenuGroupService {
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
                 .toList();
-    }
-
-    /**
-     * 업로드 완료 알림을 보낼 수 있는 주차인지 판단합니다.
-     *
-     * 허용 범위:
-     * - 이번 주
-     * - 다음 주
-     * - 다음 주보다 더 먼 미래 주차
-     *
-     * 비허용 범위:
-     * - 지난 주 및 그 이전 주차
-     */
-    public boolean isWeeklyMenuNotificationTargetWeek(LocalDate anyDateInWeek) {
-        LocalDate targetWeekStart = getWeekStart(anyDateInWeek);
-        LocalDate currentWeekStart = getWeekStart(LocalDate.now(KST));
-        return !targetWeekStart.isBefore(currentWeekStart);
-    }
-
-    /**
-     * 이 날짜가 속한 주의 알림 기준 시각인 "직전 일요일 18:00(KST)"이 지났는지 판단합니다.
-     *
-     * 예:
-     * - anyDateInWeek = 2026-03-18(수) 이면 기준 시각은 2026-03-15(일) 18:00
-     * - 현재 시간이 그 시각보다 이전이면 false
-     * - 현재 시간이 그 시각과 같거나 이후면 true
-     */
-    public boolean isPastWeeklyMenuNotificationCutoff(LocalDate anyDateInWeek) {
-        LocalDate weekStart = getWeekStart(anyDateInWeek);
-        LocalDateTime cutoff = weekStart.minusDays(1).atTime(18, 0);
-        return !LocalDateTime.now(KST).isBefore(cutoff);
     }
 
     private LocalDate getWeekStart(LocalDate date) {
