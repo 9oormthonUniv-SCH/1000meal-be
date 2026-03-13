@@ -12,6 +12,7 @@ import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.service.MenuGroupService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 
 @Tag(name = "Menu Group", description = "매장별 메뉴 그룹 관리 API")
+@SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/stores")
