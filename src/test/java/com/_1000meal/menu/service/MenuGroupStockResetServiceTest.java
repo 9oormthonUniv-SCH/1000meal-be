@@ -2,6 +2,7 @@ package com._1000meal.menu.service;
 
 import com._1000meal.menu.domain.MenuGroup;
 import com._1000meal.menu.domain.MenuGroupStock;
+import com._1000meal.menu.repository.MenuGroupDayCapacityRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,11 +13,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.lang.reflect.Field;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -24,6 +27,9 @@ class MenuGroupStockResetServiceTest {
 
     @Mock
     MenuGroupStockRepository menuGroupStockRepository;
+
+    @Mock
+    MenuGroupDayCapacityRepository menuGroupDayCapacityRepository;
 
     @InjectMocks
     MenuGroupStockResetService menuGroupStockResetService;
@@ -33,6 +39,7 @@ class MenuGroupStockResetServiceTest {
     void resetAllStocksToCapacity_resetsToEighty() throws Exception {
         MenuGroupStock stock = stock(1L, 80, 0);
         when(menuGroupStockRepository.findAll()).thenReturn(List.of(stock));
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(1L), any())).thenReturn(Optional.empty());
 
         MenuGroupStockResetService.StockResetSummary summary = menuGroupStockResetService.resetAllStocksToCapacity();
 
@@ -42,7 +49,6 @@ class MenuGroupStockResetServiceTest {
         assertEquals(0, summary.getSkipCount());
         assertEquals(0, summary.getExceptionCount());
         verify(menuGroupStockRepository).findAll();
-        verifyNoMoreInteractions(menuGroupStockRepository);
     }
 
     @Test
@@ -50,6 +56,7 @@ class MenuGroupStockResetServiceTest {
     void resetAllStocksToCapacity_resetsToForty() throws Exception {
         MenuGroupStock stock = stock(2L, 40, 13);
         when(menuGroupStockRepository.findAll()).thenReturn(List.of(stock));
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(2L), any())).thenReturn(Optional.empty());
 
         MenuGroupStockResetService.StockResetSummary summary = menuGroupStockResetService.resetAllStocksToCapacity();
 
@@ -64,6 +71,7 @@ class MenuGroupStockResetServiceTest {
     void resetAllStocksToCapacity_skipsInvalidCapacity() throws Exception {
         MenuGroupStock stock = stock(3L, 0, 25);
         when(menuGroupStockRepository.findAll()).thenReturn(List.of(stock));
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(3L), any())).thenReturn(Optional.empty());
 
         MenuGroupStockResetService.StockResetSummary summary = menuGroupStockResetService.resetAllStocksToCapacity();
 
@@ -81,6 +89,8 @@ class MenuGroupStockResetServiceTest {
         MenuGroupStock stock1 = stock(4L, 40, 13);
         MenuGroupStock stock2 = stock(5L, 40, 0);
         when(menuGroupStockRepository.findAll()).thenReturn(List.of(stock1, stock2));
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(4L), any())).thenReturn(Optional.empty());
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(5L), any())).thenReturn(Optional.empty());
 
         MenuGroupStockResetService.StockResetSummary summary = menuGroupStockResetService.resetAllStocksToCapacity();
 
@@ -98,6 +108,7 @@ class MenuGroupStockResetServiceTest {
         MenuGroupStock stock = stock(6L, 80, 20);
         stock.updateStock(7);
         when(menuGroupStockRepository.findAll()).thenReturn(List.of(stock));
+        when(menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(eq(6L), any())).thenReturn(Optional.empty());
 
         MenuGroupStockResetService.StockResetSummary summary = menuGroupStockResetService.resetAllStocksToCapacity();
 
