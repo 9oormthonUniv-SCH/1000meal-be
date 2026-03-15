@@ -1,6 +1,8 @@
 package com._1000meal.menu.service;
 
 import com._1000meal.auth.service.CurrentAccountProvider;
+import com._1000meal.fcm.domain.WeeklyMenuNotificationStatus;
+import com._1000meal.fcm.service.WeeklyMenuNotificationStateService;
 import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
@@ -25,6 +27,7 @@ import com._1000meal.store.dto.StoreTodayMenuDto;
 import com._1000meal.store.dto.StoreTodayMenuGroupDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cglib.core.Local;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,14 +37,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.temporal.WeekFields;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -57,6 +54,7 @@ public class MenuGroupService {
     private final GroupDailyMenuRepository groupDailyMenuRepository;
     private final DefaultGroupMenuRepository defaultGroupMenuRepository;
     private final StoreRepository storeRepository;
+    private final WeeklyMenuNotificationStateService weeklyMenuNotificationStateService;
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentAccountProvider currentAccountProvider;
 
@@ -521,14 +519,13 @@ public class MenuGroupService {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
         GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
 
-        // date 주차에 5일치 메뉴 등록이 완료된, group들
-        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
-        if (filledByGroup.getOrDefault(groupId, false)) {
+        if (shouldSendImmediateWeeklyUploadAlert(storeId, groupId, date)) {
             LocalDate weekStart = getWeekStart(date);
             String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
             eventPublisher.publishEvent(
                     new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
             );
+            weeklyMenuNotificationStateService.markSent(storeId, groupId, weekKey);
         }
 
         return response;
@@ -692,6 +689,66 @@ public class MenuGroupService {
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
                 .toList();
+    }
+
+    /**
+     * 일요일 18:00 배치에서 미완성으로 남았던 다음 주 메뉴만,
+     * 다음 주 월~금 기간 안에 뒤늦게 완성되면 즉시 알림을 보냅니다.
+     */
+    public boolean shouldSendImmediateWeeklyUploadAlert(Long storeId, Long groupId, LocalDate date) {
+        if (!isCurrentWeek(date)) {
+            return false;
+        }
+
+        LocalDate weekStart = getWeekStart(date);
+        String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+        var status = weeklyMenuNotificationStateService.findStatus(storeId, groupId, weekKey).orElse(null);
+        if (status == null) {
+            return false;
+        }
+
+        if (status == WeeklyMenuNotificationStatus.CLOSED_NOT_SENT
+                || status == WeeklyMenuNotificationStatus.SENT) {
+            return false;
+        }
+
+        if (!isWithinLateWeeklyNotificationWindow(date)) {
+            if (isAfterLateWeeklyNotificationWindow(date)) {
+                weeklyMenuNotificationStateService.markClosedNotSent(storeId, groupId, weekKey);
+            }
+            return false;
+        }
+
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
+        return filledByGroup.getOrDefault(groupId, false);
+    }
+
+    /**
+     * 업로드한 날짜가 현재 시점 기준 "이번 주"에 속하는지 판단합니다.
+     *
+     * 여기서의 이번 주는, 일요일 18:00 스케줄러가 검사했던 "다가오는 주"가
+     * 실제로 시작된 뒤의 월~금 기간을 뜻합니다.
+     */
+    public boolean isCurrentWeek(LocalDate date) {
+        LocalDate currentWeekStart = getWeekStart(LocalDate.now(KST));
+        return getWeekStart(date).equals(currentWeekStart);
+    }
+
+    /**
+     * 즉시 알림 허용 기간은 해당 주의 월요일부터 금요일까지입니다.
+     */
+    public boolean isWithinLateWeeklyNotificationWindow(LocalDate date) {
+        LocalDate today = LocalDate.now(KST);
+        LocalDate weekStart = getWeekStart(date);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        return !today.isBefore(weekStart) && !today.isAfter(weekEnd);
+    }
+
+    private boolean isAfterLateWeeklyNotificationWindow(LocalDate date) {
+        LocalDate today = LocalDate.now(KST);
+        LocalDate weekEnd = getWeekStart(date).plusDays(4);
+        return today.isAfter(weekEnd);
     }
 
     private LocalDate getWeekStart(LocalDate date) {
