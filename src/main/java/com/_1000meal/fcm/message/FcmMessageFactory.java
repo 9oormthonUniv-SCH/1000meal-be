@@ -38,6 +38,10 @@ public final class FcmMessageFactory {
                     "이번 주 메뉴가 올라왔어요",
                     "[" + storeName + "]에 천원의 아침밥 메뉴를 확인해보세요"
             );
+            case WEEKLY_MENU_CHANGED -> new FcmMessage(
+                    "메뉴가 변경되었어요",
+                    "[" + storeName + "] 천원의 아침밥 메뉴가 수정되었어요. 확인해보세요!"
+            );
         };
     }
 

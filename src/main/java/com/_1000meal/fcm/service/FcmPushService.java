@@ -234,6 +234,33 @@ public class FcmPushService {
         sendMulticastForAccount(accountId, "[FCM][WEEKLY_MENU_UPLOADED]", title, body, data);
     }
 
+    /**
+     * 이미 메뉴 업로드 알림을 보낸 뒤 메뉴가 수정된 경우 발송하는 "메뉴 변경" 알림.
+     */
+    public void sendWeeklyMenuChangedNotification(
+            Long accountId,
+            Long storeId,
+            String storeName,
+            Long groupId,
+            String groupName,
+            String imageUrl,
+            String weekKey
+    ) {
+        FcmMessageFactory.FcmMessage message =
+                FcmMessageFactory.of(NotificationType.WEEKLY_MENU_CHANGED, storeName, groupName, 0);
+
+        Map<String, String> data = new HashMap<>();
+        data.put("type", "WEEKLY_MENU_CHANGED");
+        data.put("storeId", String.valueOf(storeId));
+        data.put("storeName", storeName);
+        data.put("groupId", String.valueOf(groupId));
+        data.put("groupName", groupName);
+        data.put("imageUrl", imageUrl == null ? "" : imageUrl);
+        data.put("weekKey", weekKey == null ? "" : weekKey);
+
+        sendMulticastForAccount(accountId, "[FCM][WEEKLY_MENU_CHANGED]", message.title(), message.body(), data);
+    }
+
     private void sendMulticastForAccount(
             Long accountId,
             String logPrefix,
