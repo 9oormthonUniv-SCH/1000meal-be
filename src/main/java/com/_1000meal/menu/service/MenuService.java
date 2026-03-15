@@ -202,12 +202,14 @@ public class MenuService {
 
     @Transactional
     public WeeklyMenuWithGroupsResponse getWeeklyMenuWithGroups(Long storeId, LocalDate date) {
-        log.info("[MENU][WEEKLY_GROUP] storeId={}, date={}", storeId, date);
+        LocalDate effectiveDate = normalizeWeeklyMenuReferenceDate(date);
+        log.info("[MENU][WEEKLY_GROUP] storeId={}, requestedDate={}, effectiveDate={}",
+                storeId, date, effectiveDate);
 
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(StoreErrorCode.STORE_NOT_FOUND));
 
-        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate weekStart = effectiveDate.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         LocalDate weekEnd = weekStart.plusDays(6);
 
         List<DailyMenuGroupResponse> dailyResponses = new ArrayList<>(5);
@@ -238,6 +240,17 @@ public class MenuService {
                 .endDate(weekEnd)
                 .dailyMenus(dailyResponses)
                 .build();
+    }
+
+    // 기준 날짜가 토, 일요일인 경우, 그다음주 월요일로 변경.
+    private LocalDate normalizeWeeklyMenuReferenceDate(LocalDate date) {
+        if (date.getDayOfWeek() == DayOfWeek.SATURDAY) {
+            return date.plusDays(2);
+        }
+        if (date.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            return date.plusDays(1);
+        }
+        return date;
     }
 
 

@@ -280,6 +280,45 @@ class MenuServiceTest {
     }
 
     @Test
+    @DisplayName("getWeeklyMenuWithGroups: 토요일과 일요일 요청은 다음 주 기준으로 보정")
+    void getWeeklyMenuWithGroups_onWeekend_usesNextMonday() {
+        Long storeId = 1L;
+        Store store = mock(Store.class);
+        when(store.getId()).thenReturn(storeId);
+        when(storeRepository.findById(storeId)).thenReturn(Optional.of(store));
+
+        when(menuGroupService.getMenuGroups(eq(storeId), any(LocalDate.class)))
+                .thenAnswer(inv -> {
+                    LocalDate d = inv.getArgument(1);
+                    return DailyMenuWithGroupsDto.builder()
+                            .id(null)
+                            .date(d)
+                            .dayOfWeek(d.getDayOfWeek())
+                            .isOpen(true)
+                            .isHoliday(false)
+                            .totalStock(0)
+                            .groups(List.of())
+                            .build();
+                });
+
+        // 토요일 일때
+        LocalDate saturday = LocalDate.of(2026, 1, 10);
+        WeeklyMenuWithGroupsResponse saturdayRes = service.getWeeklyMenuWithGroups(storeId, saturday);
+
+        assertEquals(LocalDate.of(2026, 1, 12), saturdayRes.getStartDate());
+        assertEquals(LocalDate.of(2026, 1, 18), saturdayRes.getEndDate());
+        assertEquals(LocalDate.of(2026, 1, 12), saturdayRes.getDailyMenus().get(0).getDate());
+
+        // 일요일 일때
+        LocalDate sunday = LocalDate.of(2026, 1, 11);
+        WeeklyMenuWithGroupsResponse sundayRes = service.getWeeklyMenuWithGroups(storeId, sunday);
+
+        assertEquals(LocalDate.of(2026, 1, 12), sundayRes.getStartDate());
+        assertEquals(LocalDate.of(2026, 1, 18), sundayRes.getEndDate());
+        assertEquals(LocalDate.of(2026, 1, 12), sundayRes.getDailyMenus().get(0).getDate());
+    }
+
+    @Test
     @DisplayName("getWeeklyMenuWithGroups: 월~금만 반환되는지 확인")
     void getWeeklyMenuWithGroups_onlyWeekdays() {
         Long storeId = 1L;
