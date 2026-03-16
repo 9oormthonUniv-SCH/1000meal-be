@@ -36,7 +36,7 @@ public class StoreViewService {
         return base.stream().map(sr -> {
             StoreTodayMenuDto todayMenu = todayMenus.get(sr.getId());
             StoreTodayMenuDto mergedTodayMenu = todayMenu != null ? todayMenu : sr.getTodayMenu();
-            boolean isOpen = todayMenu != null ? todayMenu.isOpen() : sr.isOpen();
+            boolean isOpen = sr.isOpen();
             boolean isHoliday = todayMenu != null && todayMenu.isHoliday();
 
             return sr.toBuilder()
