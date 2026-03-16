@@ -1,9 +1,8 @@
 package com._1000meal.global.scheduler.store;
 
 import com._1000meal.menu.domain.DailyMenu;
-import com._1000meal.menu.domain.MenuGroup;
-import com._1000meal.menu.domain.MenuGroupStock;
 import com._1000meal.menu.repository.DailyMenuRepository;
+import com._1000meal.menu.repository.MenuGroupStockRepository;
 import com._1000meal.store.repository.StoreRepository;
 import com._1000meal.qr.roster.RosterExportJob;
 import lombok.RequiredArgsConstructor;
@@ -26,13 +25,14 @@ public class StoreCloseScheduler {
 
     private final StoreRepository storeRepository;
     private final DailyMenuRepository dailyMenuRepository;
+    private final MenuGroupStockRepository menuGroupStockRepository;
     private final RosterExportJob rosterExportJob;
 
     /**
      * 매장 영업 종료 스케줄러
      * - 모든 Store.isOpen 을 false 로 설정
-     * - 오늘 날짜 DailyMenu.isOpen 을 false 로 설정하고 stock 을 0 으로 설정
-     * - 각 DailyMenu 의 MenuGroupStock 이 있으면 stock 을 0 으로 설정   
+     * - 오늘 날짜 DailyMenu.isOpen 을 false 로 설정
+     * - 매장 기준 MenuGroupStock.stock 을 0 으로 설정
      */
     @Scheduled(cron = "0 0 12 * * MON-FRI", zone = "Asia/Seoul")
     @Transactional   
@@ -58,19 +58,12 @@ public class StoreCloseScheduler {
             if (dm.isOpen()) {
                 dm.toggleIsOpen();
             }
-            dm.updateStock(0);
-
-            if (dm.getMenuGroups() != null) {
-                for (MenuGroup group : dm.getMenuGroups()) {
-                    MenuGroupStock stock = group.getStock();
-                    if (stock != null) {
-                        stock.updateStock(0);
-                    }
-                }
-            }
         }
 
-        log.info("[스케줄러][STORE_CLOSE] date={}, dailyMenusUpdated={}", today, dailyMenus.size());
+        int updatedStocks = menuGroupStockRepository.setStockZeroByStoreIds(storeIds);
+
+        log.info("[스케줄러][STORE_CLOSE] date={}, dailyMenusUpdated={}, menuGroupStocksUpdated={}",
+                today, dailyMenus.size(), updatedStocks);
 
         try {
             rosterExportJob.runOnce(today);
