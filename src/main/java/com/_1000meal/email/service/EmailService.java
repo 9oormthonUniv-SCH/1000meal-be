@@ -39,8 +39,8 @@ public class EmailService {
             throw new IllegalArgumentException("순천향대학교 이메일만 인증할 수 있습니다.");
         }
 
-        // 1) 기존 미검증 코드 즉시 무효화(삭제)
-        tokenRepository.deleteByEmailAndVerifiedFalse(normalized);
+        // 1) 기존 인증 이력 전체 즉시 무효화(삭제)
+        tokenRepository.deleteByEmail(normalized);
 
         // 2) 새 코드 생성 및 저장 (TTL=2분)
         String code = generateCode();
@@ -56,7 +56,7 @@ public class EmailService {
         final String normalized = email.trim().toLowerCase();
 
         EmailVerificationToken token = tokenRepository
-                .findTop1ByEmailAndVerifiedFalseOrderByIdDesc(normalized)
+                .findTop1ByEmailOrderByIdDesc(normalized)
                 .orElseThrow(() -> new IllegalStateException("유효한 인증 요청이 없습니다."));
 
         if (token.isExpired()) {
@@ -64,6 +64,10 @@ public class EmailService {
         }
         if (!token.getCode().equals(inputCode)) {
             throw new IllegalArgumentException("인증 코드가 일치하지 않습니다.");
+        }
+
+        if (token.isVerified()) {
+            return;
         }
 
         // 성공: verified=true
@@ -92,13 +96,20 @@ public class EmailService {
 //            throw new IllegalStateException("이메일 인증이 만료되었습니다. 다시 인증해 주세요.");
 //        }
 //    }
-    /** 가입 직전 강제확인(verified=true면 OK) */
+    /** 가입 직전 강제확인(최신 토큰이 verified=true 이고 만료되지 않아야 함) */
     @Transactional(readOnly = true)
     public void requireVerified(String email) {
         final String normalized = email.trim().toLowerCase();
 
-        tokenRepository.findTop1ByEmailAndVerifiedTrueOrderByIdDesc(normalized)
+        EmailVerificationToken latest = tokenRepository.findTop1ByEmailOrderByIdDesc(normalized)
                 .orElseThrow(() -> new IllegalStateException("이메일 인증이 완료되지 않았습니다."));
+
+        if (!latest.isVerified()) {
+            throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
+        }
+        if (latest.isExpired()) {
+            throw new IllegalStateException("이메일 인증이 만료되었습니다. 다시 인증해 주세요.");
+        }
     }
 
     /** 가입 완료 후 깔끔 정리: 해당 이메일의 모든 토큰 제거 */

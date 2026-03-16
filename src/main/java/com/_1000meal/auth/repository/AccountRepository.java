@@ -20,6 +20,9 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
     /** 특정 상태(예: ACTIVE)의 이메일로 조회 */
     Optional<Account> findByEmailAndStatus(String email, AccountStatus status);
 
+    /** 특정 상태 제외 이메일로 조회 */
+    Optional<Account> findByEmailAndStatusNot(String email, AccountStatus status);
+
     /** 특정 상태(예: ACTIVE)의 학번으로 조회 */
     Optional<Account> findByUserIdAndStatus(String userId, AccountStatus status);
 

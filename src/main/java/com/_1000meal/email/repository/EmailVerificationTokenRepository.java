@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface EmailVerificationTokenRepository extends JpaRepository<EmailVerificationToken, Long> {
+    Optional<EmailVerificationToken> findTop1ByEmailOrderByIdDesc(String email);
     Optional<EmailVerificationToken> findTop1ByEmailAndVerifiedFalseOrderByIdDesc(String email);
     Optional<EmailVerificationToken> findTop1ByEmailAndVerifiedTrueOrderByIdDesc(String email);
     boolean existsByEmailAndVerifiedTrue(String email);
