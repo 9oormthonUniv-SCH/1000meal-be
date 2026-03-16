@@ -1,5 +1,8 @@
 package com._1000meal.email.service;
 
+import com._1000meal.auth.model.AccountStatus;
+import com._1000meal.auth.repository.AccountRepository;
+import com._1000meal.email.dto.EmailStatusResponse;
 import com._1000meal.email.domain.EmailVerificationToken;
 import com._1000meal.email.repository.EmailVerificationTokenRepository;
 import jakarta.mail.MessagingException;
@@ -22,6 +25,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final EmailVerificationTokenRepository tokenRepository;
+    private final AccountRepository accountRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     /** 6자리 숫자 코드 생성 */
@@ -77,10 +81,15 @@ public class EmailService {
         // tokenRepository.deleteByEmailAndVerifiedFalse(normalized);
     }
 
-    /** 단순 조회: verified=true 존재 여부 */
+    /** 상태 조회: 최신 토큰 기준 verified + 필요 시 account existence */
     @Transactional(readOnly = true)
-    public boolean isEmailVerified(String email) {
-        return tokenRepository.existsByEmailAndVerifiedTrue(email.trim().toLowerCase());
+    public EmailStatusResponse getEmailStatus(String email) {
+        final String normalized = email.trim().toLowerCase();
+        boolean verified = isLatestTokenVerified(normalized);
+        Boolean accountExists = verified
+                ? accountRepository.existsByEmailAndStatusNot(normalized, AccountStatus.DELETED)
+                : null;
+        return new EmailStatusResponse(normalized, verified, accountExists);
     }
 
     /** 가입 직전 강제확인(verified=true 최신 토큰이 유효해야 함) */
@@ -116,6 +125,13 @@ public class EmailService {
     @Transactional
     public void consumeAllFor(String email) {
         tokenRepository.deleteByEmail(email.trim().toLowerCase());
+    }
+
+    private boolean isLatestTokenVerified(String normalizedEmail) {
+        return tokenRepository.findTop1ByEmailOrderByIdDesc(normalizedEmail)
+                .filter(EmailVerificationToken::isVerified)
+                .filter(token -> !token.isExpired())
+                .isPresent();
     }
 
     /** 메일 발송 이벤트 페이로드 */
