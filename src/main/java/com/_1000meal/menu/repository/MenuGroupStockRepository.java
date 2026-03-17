@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface MenuGroupStockRepository extends JpaRepository<MenuGroupStock, Long> {
@@ -29,4 +30,13 @@ public interface MenuGroupStockRepository extends JpaRepository<MenuGroupStock, 
                AND s.stock > 0
             """)
     int decrementStockIfAvailable(@Param("menuGroupId") Long menuGroupId);
+
+    // 매장 기준 MenuGroupStock.stock 을 0 으로 설정
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE MenuGroupStock s
+               SET s.stock = 0
+             WHERE s.menuGroup.store.id IN :storeIds
+            """)
+    int setStockZeroByStoreIds(@Param("storeIds") List<Long> storeIds);
 }

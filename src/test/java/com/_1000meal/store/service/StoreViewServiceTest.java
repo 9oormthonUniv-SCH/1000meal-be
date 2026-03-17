@@ -33,7 +33,7 @@ class StoreViewServiceTest {
         LocalDate fixedToday = LocalDate.of(2026, 1, 7);
 
         StoreTodayMenuDto baseMenu = StoreTodayMenuDto.builder().build();
-        StoreResponse sr1 = StoreResponse.builder().id(1L).todayMenu(baseMenu).build();
+        StoreResponse sr1 = StoreResponse.builder().id(1L).todayMenu(baseMenu).isOpen(true).build();
 
         when(storeService.getAllStores()).thenReturn(List.of(sr1));
         StoreTodayMenuDto todayMenu = StoreTodayMenuDto.builder()
