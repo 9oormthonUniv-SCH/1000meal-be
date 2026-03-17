@@ -5,6 +5,8 @@ import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.email.dto.EmailStatusResponse;
 import com._1000meal.email.domain.EmailVerificationToken;
 import com._1000meal.email.repository.EmailVerificationTokenRepository;
+import com._1000meal.global.error.code.ErrorCode;
+import com._1000meal.global.error.exception.CustomException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -61,13 +63,13 @@ public class EmailService {
 
         EmailVerificationToken token = tokenRepository
                 .findTop1ByEmailOrderByIdDesc(normalized)
-                .orElseThrow(() -> new IllegalStateException("유효한 인증 요청이 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.EMAIL_NOT_VERIFIED));
 
         if (token.isExpired()) {
-            throw new IllegalStateException("인증 코드가 만료되었습니다.");
+            throw new CustomException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
         if (!token.getCode().equals(inputCode)) {
-            throw new IllegalArgumentException("인증 코드가 일치하지 않습니다.");
+            throw new CustomException(ErrorCode.EMAIL_CODE_MISMATCH);
         }
 
         if (token.isVerified()) {
@@ -111,13 +113,13 @@ public class EmailService {
         final String normalized = email.trim().toLowerCase();
 
         EmailVerificationToken latest = tokenRepository.findTop1ByEmailOrderByIdDesc(normalized)
-                .orElseThrow(() -> new IllegalStateException("이메일 인증이 완료되지 않았습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.EMAIL_NOT_VERIFIED));
 
         if (!latest.isVerified()) {
-            throw new IllegalStateException("이메일 인증이 완료되지 않았습니다.");
+            throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
         if (latest.isExpired()) {
-            throw new IllegalStateException("이메일 인증이 만료되었습니다. 다시 인증해 주세요.");
+            throw new CustomException(ErrorCode.EMAIL_CODE_EXPIRED);
         }
     }
 
