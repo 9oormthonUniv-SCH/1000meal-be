@@ -85,11 +85,17 @@ public class EmailService {
     @Transactional(readOnly = true)
     public EmailStatusResponse getEmailStatus(String email) {
         final String normalized = email.trim().toLowerCase();
+        boolean accountExists = accountRepository.existsByEmailAndStatusNot(normalized, AccountStatus.DELETED);
+        if (accountExists) {
+            return new EmailStatusResponse(normalized, true, true);
+        }
+
         boolean verified = isLatestTokenVerified(normalized);
-        Boolean accountExists = verified
-                ? accountRepository.existsByEmailAndStatusNot(normalized, AccountStatus.DELETED)
-                : null;
-        return new EmailStatusResponse(normalized, verified, accountExists);
+        if (verified) {
+            return new EmailStatusResponse(normalized, true, false);
+        }
+
+        return new EmailStatusResponse(normalized, false, null);
     }
 
     /** 가입 직전 강제확인(verified=true 최신 토큰이 유효해야 함) */
