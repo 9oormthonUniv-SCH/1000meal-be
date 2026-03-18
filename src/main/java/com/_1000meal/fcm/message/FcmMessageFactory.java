@@ -14,7 +14,7 @@ public final class FcmMessageFactory {
 
         return switch (type) {
             case OPEN_REMINDER -> new FcmMessage(
-                    "천원의 아침밥 오픈 사전 알림",
+                    "천원의 아침밥 오픈 알림",
                     "10분 후 천원의 아침밥이 시작돼요."
             );
             case LOW_STOCK_30 -> new FcmMessage(

@@ -17,6 +17,7 @@ public class StoreNotificationListener {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onStoreOpened(StoreOpenedEvent event) {
         log.info("[OPEN EVENT] storeId={}, storeName={}", event.storeId(), event.storeName());
-        fcmPushService.sendStoreOpened(event.storeId(), event.storeName());
+        // TODO: Temporarily disable live OPEN push notifications triggered on store open.
+        // fcmPushService.sendStoreOpened(event.storeId(), event.storeName());
     }
 }
