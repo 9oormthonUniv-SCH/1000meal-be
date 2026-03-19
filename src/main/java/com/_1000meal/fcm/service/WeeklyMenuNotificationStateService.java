@@ -15,12 +15,14 @@ public class WeeklyMenuNotificationStateService {
 
     private final WeeklyMenuNotificationStateRepository repository;
 
+    // 주간 메뉴 알람 상태 조회
     @Transactional(readOnly = true)
     public Optional<WeeklyMenuNotificationStatus> findStatus(Long storeId, Long menuGroupId, String weekKey) {
         return repository.findByStoreIdAndMenuGroupIdAndWeekKey(storeId, menuGroupId, weekKey)
                 .map(WeeklyMenuNotificationState::getStatus);
     }
 
+    // 상태 표시 메서드
     @Transactional
     public void markPendingLate(Long storeId, Long menuGroupId, String weekKey) {
         upsertStatus(storeId, menuGroupId, weekKey, WeeklyMenuNotificationStatus.PENDING_LATE);
@@ -54,7 +56,10 @@ public class WeeklyMenuNotificationStateService {
             return;
         }
 
-        // SENT나 CLOSED_NOT_SENT는 더 이상 뒤로 되돌리지 않습니다.
+        /*
+            이미 "발송 완료" 된 건 다시 "지연 대기중"으로 바꾸지 않는다
+            이미 마감되어 "미발송" 처리된 것도 다시 "지연 대기중"으로 바꾸지 않는다
+         */
         if (nextStatus == WeeklyMenuNotificationStatus.PENDING_LATE
                 && state.getStatus() != WeeklyMenuNotificationStatus.PENDING_LATE) {
             return;

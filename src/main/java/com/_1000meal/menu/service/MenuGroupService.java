@@ -700,7 +700,7 @@ public class MenuGroupService {
     // 일요일 18:00 배치에서 미완성으로 남았던 다음 주 메뉴만,
     // 다음 주 월~금 기간 안에 뒤늦게 완성되면 즉시 알림을 전송
     public boolean shouldSendImmediateWeeklyUploadAlert(Long storeId, Long groupId, LocalDate date) {
-        if (!isCurrentWeek(date)) {
+        if (!isCurrentWeek(date)) { // 이번 주차의 수정 내용인지
             return false;
         }
 

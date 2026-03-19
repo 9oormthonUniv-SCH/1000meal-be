@@ -71,7 +71,7 @@ public class WeeklyMenuNotificationScheduler {
             // 해당 매장에서 월~금 5일치 메뉴가 모두 입력된 group만 추립니다.
             List<Long> completedGroupIds = menuGroupService.findCompletedWeeklyMenuGroupIds(storeId, targetWeekStart);
             Set<Long> completedGroupIdSet = new HashSet<>(completedGroupIds);
-            if (completedGroupIds.isEmpty()) {
+            if (completedGroupIds.isEmpty()) { // storeId의 모든 group이 targetWeek에, 일주일치 메뉴를 채우지 않은 경우
                 for (Long groupId : allGroupIds) {
                     weeklyMenuNotificationStateService.markPendingLate(storeId, groupId, weekKey);
                 }
@@ -91,7 +91,7 @@ public class WeeklyMenuNotificationScheduler {
                 weeklyMenuNotificationStateService.markPendingLate(storeId, groupId, weekKey);
             }
 
-            log.info("[스케줄러][WEEKLY_MENU_UPLOADED] published storeId={}, groups={}, weekKey={}",
+            log.info("[스케줄러][WEEKLY_MENU_UPLOADED] published storeId={}, groupCount={}, weekKey={}",
                     storeId, completedGroupIds.size(), weekKey);
         }
     }
