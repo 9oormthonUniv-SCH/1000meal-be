@@ -1,7 +1,6 @@
 package com._1000meal.menu.service;
 
 import com._1000meal.menu.domain.MenuGroupStock;
-import com._1000meal.menu.repository.DailyMenuRepository;
 import com._1000meal.menu.repository.MenuGroupDayCapacityRepository;
 import com._1000meal.menu.repository.MenuGroupStockRepository;
 import lombok.Builder;
@@ -26,13 +25,11 @@ public class MenuGroupStockResetService {
 
     private final MenuGroupStockRepository menuGroupStockRepository;
     private final MenuGroupDayCapacityRepository menuGroupDayCapacityRepository;
-    private final DailyMenuRepository dailyMenuRepository;
 
     @Transactional
     public StockResetSummary resetAllStocksToCapacity() {
         List<MenuGroupStock> stocks = menuGroupStockRepository.findAll();
-        LocalDate todayDate = LocalDate.now(KST);
-        DayOfWeek today = todayDate.getDayOfWeek();
+        DayOfWeek today = LocalDate.now(KST).getDayOfWeek();
 
         int resetCount = 0;
         int skipCount = 0;
@@ -41,14 +38,6 @@ public class MenuGroupStockResetService {
 
         for (MenuGroupStock stock : stocks) {
             Long groupId = stock.getMenuGroup() != null ? stock.getMenuGroup().getId() : null;
-            Long storeId = stock.getMenuGroup() != null && stock.getMenuGroup().getStore() != null
-                    ? stock.getMenuGroup().getStore().getId() : null;
-            if (storeId != null && dailyMenuRepository.findDailyMenuByStoreIdAndDate(storeId, todayDate)
-                    .filter(dm -> dm.isHoliday()).isPresent()) {
-                skipCount++;
-                log.debug("[STOCK][RESET][SKIP] groupId={}, storeId={}, reason=store_holiday", groupId, storeId);
-                continue;
-            }
             int capacity = menuGroupDayCapacityRepository.findByMenuGroupIdAndDayOfWeek(groupId, today)
                     .map(dc -> dc.getCapacity())
                     .filter(c -> c != null && c > 0)
