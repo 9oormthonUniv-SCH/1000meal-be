@@ -65,7 +65,7 @@ public class StoreService {
                     }
 
                     StoreTodayMenuDto todayMenuDto = todayMenus.get(id);
-                    boolean isOpen = todayMenuDto != null ? todayMenuDto.isOpen() : store.isOpen();
+                    boolean isOpen = store.isOpen();
                     boolean isHoliday = todayMenuDto != null && todayMenuDto.isHoliday();
 
                     return StoreResponse.builder()

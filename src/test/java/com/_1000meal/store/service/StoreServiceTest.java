@@ -132,6 +132,8 @@ class StoreServiceTest {
         when(storeRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(store1, store2));
         when(store1.getId()).thenReturn(1L);
         when(store2.getId()).thenReturn(2L);
+        when(store1.isOpen()).thenReturn(true);
+        when(store2.isOpen()).thenReturn(true);
 
         StoreTodayMenuDto dm1Dto = StoreTodayMenuDto.builder()
                 .date(fixedToday)

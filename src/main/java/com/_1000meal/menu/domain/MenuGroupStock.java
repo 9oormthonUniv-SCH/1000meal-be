@@ -111,12 +111,20 @@ public class MenuGroupStock {
     }
 
     /**
-     * 일일 재고 리셋 (capacity로 복구)
+     * 일일 재고 리셋 (요일별 지정 수량으로 복구)
      */
-    public void resetDaily() {
-        this.stock = this.capacity;
+    public void resetTo(int capacity) {
+        this.stock = capacity;
         this.lastNotifiedThreshold = null;
         this.lastNotifiedDate = null;
+    }
+
+    /**
+     * 일일 재고 리셋 (기존 방식으로 복구)
+     */
+    @Deprecated
+    public void resetDaily() {
+        resetTo(this.capacity);
     }
 
     /**

@@ -1,5 +1,8 @@
 package com._1000meal.email.service;
 
+import com._1000meal.auth.model.AccountStatus;
+import com._1000meal.auth.repository.AccountRepository;
+import com._1000meal.email.dto.EmailStatusResponse;
 import com._1000meal.email.domain.EmailVerificationToken;
 import com._1000meal.email.repository.EmailVerificationTokenRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +23,7 @@ class EmailServiceTest {
 
     @Mock JavaMailSender mailSender;
     @Mock EmailVerificationTokenRepository tokenRepository;
+    @Mock AccountRepository accountRepository;
     @Mock ApplicationEventPublisher eventPublisher;
 
     @InjectMocks EmailService emailService;
@@ -43,7 +47,7 @@ class EmailServiceTest {
 
         spy.issueAndStoreCode("  USER@sch.ac.kr ");
 
-        verify(tokenRepository).deleteByEmailAndVerifiedFalse("user@sch.ac.kr");
+        verify(tokenRepository).deleteByEmail("user@sch.ac.kr");
 
         ArgumentCaptor<EmailVerificationToken> tokenCaptor = ArgumentCaptor.forClass(EmailVerificationToken.class);
         verify(tokenRepository).save(tokenCaptor.capture());
@@ -63,7 +67,7 @@ class EmailServiceTest {
     @Test
     @DisplayName("verifyCode: 유효한 인증 요청이 없으면 예외")
     void verifyCode_noRequest() {
-        when(tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc("a@sch.ac.kr"))
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
                 .thenReturn(Optional.empty());
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -78,7 +82,7 @@ class EmailServiceTest {
         EmailVerificationToken token = mock(EmailVerificationToken.class);
         when(token.isExpired()).thenReturn(true);
 
-        when(tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc("a@sch.ac.kr"))
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
                 .thenReturn(Optional.of(token));
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
@@ -95,7 +99,7 @@ class EmailServiceTest {
         when(token.isExpired()).thenReturn(false);
         when(token.getCode()).thenReturn("111111");
 
-        when(tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc("a@sch.ac.kr"))
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
                 .thenReturn(Optional.of(token));
 
         assertThrows(IllegalArgumentException.class,
@@ -110,8 +114,9 @@ class EmailServiceTest {
         EmailVerificationToken token = mock(EmailVerificationToken.class);
         when(token.isExpired()).thenReturn(false);
         when(token.getCode()).thenReturn("123456");
+        when(token.isVerified()).thenReturn(false);
 
-        when(tokenRepository.findTop1ByEmailAndVerifiedFalseOrderByIdDesc("a@sch.ac.kr"))
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
                 .thenReturn(Optional.of(token));
 
         assertDoesNotThrow(() -> emailService.verifyCode("a@sch.ac.kr", "123456"));
@@ -119,32 +124,186 @@ class EmailServiceTest {
     }
 
     @Test
-    @DisplayName("requireVerified: 인증 완료 토큰이 없으면 예외")
+    @DisplayName("verifyCode: 최신 토큰이 이미 verified=true 여도 같은 코드면 성공")
+    void verifyCode_alreadyVerified_idempotentSuccess() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isExpired()).thenReturn(false);
+        when(token.getCode()).thenReturn("123456");
+        when(token.isVerified()).thenReturn(true);
+
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
+                .thenReturn(Optional.of(token));
+
+        assertDoesNotThrow(() -> emailService.verifyCode("a@sch.ac.kr", "123456"));
+        assertDoesNotThrow(() -> emailService.verifyCode("a@sch.ac.kr", "123456"));
+        verify(token, never()).markVerified();
+    }
+
+    @Test
+    @DisplayName("verifyCode: 더 오래된 코드로 검증하면 실패하고 최신 코드만 유효")
+    void verifyCode_oldCodeFailsWhenLatestDiffers() {
+        EmailVerificationToken latest = mock(EmailVerificationToken.class);
+        when(latest.isExpired()).thenReturn(false);
+        when(latest.getCode()).thenReturn("222222");
+
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
+                .thenReturn(Optional.of(latest));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> emailService.verifyCode("a@sch.ac.kr", "111111"));
+        verify(latest, never()).markVerified();
+    }
+
+    @Test
+    @DisplayName("requireVerified: 최신 토큰이 없으면 예외")
     void requireVerified_notVerified() {
-        when(tokenRepository.findTop1ByEmailAndVerifiedTrueOrderByIdDesc("a@sch.ac.kr"))
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
                 .thenReturn(Optional.empty());
 
         assertThrows(IllegalStateException.class, () -> emailService.requireVerified("a@sch.ac.kr"));
     }
 
     @Test
-    @DisplayName("requireVerified: 인증 완료 토큰이 만료되면 예외")
-    void requireVerified_expired() {
-        EmailVerificationToken token = mock(EmailVerificationToken.class);
-        when(token.isExpired()).thenReturn(true);
+    @DisplayName("requireVerified: 최신 토큰이 미인증이면 이전 인증 성공 이력이 있어도 실패")
+    void requireVerified_latestUnverifiedFails() {
+        EmailVerificationToken latest = mock(EmailVerificationToken.class);
+        when(latest.isVerified()).thenReturn(false);
 
-        when(tokenRepository.findTop1ByEmailAndVerifiedTrueOrderByIdDesc("a@sch.ac.kr"))
-                .thenReturn(Optional.of(token));
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
+                .thenReturn(Optional.of(latest));
 
-        assertThrows(IllegalStateException.class, () -> emailService.requireVerified("a@sch.ac.kr"));
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> emailService.requireVerified("a@sch.ac.kr"));
+
+        assertTrue(ex.getMessage().contains("완료되지 않았습니다"));
+        verify(latest, never()).isExpired();
     }
 
     @Test
-    @DisplayName("isEmailVerified: repository existsBy...로 위임한다")
-    void isEmailVerified_delegates() {
-        when(tokenRepository.existsByEmailAndVerifiedTrue("a@sch.ac.kr")).thenReturn(true);
+    @DisplayName("requireVerified: 최신 인증 완료 토큰이 만료되면 예외")
+    void requireVerified_expired() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isVerified()).thenReturn(true);
+        when(token.isExpired()).thenReturn(true);
 
-        assertTrue(emailService.isEmailVerified(" a@sch.ac.kr "));
-        verify(tokenRepository).existsByEmailAndVerifiedTrue("a@sch.ac.kr");
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
+                .thenReturn(Optional.of(token));
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> emailService.requireVerified("a@sch.ac.kr"));
+        assertTrue(ex.getMessage().contains("만료"));
+    }
+
+    @Test
+    @DisplayName("requireVerified: 최신 인증 완료 토큰이 미만료면 성공")
+    void requireVerified_latestVerifiedSuccess() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isVerified()).thenReturn(true);
+        when(token.isExpired()).thenReturn(false);
+
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr"))
+                .thenReturn(Optional.of(token));
+
+        assertDoesNotThrow(() -> emailService.requireVerified(" a@sch.ac.kr "));
+        verify(token).isExpired();
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 최신 토큰이 없으면 verified=false, accountExists=null")
+    void getEmailStatus_noLatestToken() {
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.empty());
+
+        EmailStatusResponse response = emailService.getEmailStatus(" a@sch.ac.kr ");
+
+        assertFalse(response.verified());
+        assertNull(response.accountExists());
+        verifyNoInteractions(accountRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 최신 토큰이 미인증이면 verified=false, accountExists=null")
+    void getEmailStatus_latestUnverified() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isVerified()).thenReturn(false);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertFalse(response.verified());
+        assertNull(response.accountExists());
+        verifyNoInteractions(accountRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 최신 인증 토큰이 만료되면 verified=false, accountExists=null")
+    void getEmailStatus_latestVerifiedButExpired() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isVerified()).thenReturn(true);
+        when(token.isExpired()).thenReturn(true);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertFalse(response.verified());
+        assertNull(response.accountExists());
+        verifyNoInteractions(accountRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 최신 인증 토큰이 유효하고 계정이 없으면 accountExists=false")
+    void getEmailStatus_verifiedAndNoAccount() {
+        EmailVerificationToken token = mock(EmailVerificationToken.class);
+        when(token.isVerified()).thenReturn(true);
+        when(token.isExpired()).thenReturn(false);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertTrue(response.verified());
+        assertEquals(Boolean.FALSE, response.accountExists());
+        verify(accountRepository).existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 계정이 있으면 토큰이 없어도 verified=true, accountExists=true")
+    void getEmailStatus_accountExistsWithoutToken() {
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(true);
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertTrue(response.verified());
+        assertEquals(Boolean.TRUE, response.accountExists());
+        verifyNoInteractions(tokenRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 계정이 있으면 최신 토큰이 미인증이어도 verified=true, accountExists=true")
+    void getEmailStatus_accountExistsWinsOverUnverifiedToken() {
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(true);
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertTrue(response.verified());
+        assertEquals(Boolean.TRUE, response.accountExists());
+        verifyNoInteractions(tokenRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 예전 verified 이력이 있어도 최신 토큰이 미인증이면 verified=false")
+    void getEmailStatus_latestWinsOverOlderVerified() {
+        EmailVerificationToken latest = mock(EmailVerificationToken.class);
+        when(latest.isVerified()).thenReturn(false);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(latest));
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertFalse(response.verified());
+        assertNull(response.accountExists());
+        verifyNoInteractions(accountRepository);
     }
 }

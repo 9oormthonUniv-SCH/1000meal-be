@@ -1,8 +1,11 @@
 package com._1000meal.auth.service;
 
 import com._1000meal.auth.dto.ChangeEmailConfirmRequest;
+import com._1000meal.auth.dto.FindIdRequest;
+import com._1000meal.auth.dto.FindIdResponse;
 import com._1000meal.auth.model.Account;
 import com._1000meal.auth.model.AccountStatus;
+import com._1000meal.auth.model.UserProfile;
 import com._1000meal.auth.repository.AccountRepository;
 import com._1000meal.auth.repository.UserProfileRepository;
 import com._1000meal.email.service.EmailService;
@@ -28,6 +31,25 @@ class AccountServiceTest {
     @Mock EmailService emailService;
 
     @InjectMocks AccountService accountService;
+
+    @Test
+    @DisplayName("findId: signup과 동일하게 이메일 trim/lower 후 DELETED 제외 조회")
+    void findId_normalizesEmail() {
+        Account account = mock(Account.class);
+        UserProfile profile = mock(UserProfile.class);
+
+        when(account.getId()).thenReturn(1L);
+        when(account.getUserId()).thenReturn("20250001");
+        when(accountRepository.findByEmailAndStatusNot("user@sch.ac.kr", AccountStatus.DELETED))
+                .thenReturn(Optional.of(account));
+        when(userProfileRepository.findByAccountId(1L)).thenReturn(Optional.of(profile));
+        when(profile.getName()).thenReturn("홍길동");
+
+        FindIdResponse response = accountService.findId(new FindIdRequest("  USER@sch.ac.kr ", "홍길동"));
+
+        assertEquals("20250001", response.userId());
+        verify(accountRepository).findByEmailAndStatusNot("user@sch.ac.kr", AccountStatus.DELETED);
+    }
 
     @Test
     @DisplayName("verifyCredentialForEmailChange: 현재 이메일 불일치면 실패")

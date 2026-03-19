@@ -13,7 +13,8 @@ public class StoreStockResetScheduler {
 
     private final MenuGroupStockResetService menuGroupStockResetService;
 
-    @Scheduled(cron = "0 0 0 * * *", zone = "Asia/Seoul")
+    // 월~금 00:00 KST
+    @Scheduled(cron = "0 0 0 * * MON-FRI", zone = "Asia/Seoul")
     public void resetStocksAtMidnight() {
         log.info("[스케줄러][STOCK_RESET] start");
 

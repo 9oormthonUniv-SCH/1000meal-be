@@ -64,7 +64,6 @@ public class EmailController {
             """
     )
     public ResponseEntity<ApiResponse<EmailStatusResponse>> status(@RequestParam String email) {
-        boolean verified = emailService.isEmailVerified(email);
-        return ResponseEntity.ok(ApiResponse.ok(new EmailStatusResponse(email, verified)));
+        return ResponseEntity.ok(ApiResponse.ok(emailService.getEmailStatus(email)));
     }
 }

@@ -27,11 +27,13 @@ public class AccountService {
     /* 아이디(학번) 찾기: 이메일 + 이름 일치 */
     @Transactional(readOnly = true)
     public FindIdResponse findId(FindIdRequest req) {
+        final String email = req.email() == null ? "" : req.email().trim().toLowerCase();
+
         // 1) 이메일로 계정 찾기
-        Account account = accountRepository.findByEmail(req.email())
+        Account account = accountRepository.findByEmailAndStatusNot(email, AccountStatus.DELETED)
                 .orElseThrow(() -> new CustomException(
                         ErrorCode.USER_NOT_FOUND,
-                        "해당 이메일(" + req.email() + ")로 가입된 계정을 찾을 수 없습니다.")
+                        "해당 이메일(" + email + ")로 가입된 계정을 찾을 수 없습니다.")
                 );
 
         // 2) 프로필에서 이름 확인
