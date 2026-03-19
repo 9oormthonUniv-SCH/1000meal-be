@@ -6,5 +6,6 @@ public enum NotificationType {
     STOCK_DEADLINE,
     LOW_STOCK_30,
     LOW_STOCK_10,
-    WEEKLY_MENU_UPLOADED
+    WEEKLY_MENU_UPLOADED,
+    WEEKLY_MENU_CHANGED
 }

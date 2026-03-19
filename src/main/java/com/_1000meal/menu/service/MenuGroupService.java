@@ -1,6 +1,8 @@
 package com._1000meal.menu.service;
 
 import com._1000meal.auth.service.CurrentAccountProvider;
+import com._1000meal.fcm.domain.WeeklyMenuNotificationStatus;
+import com._1000meal.fcm.service.WeeklyMenuNotificationStateService;
 import com._1000meal.global.error.code.MenuErrorCode;
 import com._1000meal.global.error.code.StoreErrorCode;
 import com._1000meal.global.error.exception.CustomException;
@@ -13,6 +15,7 @@ import com._1000meal.menu.dto.*;
 import com._1000meal.menu.enums.DeductionUnit;
 import com._1000meal.menu.domain.StockDeductResult;
 import com._1000meal.menu.event.LowStock30Event;
+import com._1000meal.menu.event.WeeklyMenuChangedEvent;
 import com._1000meal.menu.event.WeeklyMenuUploadedEvent;
 import com._1000meal.menu.repository.DefaultGroupMenuRepository;
 import com._1000meal.menu.repository.DailyMenuRepository;
@@ -33,14 +36,8 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.ZoneId;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.temporal.TemporalAdjusters;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -48,12 +45,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MenuGroupService {
 
+    private static final ZoneId KST = ZoneId.of("Asia/Seoul");
+
     private final MenuGroupRepository menuGroupRepository;
     private final MenuGroupStockRepository stockRepository;
     private final DailyMenuRepository dailyMenuRepository;
     private final GroupDailyMenuRepository groupDailyMenuRepository;
     private final DefaultGroupMenuRepository defaultGroupMenuRepository;
     private final StoreRepository storeRepository;
+    private final WeeklyMenuNotificationStateService weeklyMenuNotificationStateService;
     private final ApplicationEventPublisher eventPublisher;
     private final CurrentAccountProvider currentAccountProvider;
 
@@ -518,12 +518,18 @@ public class MenuGroupService {
         MenuGroup menuGroup = getAuthorizedGroupForStore(storeId, groupId);
         GroupDailyMenuResponse response = upsertGroupDailyMenu(menuGroup, date, request);
 
-        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
-        if (filledByGroup.getOrDefault(groupId, false)) {
+        if (shouldSendImmediateWeeklyUploadAlert(storeId, groupId, date)) {
             LocalDate weekStart = getWeekStart(date);
             String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
             eventPublisher.publishEvent(
                     new WeeklyMenuUploadedEvent(storeId, List.of(groupId), weekKey, weekStart)
+            );
+            weeklyMenuNotificationStateService.markSent(storeId, groupId, weekKey);
+        } else if (shouldSendMenuChangeAlert(storeId, groupId, date)) {
+            LocalDate weekStart = getWeekStart(date);
+            String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+            eventPublisher.publishEvent(
+                    new WeeklyMenuChangedEvent(storeId, List.of(groupId), weekKey, weekStart)
             );
         }
 
@@ -593,10 +599,31 @@ public class MenuGroupService {
         return stockRepository.save(group.getStock());
     }
 
+    /**
+     * 해당 주(월~금) 중 매장 휴무가 아닌 날만 필수일로 반환
+     * 휴무일에는 메뉴가 없으므로, 필수일에만 메뉴가 올라왔는지 확인
+     */
+    @Transactional(readOnly = true)
+    public Set<LocalDate> getRequiredWeekDatesForStore(Long storeId, LocalDate weekStart) {
+        LocalDate weekEnd = weekStart.plusDays(4);
+        Set<LocalDate> required = new HashSet<>();
+        for (int i = 0; i < 5; i++) {
+            required.add(weekStart.plusDays(i));
+        }
+        List<DailyMenu> dailyMenus = dailyMenuRepository.findByStoreIdAndDateBetween(storeId, weekStart, weekEnd);
+        for (DailyMenu dm : dailyMenus) {
+            if (dm.isHoliday()) {
+                required.remove(dm.getDate());
+            }
+        }
+        return required;
+    }
+
     @Transactional(readOnly = true)
     public boolean isWeeklyMenuFilled(Long storeId, LocalDate anyDateInWeek) {
         LocalDate weekStart = getWeekStart(anyDateInWeek);
         LocalDate weekEnd = weekStart.plusDays(4);
+        Set<LocalDate> requiredDates = getRequiredWeekDatesForStore(storeId, weekStart);
 
         List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
         if (groups.isEmpty()) {
@@ -614,8 +641,8 @@ public class MenuGroupService {
             }
         }
 
-        for (int i = 0; i < 5; i++) {
-            if (!filledDates.contains(weekStart.plusDays(i))) {
+        for (LocalDate d : requiredDates) {
+            if (!filledDates.contains(d)) {
                 return false;
             }
         }
@@ -626,6 +653,7 @@ public class MenuGroupService {
     public Map<Long, Boolean> isWeeklyMenuFilledByGroup(Long storeId, LocalDate anyDateInWeek) {
         LocalDate weekStart = getWeekStart(anyDateInWeek);
         LocalDate weekEnd = weekStart.plusDays(4);
+        Set<LocalDate> requiredDates = getRequiredWeekDatesForStore(storeId, weekStart);
 
         List<MenuGroup> groups = menuGroupRepository.findByStoreIdOrderBySortOrderAscIdAsc(storeId);
         if (groups.isEmpty()) {
@@ -645,28 +673,120 @@ public class MenuGroupService {
             }
         }
 
+        // 휴무가 아닌 날만 검사
         Map<Long, Boolean> result = new HashMap<>();
         for (Long groupId : groupIds) {
             Set<LocalDate> dates = filledByGroup.getOrDefault(groupId, Set.of());
-            boolean ok = true;
-            for (int i = 0; i < 5; i++) {
-                if (!dates.contains(weekStart.plusDays(i))) {
-                    ok = false;
-                    break;
-                }
-            }
+            boolean ok = requiredDates.stream().allMatch(dates::contains);
             result.put(groupId, ok);
         }
         return result;
     }
 
-    private LocalDate getWeekStart(LocalDate date) {
-        return date.with(java.time.temporal.TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    // 주어진 store에서 이번 주(월~금) 메뉴가 모두 입력된 그룹 ID만 반환
+    @Transactional(readOnly = true)
+    public List<Long> findCompletedWeeklyMenuGroupIds(Long storeId, LocalDate anyDateInWeek) {
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, anyDateInWeek);
+        if (filledByGroup.isEmpty()) {
+            return List.of();
+        }
+
+        return filledByGroup.entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .toList();
+    }
+
+    // 일요일 18:00 배치에서 미완성으로 남았던 다음 주 메뉴만,
+    // 다음 주 월~금 기간 안에 뒤늦게 완성되면 즉시 알림을 전송
+    public boolean shouldSendImmediateWeeklyUploadAlert(Long storeId, Long groupId, LocalDate date) {
+        if (!isCurrentWeek(date)) { // 이번 주차의 수정 내용인지
+            return false;
+        }
+
+        LocalDate weekStart = getWeekStart(date);
+        String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+        var status = weeklyMenuNotificationStateService.findStatus(storeId, groupId, weekKey).orElse(null);
+        if (status == null) {
+            return false;
+        }
+
+        if (status == WeeklyMenuNotificationStatus.CLOSED_NOT_SENT
+                || status == WeeklyMenuNotificationStatus.SENT) {
+            return false;
+        }
+
+        if (!isWithinLateWeeklyNotificationWindow(date)) {
+            if (isAfterLateWeeklyNotificationWindow(date)) {
+                weeklyMenuNotificationStateService.markClosedNotSent(storeId, groupId, weekKey);
+            }
+            return false;
+        }
+
+        Map<Long, Boolean> filledByGroup = isWeeklyMenuFilledByGroup(storeId, date);
+        return filledByGroup.getOrDefault(groupId, false);
     }
 
     /**
-     * 메뉴 그룹 삭제 (기본 그룹은 삭제 불가)
+     * 이미 해당 주에 메뉴 업로드 알림을 보낸 상태(SENT)인데 메뉴가 수정된 경우,
+     * "메뉴 변경" 알림을 보내야 하는지 판단합니다.
      */
+    public boolean shouldSendMenuChangeAlert(Long storeId, Long groupId, LocalDate date) {
+        if (!isCurrentWeek(date)) {
+            return false;
+        }
+        LocalDate weekStart = getWeekStart(date);
+        String weekKey = weekStart.format(DateTimeFormatter.ISO_DATE);
+        var status = weeklyMenuNotificationStateService.findStatus(storeId, groupId, weekKey).orElse(null);
+        return status == WeeklyMenuNotificationStatus.SENT;
+    }
+
+    /**
+     * 업로드한 날짜가 알림 기준 "이번 주"에 속하는지 판단합니다.
+     * 일요일이면 다가오는 주(다음 월요일 시작), 월~금이면 오늘이 속한 주로 정의
+     */
+    public boolean isCurrentWeek(LocalDate date) {
+        return getWeekStart(date).equals(getNotificationTargetWeekStart());
+    }
+
+    /**
+     * 즉시 알림 허용 기간: 일요일 18시 이후에는 다가오는 주(다음 월요일~금)도 허용,
+     * 월~금에는 해당 주의 월~금만 허용.
+     */
+    public boolean isWithinLateWeeklyNotificationWindow(LocalDate date) {
+        LocalDate today = LocalDate.now(KST);
+        LocalDate weekStart = getWeekStart(date);
+        LocalDate weekEnd = weekStart.plusDays(4);
+
+        if (today.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            return weekStart.equals(today.with(TemporalAdjusters.next(DayOfWeek.MONDAY)));
+        }
+        return !today.isBefore(weekStart) && !today.isAfter(weekEnd);
+    }
+
+    private boolean isAfterLateWeeklyNotificationWindow(LocalDate date) {
+        LocalDate today = LocalDate.now(KST);
+        LocalDate weekEnd = getWeekStart(date).plusDays(4);
+        return today.isAfter(weekEnd);
+    }
+
+    private LocalDate getWeekStart(LocalDate date) {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    }
+
+    /**
+     * 알림 기준 "이번 주"의 월요일. 일요일이면 다가오는 주(다음 월요일), 아니면 오늘이 속한 주의 월요일.
+     * 일요일 18시 이후 다음 주 메뉴 저장 시 즉시 알림이 나가도록 스케줄러의 targetWeekStart와 맞춤.
+     */
+    private LocalDate getNotificationTargetWeekStart() {
+        LocalDate today = LocalDate.now(KST);
+        if (today.getDayOfWeek() == DayOfWeek.SUNDAY) {
+            return today.with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+        }
+        return getWeekStart(today);
+    }
+
+    // 메뉴 그룹 삭제 (기본 그룹은 삭제 불가)
     @Transactional
     public void deleteMenuGroup(Long groupId) {
         MenuGroup menuGroup = menuGroupRepository.findById(groupId)
