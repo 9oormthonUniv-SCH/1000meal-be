@@ -14,7 +14,7 @@ public final class FcmMessageFactory {
 
         return switch (type) {
             case OPEN_REMINDER -> new FcmMessage(
-                    "천원의 아침밥 오픈 사전 알림",
+                    "천원의 아침밥 오픈 알림",
                     "10분 후 천원의 아침밥이 시작돼요."
             );
             case LOW_STOCK_30 -> new FcmMessage(
@@ -37,6 +37,10 @@ public final class FcmMessageFactory {
             case WEEKLY_MENU_UPLOADED -> new FcmMessage(
                     "이번 주 메뉴가 올라왔어요",
                     "[" + storeName + "]에 천원의 아침밥 메뉴를 확인해보세요"
+            );
+            case WEEKLY_MENU_CHANGED -> new FcmMessage(
+                    "메뉴가 변경되었어요",
+                    "[" + storeName + "] 천원의 아침밥 메뉴가 수정되었어요. 확인해보세요!"
             );
         };
     }

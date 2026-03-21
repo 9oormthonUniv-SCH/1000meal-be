@@ -34,7 +34,7 @@ public class StoreCloseScheduler {
      * - 오늘 날짜 DailyMenu.isOpen 을 false 로 설정
      * - 매장 기준 MenuGroupStock.stock 을 0 으로 설정
      */
-    @Scheduled(cron = "0 0 12 * * MON-FRI", zone = "Asia/Seoul")
+    @Scheduled(cron = "0 0 10 * * MON-FRI", zone = "Asia/Seoul")
     @Transactional   
     public void closeAllStores() {
         LocalDate today = LocalDate.now(KST);

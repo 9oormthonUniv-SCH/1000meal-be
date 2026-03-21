@@ -211,6 +211,7 @@ class EmailServiceTest {
     @Test
     @DisplayName("getEmailStatus: 최신 토큰이 없으면 verified=false, accountExists=null")
     void getEmailStatus_noLatestToken() {
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
         when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.empty());
 
         EmailStatusResponse response = emailService.getEmailStatus(" a@sch.ac.kr ");
@@ -225,6 +226,7 @@ class EmailServiceTest {
     void getEmailStatus_latestUnverified() {
         EmailVerificationToken token = mock(EmailVerificationToken.class);
         when(token.isVerified()).thenReturn(false);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
         when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
 
         EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
@@ -240,6 +242,7 @@ class EmailServiceTest {
         EmailVerificationToken token = mock(EmailVerificationToken.class);
         when(token.isVerified()).thenReturn(true);
         when(token.isExpired()).thenReturn(true);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
         when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
 
         EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
@@ -255,8 +258,8 @@ class EmailServiceTest {
         EmailVerificationToken token = mock(EmailVerificationToken.class);
         when(token.isVerified()).thenReturn(true);
         when(token.isExpired()).thenReturn(false);
-        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
         when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
+        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
 
         EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
 
@@ -266,18 +269,27 @@ class EmailServiceTest {
     }
 
     @Test
-    @DisplayName("getEmailStatus: 최신 인증 토큰이 유효하고 계정이 있으면 accountExists=true")
-    void getEmailStatus_verifiedAndAccountExists() {
-        EmailVerificationToken token = mock(EmailVerificationToken.class);
-        when(token.isVerified()).thenReturn(true);
-        when(token.isExpired()).thenReturn(false);
-        when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(token));
+    @DisplayName("getEmailStatus: 계정이 있으면 토큰이 없어도 verified=true, accountExists=true")
+    void getEmailStatus_accountExistsWithoutToken() {
         when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(true);
 
         EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
 
         assertTrue(response.verified());
         assertEquals(Boolean.TRUE, response.accountExists());
+        verifyNoInteractions(tokenRepository);
+    }
+
+    @Test
+    @DisplayName("getEmailStatus: 계정이 있으면 최신 토큰이 미인증이어도 verified=true, accountExists=true")
+    void getEmailStatus_accountExistsWinsOverUnverifiedToken() {
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(true);
+
+        EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
+
+        assertTrue(response.verified());
+        assertEquals(Boolean.TRUE, response.accountExists());
+        verifyNoInteractions(tokenRepository);
     }
 
     @Test
@@ -285,6 +297,7 @@ class EmailServiceTest {
     void getEmailStatus_latestWinsOverOlderVerified() {
         EmailVerificationToken latest = mock(EmailVerificationToken.class);
         when(latest.isVerified()).thenReturn(false);
+        when(accountRepository.existsByEmailAndStatusNot("a@sch.ac.kr", AccountStatus.DELETED)).thenReturn(false);
         when(tokenRepository.findTop1ByEmailOrderByIdDesc("a@sch.ac.kr")).thenReturn(Optional.of(latest));
 
         EmailStatusResponse response = emailService.getEmailStatus("a@sch.ac.kr");
