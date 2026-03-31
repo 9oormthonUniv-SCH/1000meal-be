@@ -13,10 +13,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.sql.SQLException;
 import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -63,7 +65,8 @@ class NotificationHistoryServiceTest {
     @DisplayName("유니크 충돌 시 false를 반환하고 skip metric이 증가한다")
     void returnFalseWhenDuplicateKey() {
         LocalDate sentDate = LocalDate.of(2026, 3, 4);
-        doThrow(new DataIntegrityViolationException("duplicate"))
+        SQLException sqlEx = new SQLException("Duplicate entry", "23000", 1062);
+        doThrow(new DataIntegrityViolationException("duplicate", sqlEx))
                 .when(historyRepository)
                 .saveAndFlush(org.mockito.ArgumentMatchers.any(NotificationHistory.class));
 
@@ -74,5 +77,19 @@ class NotificationHistoryServiceTest {
         assertFalse(marked);
         assertEquals(1.0, meterRegistry.get("notification.dedup.skipped")
                 .tag("type", "STOCK_DEADLINE").counter().count());
+    }
+
+    @Test
+    @DisplayName("중복으로 확인되지 않은 무결성 오류는 상위로 전파한다")
+    void throwWhenIntegrityErrorIsNotDuplicate() {
+        LocalDate sentDate = LocalDate.of(2026, 3, 4);
+        SQLException sqlEx = new SQLException("Cannot add or update a child row", "23000", 1452);
+        doThrow(new DataIntegrityViolationException("fk violation", sqlEx))
+                .when(historyRepository)
+                .saveAndFlush(org.mockito.ArgumentMatchers.any(NotificationHistory.class));
+
+        assertThrows(DataIntegrityViolationException.class, () ->
+                service.tryMarkSent(NotificationType.STOCK_DEADLINE, 1L, 2L, 3L, sentDate, null)
+        );
     }
 }
