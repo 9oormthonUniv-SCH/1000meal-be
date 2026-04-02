@@ -35,9 +35,11 @@ services:
       FCM_ENABLED: "true"
       FCM_SERVICE_ACCOUNT_BASE64: ${FCM_SERVICE_ACCOUNT_BASE64}
       SHEETS_SERVICE_ACCOUNT_BASE64: ${SHEETS_SERVICE_ACCOUNT_BASE64}
+      
+      API_HOLIDAY_SERVICE_KEY: ${API_HOLIDAY_SERVICE_KEY}
 
     volumes:
-      - ./var/rosters:/app/var/rosters   # 🔥 추가된 부분
+      - ./var/rosters:/app/var/rosters
 
     restart: "no"
 

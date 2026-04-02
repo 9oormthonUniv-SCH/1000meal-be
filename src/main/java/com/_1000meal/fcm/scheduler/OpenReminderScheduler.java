@@ -3,6 +3,7 @@ package com._1000meal.fcm.scheduler;
 import com._1000meal.fcm.domain.FcmToken;
 import com._1000meal.fcm.domain.NotificationType;
 import com._1000meal.fcm.message.FcmMessageFactory;
+import com._1000meal.holiday.service.HolidayScheduleGuard;
 import com._1000meal.fcm.repository.FcmTokenRepository;
 import com._1000meal.fcm.repository.NotificationPreferenceRepository;
 import com._1000meal.fcm.sender.FcmSendResult;
@@ -32,12 +33,17 @@ public class OpenReminderScheduler {
     private final NotificationPreferenceRepository notificationPreferenceRepository;
     private final FcmTokenRepository fcmTokenRepository;
     private final FcmSender fcmSender;
+    private final HolidayScheduleGuard holidayScheduleGuard;
 
     // 평일(월~금) 07:50 KST
     @Scheduled(cron = "0 50 7 * * MON-FRI", zone = "Asia/Seoul")
     public void sendOpenReminder() {
         LocalDate today = LocalDate.now(ZONE_ID);
         log.info("[FCM][OPEN_REMINDER] scheduler tick. date={}", today);
+
+        if (holidayScheduleGuard.shouldSkip("OPEN_REMINDER", today)) {
+            return;
+        }
 
         List<Long> enabledAccountIds = notificationPreferenceRepository.findEnabledAccountIds();
         if (enabledAccountIds.isEmpty()) {

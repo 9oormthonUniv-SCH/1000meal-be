@@ -40,14 +40,15 @@ public class CustomExceptionHandler {
                 .body(Result.error(code, ex.getMessage()));
     }
 
-    // (선택) 마지막 안전망
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<Object> handleOthers(Exception ex) {
-        var code = com._1000meal.global.error.code.ErrorCode.INTERNAL_SERVER_ERROR;
-        log.error("[Unhandled] ", ex);
-        return ResponseEntity.status(code.getHttpStatusCode())
-                .body(Result.error(code, code.getMessage()));
-    }
+    // validation 예외를 GlobalExceptionHandler에서 처리하도록 변경
+//    // (선택) 마지막 안전망
+//    @ExceptionHandler(Exception.class)
+//    public ResponseEntity<Object> handleOthers(Exception ex) {
+//        var code = com._1000meal.global.error.code.ErrorCode.INTERNAL_SERVER_ERROR;
+//        log.error("[Unhandled] ", ex);
+//        return ResponseEntity.status(code.getHttpStatusCode())
+//                .body(Result.error(code, code.getMessage()));
+//    }
 
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public ResponseEntity<?> handleNoResourceFound(org.springframework.web.servlet.resource.NoResourceFoundException e) {
