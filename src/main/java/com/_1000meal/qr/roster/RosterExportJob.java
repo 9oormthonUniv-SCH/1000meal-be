@@ -1,5 +1,6 @@
 package com._1000meal.qr.roster;
 
+import com._1000meal.holiday.service.HolidayScheduleGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,6 +17,7 @@ public class RosterExportJob {
 
     private final RosterExportService rosterExportService;
     private final ObjectProvider<RosterSheetsSyncService> rosterSheetsSyncServiceProvider;
+    private final HolidayScheduleGuard holidayScheduleGuard;
 
     // @Scheduled(cron = "0 * * * * *", zone = "Asia/Seoul")
     // public void runDaily() {
@@ -23,6 +25,9 @@ public class RosterExportJob {
     // }
 
     public void runOnce(LocalDate usedDate) {
+        if (holidayScheduleGuard.shouldSkip("ROSTER_EXPORT", usedDate)) {
+            return;
+        }
         log.info("Roster export job started: usedDate={}", usedDate);
         Path mergedCsvPath = rosterExportService.exportDailyRosters(usedDate);
 
