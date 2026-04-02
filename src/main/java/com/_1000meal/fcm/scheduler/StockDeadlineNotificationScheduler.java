@@ -1,6 +1,7 @@
 package com._1000meal.fcm.scheduler;
 
 import com._1000meal.fcm.service.StockDeadlineNotificationService;
+import com._1000meal.holiday.service.HolidayScheduleGuard;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ public class StockDeadlineNotificationScheduler {
 
     private final StockDeadlineNotificationService service;
     private final MeterRegistry meterRegistry;
+    private final HolidayScheduleGuard holidayScheduleGuard;
 
     @Scheduled(cron = "0 */5 8-10 * * MON-FRI", zone = "Asia/Seoul")
     public void triggerStockDeadlineNotifications() {
@@ -28,6 +30,9 @@ public class StockDeadlineNotificationScheduler {
         meterRegistry.counter("notification.stock_deadline.scheduler.tick").increment();
         log.info("[FCM][STOCK_DEADLINE] scheduler tick. now={}, zone={}, window=08:00-10:59/5m",
                 now, ZONE_ID);
+        if (holidayScheduleGuard.shouldSkip("STOCK_DEADLINE", today)) {
+            return;
+        }
         service.sendStockDeadlineNotifications(today);
         log.info("[FCM][STOCK_DEADLINE] scheduled send completed for {}", today);
     }

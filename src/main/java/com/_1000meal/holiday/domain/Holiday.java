@@ -29,5 +29,9 @@ public class Holiday {
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    public void updateName(String name) {
+        this.name = name;
+    }
 }
 
