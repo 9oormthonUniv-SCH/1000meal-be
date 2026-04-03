@@ -15,11 +15,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Tag(name = "Holiday", description = "휴일 관리 API")
+@Tag(name = "Admin Holiday", description = "관리자 전용 휴일 API")
 @SecurityRequirement(name = "bearerAuth")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/holidays")
+@RequestMapping("/api/v1/admin/holidays")
 public class HolidayController {
 
     private final HolidaySyncService holidaySyncService;

@@ -64,7 +64,7 @@ class HolidayControllerTest {
                 new HolidayResponse(1L, LocalDate.of(2026, 1, 1), "신정")
         ));
 
-        mockMvc.perform(get("/api/v1/holidays").param("year", "2026"))
+        mockMvc.perform(get("/api/v1/admin/holidays").param("year", "2026"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].name").value("신정"));
     }
@@ -77,7 +77,7 @@ class HolidayControllerTest {
 
         String body = objectMapper.writeValueAsString(new RequestBody("변경명"));
 
-        mockMvc.perform(patch("/api/v1/holidays/{holidayId}", 1L)
+        mockMvc.perform(patch("/api/v1/admin/holidays/{holidayId}", 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -91,7 +91,7 @@ class HolidayControllerTest {
     void syncHolidays_callsServiceWithYear() throws Exception {
         doNothing().when(holidaySyncService).syncYear(anyInt());
 
-        mockMvc.perform(post("/api/v1/holidays/sync").param("year", "2027"))
+        mockMvc.perform(post("/api/v1/admin/holidays/sync").param("year", "2027"))
                 .andExpect(status().isOk());
 
         verify(holidaySyncService).syncYear(eq(2027));
