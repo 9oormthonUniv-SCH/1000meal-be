@@ -33,4 +33,16 @@ public class MenuGroupDayCapacity {
 
     @Column(nullable = false)
     private Integer capacity;
+
+    public static MenuGroupDayCapacity create(MenuGroup menuGroup, DayOfWeek dayOfWeek, int capacity) {
+        MenuGroupDayCapacity entity = new MenuGroupDayCapacity();
+        entity.menuGroup = menuGroup;
+        entity.dayOfWeek = dayOfWeek;
+        entity.capacity = capacity;
+        return entity;
+    }
+
+    public void updateCapacity(int capacity) {
+        this.capacity = capacity;
+    }
 }
